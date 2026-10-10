@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Oranget Packs</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#12081c;color:#fff;min-height:100vh}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#1a0f28f2;border-bottom:1px solid #ffffff14}
+header h1{margin:0;font-size:22px}
+.tabs{display:flex;gap:8px}
+.tabs button{border:0;border-radius:999px;padding:8px 14px;background:#2a1a40;color:#fff;font-weight:800;cursor:pointer}
+.tabs button.on{background:#f79a3e;color:#1a1020}
+.tokens{display:flex;align-items:center;gap:8px;background:#2a1a40;border-radius:999px;padding:8px 12px;font-weight:800}
+.tokens button{border:0;background:#f79a3e;color:#1a1020;border-radius:999px;padding:4px 10px;font-weight:900;cursor:pointer}
+main{padding:16px;max-width:1100px;margin:0 auto}
+.mute{opacity:.75;margin:0 0 14px;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{border:0;border-radius:16px;padding:12px;text-align:left;cursor:pointer;background:linear-gradient(160deg,var(--c1),var(--c2));color:#fff;box-shadow:0 10px 24px #0005}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:12px;background:#0003;display:block}
+.card .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:800}
+.section{margin-bottom:22px}
+.section h2{margin:0 0 10px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.blook{position:relative;background:#221533;border-radius:14px;padding:10px;text-align:center;border:2px solid #ffffff12}
+.blook img{width:72px;height:72px;object-fit:contain;display:block;margin:0 auto 6px}
+.blook .name{font-size:12px;font-weight:700}
+.blook .rar{font-size:11px;opacity:.8}
+.blook .cnt{position:absolute;top:-6px;right:-6px;background:#ffd36a;color:#1a1020;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}
+.blook.lock{opacity:.4;filter:grayscale(.85)}
+.modal-bg{position:fixed;inset:0;background:#000c;z-index:50;display:grid;place-items:center;padding:12px}
+.modal{width:min(560px,100%);max-height:min(92vh,860px);overflow:auto;background:#1b1228;border-radius:18px;border:1px solid #ffffff1a}
+.modal-head{display:flex;gap:12px;align-items:center;padding:14px;background:linear-gradient(160deg,var(--c1),var(--c2))}
+.modal-head img{width:72px;height:72px;object-fit:contain;border-radius:12px;background:#0003}
+.modal-body{padding:14px}
+.odds-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #ffffff10;font-size:13px}
+.odds-row .left{display:flex;gap:8px;align-items:center;min-width:0}
+.odds-row img{width:36px;height:36px;object-fit:contain}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.controls input[type=range]{flex:1;min-width:140px}
+.btn-main{background:#f79a3e;color:#1a1020;border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer;font-size:15px}
+.btn-ghost{background:#2e2044;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer}
+.btn-main:disabled{opacity:.4;cursor:not-allowed}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.empty{opacity:.65;padding:28px 0;text-align:center}
+.err{background:#5a1020;color:#ffd0d0;padding:10px 12px;border-radius:10px;margin:10px 0;font-size:13px}
+.open-stage{min-height:320px;display:grid;place-items:center;padding:20px 10px;position:relative}
+.pack-shake{width:160px;height:160px;object-fit:contain;animation:shake .7s ease-in-out infinite;filter:drop-shadow(0 12px 24px #0008)}
+@keyframes shake{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-8deg) scale(1.04)}40%{transform:rotate(8deg) scale(1.06)}60%{transform:rotate(-6deg) scale(1.03)}80%{transform:rotate(6deg) scale(1.05)}}
+.pack-burst{width:160px;height:160px;object-fit:contain;animation:burst .45s ease-out forwards}
+@keyframes burst{0%{transform:scale(1) rotate(0);opacity:1}60%{transform:scale(1.35) rotate(8deg);opacity:.9}100%{transform:scale(.2) rotate(-12deg);opacity:0}}
+.reveal-wrap{text-align:center;animation:popIn .45s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes popIn{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.reveal-img{width:140px;height:140px;object-fit:contain;display:block;margin:0 auto 10px;filter:drop-shadow(0 0 18px var(--glow,#fff8))}
+.reveal-name{font-size:22px;font-weight:900}
+.reveal-rar{font-size:14px;font-weight:800;margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
+.rarity-flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,var(--glow,#fff5),transparent 55%);animation:flash .6s ease-out}
+@keyframes flash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.multi-queue{font-size:13px;opacity:.8;margin-top:8px}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>Oranget Packs</h1>
+  <div class="tabs">
+    <button type="button" id="tabMarket" class="on">Market</button>
+    <button type="button" id="tabInv">My Blooks</button>
+  </div>
+  <div class="tokens">
+    🪙 <span id="tok">500</span>
+    <button type="button" id="addTok">+100</button>
+  </div>
+</header>
+<main>
+  <section id="viewMarket">
+    <p class="mute">Tap a pack → odds → choose 1–50 → Open. Blooket-style shake + reveal. Inventory by pack.</p>
+    <div id="packGrid" class="grid"></div>
+  </section>
+  <section id="viewInv" hidden>
+    <p class="mute">Your blooks, grouped by pack.</p>
+    <div id="invRoot"></div>
+  </section>
+</main>
+<div id="modalBg" class="modal-bg" hidden></div>
+<script>
+window.PACKS=[{"id": "medieval", "name": "Medieval Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Medieval.webp", "c1": "#d9b36c", "c2": "#4a2c12", "blooks": [{"id": "elf", "name": "Elf", "rarity": "Uncommon", "chance": 13.395, "image": "https://cloaket.softfault.cc/api/content/blooks/Elf.webp?v=9", "sell": 5}, {"id": "fairy", "name": "Fairy", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Fairy.webp?v=9", "sell": 5}, {"id": "slime_monster", "name": "Slime Monster", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Slime%20Monster.webp?v=9", "sell": 5}, {"id": "witch", "name": "Witch", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Witch.webp?v=9", "sell": 5}, {"id": "wizard", "name": "Wizard", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Wizard.webp?v=9", "sell": 5}, {"id": "dragon", "name": "Dragon", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Dragon.webp?v=9", "sell": 20}, {"id": "jester", "name": "Jester", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Jester.webp?v=9", "sell": 20}, {"id": "queen", "name": "Queen", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Queen.webp?v=9", "sell": 20}, {"id": "unicorn", "name": "Unicorn", "rarity": "Epic", "chance": 5.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Unicorn.webp?v=9", "sell": 75}, {"id": "king", "name": "King", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/King.webp?v=9", "sell": 200}, {"id": "phantom_king", "name": "Phantom King", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Phantom%20King.webp?v=9", "sell": 1000}]}, {"id": "breakfast", "name": "Breakfast Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Breakfast.webp?v=2", "c1": "#ffcf5c", "c2": "#8a4a12", "blooks": [{"id": "breakfast_combo", "name": "Breakfast Combo", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Breakfast%20Combo.webp?v=9", "sell": 5}, {"id": "cereal", "name": "Cereal", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Cereal.webp?v=9", "sell": 5}, {"id": "milk", "name": "Milk", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Milk.webp?v=9", "sell": 5}, {"id": "orange_juice", "name": "Orange Juice", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Orange%20Juice.webp?v=9", "sell": 5}, {"id": "toast", "name": "Toast", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Toast.webp?v=9", "sell": 5}, {"id": "yogurt", "name": "Yogurt", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Yogurt.webp?v=9", "sell": 5}, {"id": "pancakes", "name": "Pancakes", "rarity": "Rare", "chance": 9.184, "image": "https://cloaket.softfault.cc/api/content/blooks/Pancakes.webp?v=9", "sell": 20}, {"id": "waffle", "name": "Waffle", "rarity": "Rare", "chance": 9.184, "image": "https://cloaket.softfault.cc/api/content/blooks/Waffle.webp?v=9", "sell": 20}, {"id": "french_toast", "name": "French Toast", "rarity": "Epic", "chance": 5.102, "image": "https://cloaket.softfault.cc/api/content/blooks/French%20Toast.webp?v=9", "sell": 75}, {"id": "chocolate_milk", "name": "Chocolate Milk", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Chocolate%20Milk.webp?v=1", "sell": 200}, {"id": "bacon_and_eggs", "name": "Bacon and Eggs", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Bacon%20and%20Eggs.webp?v=1", "sell": 300}, {"id": "rainbow_waffles", "name": "Rainbow Waffles", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Waffles.webp?v=4", "sell": 1000}]}, {"id": "wonderland", "name": "Wonderland Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Wonderland.webp", "c1": "#ff9fd0", "c2": "#5a1240", "blooks": [{"id": "two_of_spades", "name": "Two of Spades", "rarity": "Uncommon", "chance": 15.2, "image": "https://cloaket.softfault.cc/api/content/blooks/Two%20of%20Spades.webp?v=9", "sell": 5}, {"id": "alice", "name": "Alice", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Alice.webp?v=9", "sell": 5}, {"id": "drink_me", "name": "Drink Me", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Drink%20Me.webp?v=9", "sell": 5}, {"id": "eat_me", "name": "Eat Me", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Eat%20Me.webp?v=9", "sell": 5}, {"id": "queen_of_hearts", "name": "Queen of Hearts", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Queen%20of%20Hearts.webp?v=9", "sell": 5}, {"id": "cheshire_cat", "name": "Cheshire Cat", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheshire%20Cat.webp?v=9", "sell": 20}, {"id": "dormouse", "name": "Dormouse", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dormouse.webp?v=9", "sell": 20}, {"id": "white_rabbit", "name": "White Rabbit", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/White%20Rabbit.webp?v=9", "sell": 20}, {"id": "caterpillar", "name": "Caterpillar", "rarity": "Epic", "chance": 2.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Caterpillar.webp?v=9", "sell": 75}, {"id": "mad_hatter", "name": "Mad Hatter", "rarity": "Epic", "chance": 2.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Mad%20Hatter.webp?v=9", "sell": 75}, {"id": "king_of_hearts", "name": "King of Hearts", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/King%20of%20Hearts.webp?v=9", "sell": 200}]}, {"id": "autumn", "name": "Autumn Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Autumn.webp", "c1": "#ffb35c", "c2": "#6a2f0f", "blooks": [{"id": "black_bear", "name": "Black Bear", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Black%20Bear.webp?v=1", "sell": 5}, {"id": "pumpkin_pie", "name": "Pumpkin Pie", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Pie.webp?v=1", "sell": 5}, {"id": "chipmunk", "name": "Chipmunk", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Chipmunk.webp?v=1", "sell": 5}, {"id": "cornucopia", "name": "Cornucopia", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Cornucopia.webp?v=1", "sell": 5}, {"id": "autumn_cat", "name": "Autumn Cat", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Autumn%20Cat.webp?v=1", "sell": 20}, {"id": "pumpkin_puppy", "name": "Pumpkin Puppy", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Puppy.webp?v=1", "sell": 20}, {"id": "red_squirrel", "name": "Red Squirrel", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Red%20Squirrel.webp?v=1", "sell": 20}, {"id": "autumn_crow", "name": "Autumn Crow", "rarity": "Epic", "chance": 2.945, "image": "https://cloaket.softfault.cc/api/content/blooks/Autumn%20Crow.webp?v=1", "sell": 75}, {"id": "turkey", "name": "Turkey", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Turkey.webp?v=1", "sell": 200}, {"id": "goldfinch", "name": "Goldfinch", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Goldfinch.webp?v=1", "sell": 300}, {"id": "aurora_fox", "name": "Aurora Fox", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Aurora%20Fox.webp?v=2", "sell": 1000}]}, {"id": "spooky", "name": "Spooky Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Spooky.webp?v=2", "c1": "#b45cff", "c2": "#3a1052", "blooks": [{"id": "frankenstein", "name": "Frankenstein", "rarity": "Uncommon", "chance": 18.486, "image": "https://cloaket.softfault.cc/api/content/blooks/Frankenstein.webp?v=9", "sell": 5}, {"id": "pumpkin", "name": "Pumpkin", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin.webp?v=9", "sell": 5}, {"id": "swamp_monster", "name": "Swamp Monster", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Swamp%20Monster.webp?v=9", "sell": 5}, {"id": "vampire", "name": "Vampire", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Vampire.webp?v=9", "sell": 5}, {"id": "caramel_apple", "name": "Caramel Apple", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Caramel%20Apple.webp?v=9", "sell": 20}, {"id": "mummy", "name": "Mummy", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Mummy.webp?v=9", "sell": 20}, {"id": "zombie", "name": "Zombie", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Zombie.webp?v=9", "sell": 20}, {"id": "werewolf", "name": "Werewolf", "rarity": "Epic", "chance": 5.196, "image": "https://cloaket.softfault.cc/api/content/blooks/Werewolf.webp?v=9", "sell": 75}, {"id": "ghost", "name": "Ghost", "rarity": "Legendary", "chance": 0.649, "image": "https://cloaket.softfault.cc/api/content/blooks/Ghost.webp?v=9", "sell": 200}, {"id": "haunted_pumpkin", "name": "Haunted Pumpkin", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Haunted%20Pumpkin.webp?v=9", "sell": 300}, {"id": "pumpkin_cookie", "name": "Pumpkin Cookie", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Cookie.webp?v=9", "sell": 300}, {"id": "ghost_cookie", "name": "Ghost Cookie", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Ghost%20Cookie.webp?v=9", "sell": 300}, {"id": "spooky_pumpkin", "name": "Spooky Pumpkin", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Pumpkin.webp?v=9", "sell": 300}, {"id": "spooky_mummy", "name": "Spooky Mummy", "rarity": "Chroma", "chance": 0.01, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Mummy.webp?v=9", "sell": 350}, {"id": "spooky_ghost", "name": "Spooky Ghost", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Ghost.webp?v=9", "sell": 1000}]}, {"id": "space", "name": "Space Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Space.webp", "c1": "#8a7fff", "c2": "#12103a", "blooks": [{"id": "earth", "name": "Earth", "rarity": "Uncommon", "chance": 18.676, "image": "https://cloaket.softfault.cc/api/content/blooks/Earth.webp?v=9", "sell": 5}, {"id": "alien", "name": "Alien", "rarity": "Uncommon", "chance": 18.673, "image": "https://cloaket.softfault.cc/api/content/blooks/Alien.webp?v=9", "sell": 5}, {"id": "meteor", "name": "Meteor", "rarity": "Uncommon", "chance": 18.683, "image": "https://cloaket.softfault.cc/api/content/blooks/Meteor.webp?v=9", "sell": 5}, {"id": "stars", "name": "Stars", "rarity": "Uncommon", "chance": 18.678, "image": "https://cloaket.softfault.cc/api/content/blooks/Stars.webp?v=9", "sell": 5}, {"id": "planet", "name": "Planet", "rarity": "Rare", "chance": 9.962, "image": "https://cloaket.softfault.cc/api/content/blooks/Planet.webp?v=9", "sell": 20}, {"id": "ufo", "name": "UFO", "rarity": "Rare", "chance": 9.962, "image": "https://cloaket.softfault.cc/api/content/blooks/UFO.webp?v=9", "sell": 20}, {"id": "spaceship", "name": "Spaceship", "rarity": "Epic", "chance": 4.483, "image": "https://cloaket.softfault.cc/api/content/blooks/Spaceship.webp?v=9", "sell": 75}, {"id": "astronaut", "name": "Astronaut", "rarity": "Legendary", "chance": 0.448, "image": "https://cloaket.softfault.cc/api/content/blooks/Astronaut.webp?v=9", "sell": 200}, {"id": "black_astronaut", "name": "Black Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Black%20Astronaut.webp?v=9", "sell": 300}, {"id": "brown_astronaut", "name": "Brown Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Brown%20Astronaut.webp?v=9", "sell": 300}, {"id": "green_astronaut", "name": "Green Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Green%20Astronaut.webp?v=9", "sell": 300}, {"id": "orange_astronaut", "name": "Orange Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Orange%20Astronaut.webp?v=9", "sell": 300}, {"id": "pink_astronaut", "name": "Pink Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Pink%20Astronaut.webp?v=9", "sell": 300}, {"id": "red_astronaut", "name": "Red Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Red%20Astronaut.webp?v=9", "sell": 300}, {"id": "yellow_astronaut", "name": "Yellow Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Yellow%20Astronaut.webp?v=9", "sell": 300}, {"id": "blue_astronaut", "name": "Blue Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Blue%20Astronaut.webp?v=9", "sell": 300}, {"id": "cyan_astronaut", "name": "Cyan Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Cyan%20Astronaut.webp?v=9", "sell": 300}, {"id": "lime_astronaut", "name": "Lime Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Lime%20Astronaut.webp?v=9", "sell": 300}, {"id": "purple_astronaut", "name": "Purple Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Purple%20Astronaut.webp?v=9", "sell": 300}, {"id": "rainbow_astronaut", "name": "Rainbow Astronaut", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Astronaut.webp?v=9", "sell": 1000}]}, {"id": "bot", "name": "Bot Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Bot.webp?v=2", "c1": "#b0b8c4", "c2": "#2e3440", "blooks": [{"id": "angry_bot", "name": "Angry Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Angry%20Bot.webp?v=9", "sell": 5}, {"id": "happy_bot", "name": "Happy Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Happy%20Bot.webp?v=9", "sell": 5}, {"id": "lil_bot", "name": "Lil Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lil%20Bot.webp?v=9", "sell": 5}, {"id": "lovely_bot", "name": "Lovely Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lovely%20Bot.webp?v=9", "sell": 5}, {"id": "buddy_bot", "name": "Buddy Bot", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Buddy%20Bot.webp?v=9", "sell": 20}, {"id": "watson", "name": "Watson", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Watson.webp?v=9", "sell": 20}, {"id": "brainy_bot", "name": "Brainy Bot", "rarity": "Epic", "chance": 3.7, "image": "https://cloaket.softfault.cc/api/content/blooks/Brainy%20Bot.webp?v=9", "sell": 75}, {"id": "mega_bot", "name": "Mega Bot", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/Mega%20Bot.webp?v=9", "sell": 200}]}, {"id": "aquatic", "name": "Aquatic Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Aquatic.webp", "c1": "#5fc9ff", "c2": "#0b3a6a", "blooks": [{"id": "old_boot", "name": "Old Boot", "rarity": "Uncommon", "chance": 14.514, "image": "https://cloaket.softfault.cc/api/content/blooks/Old%20Boot.webp?v=9", "sell": 5}, {"id": "clownfish", "name": "Clownfish", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Clownfish.webp?v=9", "sell": 5}, {"id": "crab", "name": "Crab", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Crab.webp?v=9", "sell": 5}, {"id": "frog", "name": "Frog", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Frog.webp?v=9", "sell": 5}, {"id": "jellyfish", "name": "Jellyfish", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Jellyfish.webp?v=9", "sell": 5}, {"id": "blobfish", "name": "Blobfish", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Blobfish.webp?v=9", "sell": 20}, {"id": "octopus", "name": "Octopus", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Octopus.webp?v=9", "sell": 20}, {"id": "pufferfish", "name": "Pufferfish", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Pufferfish.webp?v=9", "sell": 20}, {"id": "narwhal", "name": "Narwhal", "rarity": "Epic", "chance": 3.786, "image": "https://cloaket.softfault.cc/api/content/blooks/Narwhal.webp?v=9", "sell": 75}, {"id": "dolphin", "name": "Dolphin", "rarity": "Epic", "chance": 2.913, "image": "https://cloaket.softfault.cc/api/content/blooks/Dolphin.webp?v=9", "sell": 75}, {"id": "baby_shark", "name": "Baby Shark", "rarity": "Legendary", "chance": 0.485, "image": "https://cloaket.softfault.cc/api/content/blooks/Baby%20Shark.webp?v=9", "sell": 200}, {"id": "megalodon", "name": "Megalodon", "rarity": "Legendary", "chance": 0.194, "image": "https://cloaket.softfault.cc/api/content/blooks/Megalodon.webp?v=9", "sell": 250}, {"id": "golden_blobfish", "name": "Golden Blobfish", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Golden%20Blobfish.webp?v=2", "sell": 300}]}, {"id": "bug", "name": "Bug Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Bug%20Pack.webp?v=2", "c1": "#67c96b", "c2": "#123b47", "blooks": [{"id": "ant", "name": "Ant", "rarity": "Uncommon", "chance": 19.62, "image": "https://cloaket.softfault.cc/api/content/blooks/Ant.svg?v=2", "sell": 5}, {"id": "rhino_beetle", "name": "Rhino Beetle", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Rhino%20Beetle.svg?v=2", "sell": 5}, {"id": "ladybug", "name": "Ladybug", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Ladybug.svg?v=2", "sell": 5}, {"id": "fly", "name": "Fly", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Fly.svg?v=2", "sell": 5}, {"id": "worm", "name": "Worm", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Worm.svg?v=2", "sell": 20}, {"id": "bee", "name": "Bee", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Bee.svg?v=2", "sell": 20}, {"id": "mantis", "name": "Mantis", "rarity": "Epic", "chance": 2.97, "image": "https://cloaket.softfault.cc/api/content/blooks/Mantis.svg?v=2", "sell": 75}, {"id": "butterfly", "name": "Butterfly", "rarity": "Legendary", "chance": 0.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Butterfly.svg?v=2", "sell": 200}, {"id": "blue_butterfly", "name": "Blue Butterfly", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Blue%20Butterfly.svg?v=2", "sell": 300}, {"id": "spring_butterfly", "name": "Spring Butterfly", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Spring%20Butterfly.webp", "sell": 1000}]}, {"id": "safari", "name": "Safari Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Safari.webp", "c1": "#ffd27f", "c2": "#6a3a0f", "blooks": [{"id": "flamingo", "name": "Flamingo", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Flamingo.webp?v=9", "sell": 5}, {"id": "panda", "name": "Panda", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Panda.webp?v=9", "sell": 5}, {"id": "sloth", "name": "Sloth", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Sloth.webp?v=9", "sell": 5}, {"id": "tenrec", "name": "Tenrec", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Tenrec.webp?v=9", "sell": 5}, {"id": "zebra", "name": "Zebra", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Zebra.webp?v=9", "sell": 5}, {"id": "elephant", "name": "Elephant", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Elephant.webp?v=9", "sell": 20}, {"id": "lemur", "name": "Lemur", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Lemur.webp?v=9", "sell": 20}, {"id": "peacock", "name": "Peacock", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Peacock.webp?v=9", "sell": 20}, {"id": "chameleon", "name": "Chameleon", "rarity": "Epic", "chance": 3.48, "image": "https://cloaket.softfault.cc/api/content/blooks/Chameleon.webp?v=9", "sell": 75}, {"id": "lion", "name": "Lion", "rarity": "Legendary", "chance": 0.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lion.webp?v=9", "sell": 200}, {"id": "rainbow_panda", "name": "Rainbow Panda", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Panda.webp?v=9", "sell": 300}]}, {"id": "dino", "name": "Dino Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Dino.webp", "c1": "#a8d977", "c2": "#2f5d2a", "blooks": [{"id": "amber", "name": "Amber", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Amber.webp?v=9", "sell": 5}, {"id": "dino_egg", "name": "Dino Egg", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dino%20Egg.webp?v=9", "sell": 5}, {"id": "dino_fossil", "name": "Dino Fossil", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dino%20Fossil.webp?v=9", "sell": 5}, {"id": "stegosaurus", "name": "Stegosaurus", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Stegosaurus.webp?v=9", "sell": 5}, {"id": "brontosaurus", "name": "Brontosaurus", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Brontosaurus.webp?v=9", "sell": 20}, {"id": "velociraptor", "name": "Velociraptor", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Velociraptor.webp?v=9", "sell": 20}, {"id": "triceratops", "name": "Triceratops", "rarity": "Epic", "chance": 3.7, "image": "https://cloaket.softfault.cc/api/content/blooks/Triceratops.webp?v=9", "sell": 75}, {"id": "tyrannosaurus_rex", "name": "Tyrannosaurus Rex", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/Tyrannosaurus%20Rex.webp?v=9", "sell": 200}]}, {"id": "icemonster", "name": "Ice Monster Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Ice%20Monster.webp", "c1": "#7fd8ff", "c2": "#1a4b7a", "blooks": [{"id": "ice_bat", "name": "Ice Bat", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Bat.webp?v=9", "sell": 5}, {"id": "ice_bug", "name": "Ice Bug", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Bug.webp?v=9", "sell": 5}, {"id": "ice_elemental", "name": "Ice Elemental", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Elemental.webp?v=9", "sell": 5}, {"id": "rock_monster", "name": "Rock Monster", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Rock%20Monster.webp?v=9", "sell": 5}, {"id": "dink", "name": "Dink", "rarity": "Rare", "chance": 8.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dink.webp?v=9", "sell": 20}, {"id": "donk", "name": "Donk", "rarity": "Rare", "chance": 8.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Donk.webp?v=9", "sell": 20}, {"id": "bush_monster", "name": "Bush Monster", "rarity": "Epic", "chance": 4.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Bush%20Monster.webp?v=9", "sell": 75}, {"id": "yeti", "name": "Yeti", "rarity": "Legendary", "chance": 0.35, "image": "https://cloaket.softfault.cc/api/content/blooks/Yeti.webp?v=9", "sell": 200}, {"id": "ice_slime", "name": "Ice Slime", "rarity": "Chroma", "chance": 0.08, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Slime.webp?v=9", "sell": 300}, {"id": "frozen_fossil", "name": "Frozen Fossil", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Frozen%20Fossil.webp?v=9", "sell": 300}, {"id": "ice_crab", "name": "Ice Crab", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Crab.webp?v=9", "sell": 300}]}, {"id": "blizzard", "name": "Blizzard Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Blizzard.webp", "c1": "#9fd8ff", "c2": "#123a6a", "blooks": [{"id": "holiday_gift", "name": "Holiday Gift", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Holiday%20Gift.webp?v=9", "sell": 5}, {"id": "holiday_wreath", "name": "Holiday Wreath", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Holiday%20Wreath.webp?v=9", "sell": 5}, {"id": "hot_chocolate", "name": "Hot Chocolate", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Hot%20Chocolate.webp?v=9", "sell": 5}, {"id": "snow_globe", "name": "Snow Globe", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Snow%20Globe.webp?v=9", "sell": 5}, {"id": "stocking", "name": "Stocking", "rarity": "Uncommon", "chance": 11.915, "image": "https://cloaket.softfault.cc/api/content/blooks/Stocking.webp?v=9", "sell": 5}, {"id": "gingerbread_house", "name": "Gingerbread House", "rarity": "Rare", "chance": 9.408, "image": "https://cloaket.softfault.cc/api/content/blooks/Gingerbread%20House.webp?v=9", "sell": 20}, {"id": "gingerbread_man", "name": "Gingerbread Man", "rarity": "Rare", "chance": 9.408, "image": "https://cloaket.softfault.cc/api/content/blooks/Gingerbread%20Man.webp?v=9", "sell": 20}, {"id": "reindeer", "name": "Reindeer", "rarity": "Rare", "chance": 5.752, "image": "https://cloaket.softfault.cc/api/content/blooks/Reindeer.webp?v=9", "sell": 20}, {"id": "snowman", "name": "Snowman", "rarity": "Epic", "chance": 4.15, "image": "https://cloaket.softfault.cc/api/content/blooks/Snowman.webp?v=9", "sell": 75}, {"id": "santa_claus", "name": "Santa Claus", "rarity": "Legendary", "chance": 0.822, "image": "https://cloaket.softfault.cc/api/content/blooks/Santa%20Claus.webp?v=9", "sell": 200}, {"id": "egypt_snow_globe", "name": "Egypt Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Egypt%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "japan_snow_globe", "name": "Japan Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Japan%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "london_snow_globe", "name": "London Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/London%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "new_york_snow_globe", "name": "New York Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/New%20York%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "paris_snow_globe", "name": "Paris Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Paris%20Snow%20Globe.webp?v=9", "sell": 300}]}, {"id": "outback", "name": "Outback Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Outback.webp", "c1": "#ff9e6b", "c2": "#7a2f12", "blooks": [{"id": "dingo", "name": "Dingo", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Dingo.webp?v=9", "sell": 5}, {"id": "echidna", "name": "Echidna", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Echidna.webp?v=9", "sell": 5}, {"id": "koala", "name": "Koala", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Koala.webp?v=9", "sell": 5}, {"id": "kookaburra", "name": "Kookaburra", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Kookaburra.webp?v=9", "sell": 5}, {"id": "joey", "name": "Joey", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Joey.webp?v=9", "sell": 20}, {"id": "kangaroo", "name": "Kangaroo", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Kangaroo.webp?v=9", "sell": 20}, {"id": "platypus", "name": "Platypus", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Platypus.webp?v=9", "sell": 20}, {"id": "crocodile", "name": "Crocodile", "rarity": "Epic", "chance": 3.6, "image": "https://cloaket.softfault.cc/api/content/blooks/Crocodile.webp?v=9", "sell": 75}, {"id": "sugar_glider", "name": "Sugar Glider", "rarity": "Legendary", "chance": 0.37, "image": "https://cloaket.softfault.cc/api/content/blooks/Sugar%20Glider.webp?v=9", "sell": 200}, {"id": "teal_platypus", "name": "Teal Platypus", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Teal%20Platypus.webp?v=9", "sell": 300}]}, {"id": "lunch", "name": "Lunch Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Lunch.webp?v=6", "c1": "#ffd45c", "c2": "#b3541e", "blooks": [{"id": "bananas", "name": "Bananas", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Bananas.webp?v=1", "sell": 5}, {"id": "watermelon", "name": "Watermelon", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Watermelon.webp?v=1", "sell": 5}, {"id": "cheese", "name": "Cheese", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheese.webp?v=1", "sell": 5}, {"id": "doughnut", "name": "Doughnut", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Doughnut.webp?v=1", "sell": 5}, {"id": "taco", "name": "Taco", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Taco.webp?v=1", "sell": 20}, {"id": "bao", "name": "Bao", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Bao.webp?v=1", "sell": 20}, {"id": "sushi", "name": "Sushi", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Sushi.webp?v=1", "sell": 20}, {"id": "cheeseburger", "name": "Cheeseburger", "rarity": "Epic", "chance": 3.31, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheeseburger.webp?v=1", "sell": 75}, {"id": "sandwich", "name": "Sandwich", "rarity": "Legendary", "chance": 0.65, "image": "https://cloaket.softfault.cc/api/content/blooks/Sandwich.webp?v=1", "sell": 200}, {"id": "half_a_sandwich", "name": "Half a Sandwich", "rarity": "Chroma", "chance": 0.04, "image": "https://cloaket.softfault.cc/api/content/blooks/Half%20a%20Sandwich.webp?v=1", "sell": 300}]}];window.RCOLOR={"Uncommon": "#4cc45a", "Rare": "#3b8df0", "Epic": "#b04cf0", "Legendary": "#ffb400", "Chroma": "#00e5ff", "Mystical": "#00f3ff", "Unique": "#ff7a2f"};
+(function () {
+  if (!window.PACKS || !window.PACKS.length) {
+    document.body.innerHTML = '<p style="padding:20px">Pack data failed to load.</p>';
+    return;
+  }
+  var PACKS = window.PACKS;
+  var RCOLOR = window.RCOLOR || {};
+  var LS = 'oranget_packs_v3';
+  var opening = false;
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(LS);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (typeof s.tokens === 'number' && Array.isArray(s.inv)) return s;
+      }
+    } catch (e) {}
+    return { tokens: 500, inv: [] };
+  }
+  function saveState(s) {
+    state = s;
+    try { localStorage.setItem(LS, JSON.stringify(s)); } catch (e) {}
+    document.getElementById('tok').textContent = state.tokens;
+  }
+  var state = loadState();
+  document.getElementById('tok').textContent = state.tokens;
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function roll(pack) {
+    var list = pack.blooks || [];
+    if (!list.length) return null;
+    var total = 0, i;
+    for (i = 0; i < list.length; i++) total += Number(list[i].chance) || 0;
+    if (total <= 0) return list[Math.floor(Math.random() * list.length)];
+    var r = Math.random() * total;
+    for (i = 0; i < list.length; i++) {
+      r -= Number(list[i].chance) || 0;
+      if (r <= 0) return list[i];
+    }
+    return list[list.length - 1];
+  }
+
+  function closeModal() {
+    if (opening) return;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = true;
+    bg.innerHTML = '';
+  }
+
+  function wait(ms) {
+    return new Promise(function (res) { setTimeout(res, ms); });
+  }
+
+  async function playOpenAnim(pack, got) {
+    opening = true;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-body"><div class="open-stage"><img class="pack-shake" src="' + esc(pack.image) + '" alt=""/><div class="multi-queue">Opening ' + got.length + ' pack' + (got.length > 1 ? 's' : '') + '…</div></div></div></div>';
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+    await wait(900);
+
+    var stage = bg.querySelector('.open-stage');
+    if (stage) stage.innerHTML = '<img class="pack-burst" src="' + esc(pack.image) + '" alt=""/>';
+    await wait(400);
+
+    for (var i = 0; i < got.length; i++) {
+      var b = got[i];
+      var col = RCOLOR[b.rarity] || '#fff';
+      bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + ';--glow:' + col + '" id="modalBox"><div class="modal-body"><div class="open-stage"><div class="rarity-flash" style="--glow:' + col + '88"></div><div class="reveal-wrap"><img class="reveal-img" style="--glow:' + col + '" src="' + esc(b.image) + '" alt=""/><div class="reveal-name">' + esc(b.name) + '</div><div class="reveal-rar" style="color:' + col + '">' + esc(b.rarity) + '</div><div class="multi-queue">' + (i + 1) + ' / ' + got.length + '</div></div></div></div></div>';
+      document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+      await wait(got.length === 1 ? 1100 : 650);
+    }
+
+    opening = false;
+    showResults(pack, got);
+  }
+
+  function showResults(pack, got) {
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+    var cards = '';
+    for (var i = 0; i < got.length; i++) {
+      var b = got[i];
+      var col = RCOLOR[b.rarity] || '#fff';
+      cards += '<div class="blook" style="border-color:' + col + '"><img src="' + esc(b.image) + '" alt=""/><div class="name">' + esc(b.name) + '</div><div class="rar" style="color:' + col + '">' + esc(b.rarity) + '</div></div>';
+    }
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-head"><img src="' + esc(pack.image) + '" alt=""/><div><div style="font-size:18px;font-weight:900">You got ' + got.length + '!</div><div>' + esc(pack.name) + '</div></div></div><div class="modal-body"><div class="result-grid">' + cards + '</div><div class="controls"><button type="button" class="btn-main" id="btnAgain">Open ' + got.length + ' more</button><button type="button" class="btn-ghost" id="btnToInv">My Blooks</button><button type="button" class="btn-ghost" id="btnCloseRes">Close</button></div></div></div>';
+    document.getElementById('btnCloseRes').onclick = function (e) { e.preventDefault(); closeModal(); };
+    document.getElementById('btnAgain').onclick = function (e) { e.preventDefault(); doOpen(pack, got.length); };
+    document.getElementById('btnToInv').onclick = function (e) { e.preventDefault(); closeModal(); document.getElementById('tabInv').click(); };
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+  }
+
+  function doOpen(pack, n) {
+    if (opening) return;
+    n = Math.max(1, Math.min(50, parseInt(n, 10) || 1));
+    var cost = pack.price * n;
+    if (state.tokens < cost) {
+      alert('Not enough tokens. You have ' + state.tokens + ', need ' + cost + '. Tap +100.');
+      return;
+    }
+    var got = [];
+    for (var i = 0; i < n; i++) {
+      var b = roll(pack);
+      if (b) got.push(b);
+    }
+    if (!got.length) {
+      alert('Open failed — pack has no blooks.');
+      return;
+    }
+    var inv = state.inv.slice();
+    for (var k = 0; k < got.length; k++) inv.push(got[k].id);
+    saveState({ tokens: state.tokens - cost, inv: inv });
+    playOpenAnim(pack, got);
+  }
+
+  function showPackModal(pack) {
+    if (opening) return;
+    var max = Math.floor(state.tokens / pack.price);
+    if (max < 1) max = 1;
+    if (max > 50) max = 50;
+    var sorted = (pack.blooks || []).slice().sort(function (a, b) {
+      return (Number(b.chance) || 0) - (Number(a.chance) || 0);
+    });
+    var odds = '';
+    for (var i = 0; i < sorted.length; i++) {
+      var b = sorted[i];
+      var col = RCOLOR[b.rarity] || '#aaa';
+      odds += '<div class="odds-row"><div class="left"><img src="' + esc(b.image) + '" alt=""/><div><div style="font-weight:700">' + esc(b.name) + '</div><div style="color:' + col + '">' + esc(b.rarity) + '</div></div></div><div style="font-weight:800">' + (Number(b.chance) || 0).toFixed(3) + '%</div></div>';
+    }
+    var canOpen = state.tokens >= pack.price;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-head"><img src="' + esc(pack.image) + '" alt=""/><div><div style="font-size:18px;font-weight:900">' + esc(pack.name) + '</div><div>🪙 ' + pack.price + ' each · open up to 50</div></div></div><div class="modal-body">' + (canOpen ? '' : '<div class="err">Not enough tokens. Tap +100 in the header.</div>') + '<div style="font-weight:800;margin-bottom:8px">Odds per pack</div>' + odds + '<div class="controls"><label>Amount: <strong id="nLabel">1</strong></label><input id="nRange" type="range" min="1" max="' + max + '" value="1"/><span id="costLabel">Cost: ' + pack.price + '</span></div><div class="controls"><button type="button" class="btn-main" id="btnOpen"' + (canOpen ? '' : ' disabled') + '>Open pack</button><button type="button" class="btn-ghost" id="btnClose">Close</button></div></div></div>';
+    var range = document.getElementById('nRange');
+    function sync() {
+      var n = parseInt(range.value, 10) || 1;
+      document.getElementById('nLabel').textContent = n;
+      document.getElementById('costLabel').textContent = 'Cost: ' + (n * pack.price);
+      document.getElementById('btnOpen').disabled = state.tokens < n * pack.price;
+    }
+    range.addEventListener('input', sync);
+    document.getElementById('btnClose').onclick = function (e) { e.preventDefault(); closeModal(); };
+    document.getElementById('btnOpen').onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      doOpen(pack, range.value);
+    };
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+  }
+
+  function renderMarket() {
+    var root = document.getElementById('packGrid');
+    var html = '';
+    for (var i = 0; i < PACKS.length; i++) {
+      var p = PACKS[i];
+      html += '<button type="button" class="card" style="--c1:' + esc(p.c1) + ';--c2:' + esc(p.c2) + '" data-id="' + esc(p.id) + '"><img src="' + esc(p.image) + '" alt=""/><div class="meta"><span>' + esc(p.name) + '</span><span>🪙 ' + p.price + '</span></div></button>';
+    }
+    root.innerHTML = html;
+    var buttons = root.querySelectorAll('.card');
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var pack = null;
+        for (var k = 0; k < PACKS.length; k++) if (PACKS[k].id === id) pack = PACKS[k];
+        if (pack) showPackModal(pack);
+      });
+    }
+  }
+
+  function renderInv() {
+    var root = document.getElementById('invRoot');
+    var counts = {};
+    for (var i = 0; i < state.inv.length; i++) {
+      var id = state.inv[i];
+      counts[id] = (counts[id] || 0) + 1;
+    }
+    if (!state.inv.length) {
+      root.innerHTML = '<div class="empty">No blooks yet — open packs in Market.</div>';
+      return;
+    }
+    var html = '';
+    for (var p = 0; p < PACKS.length; p++) {
+      var pack = PACKS[p];
+      var owned = 0;
+      for (var b = 0; b < pack.blooks.length; b++) if (counts[pack.blooks[b].id]) owned++;
+      if (!owned) continue;
+      html += '<div class="section"><h2><span>' + esc(pack.name) + '</span><span class="mute">' + owned + '/' + pack.blooks.length + '</span></h2><div class="grid">';
+      for (var j = 0; j < pack.blooks.length; j++) {
+        var bl = pack.blooks[j];
+        var n = counts[bl.id] || 0;
+        if (!n) {
+          html += '<div class="blook lock"><img src="' + esc(bl.image) + '" alt=""/><div class="name">???</div><div class="rar">Locked</div></div>';
+        } else {
+          html += '<div class="blook" style="border-color:' + (RCOLOR[bl.rarity] || '#fff3') + '">' + (n > 1 ? '<span class="cnt">×' + n + '</span>' : '') + '<img src="' + esc(bl.image) + '" alt=""/><div class="name">' + esc(bl.name) + '</div><div class="rar" style="color:' + (RCOLOR[bl.rarity] || '#aaa') + '">' + esc(bl.rarity) + '</div></div>';
+        }
+      }
+      html += '</div></div>';
+    }
+    root.innerHTML = html || '<div class="empty">No blooks yet.</div>';
+  }
+
+  document.getElementById('modalBg').addEventListener('click', function (e) {
+    if (e.target.id === 'modalBg') closeModal();
+  });
+  document.getElementById('tabMarket').onclick = function () {
+    document.getElementById('tabMarket').classList.add('on');
+    document.getElementById('tabInv').classList.remove('on');
+    document.getElementById('viewMarket').hidden = false;
+    document.getElementById('viewInv').hidden = true;
+  };
+  document.getElementById('tabInv').onclick = function () {
+    document.getElementById('tabInv').classList.add('on');
+    document.getElementById('tabMarket').classList.remove('on');
+    document.getElementById('viewMarket').hidden = true;
+    document.getElementById('viewInv').hidden = false;
+    renderInv();
+  };
+  document.getElementById('addTok').onclick = function () {
+    saveState({ tokens: state.tokens + 100, inv: state.inv.slice() });
+  };
+
+  renderMarket();
+  renderInv();
+})();
+
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Oranget Packs</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#12081c;color:#fff;min-height:100vh}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#1a0f28f2;border-bottom:1px solid #ffffff14}
+header h1{margin:0;font-size:22px}
+.tabs{display:flex;gap:8px}
+.tabs button{border:0;border-radius:999px;padding:8px 14px;background:#2a1a40;color:#fff;font-weight:800;cursor:pointer}
+.tabs button.on{background:#f79a3e;color:#1a1020}
+.tokens{display:flex;align-items:center;gap:8px;background:#2a1a40;border-radius:999px;padding:8px 12px;font-weight:800}
+.tokens button{border:0;background:#f79a3e;color:#1a1020;border-radius:999px;padding:4px 10px;font-weight:900;cursor:pointer}
+main{padding:16px;max-width:1100px;margin:0 auto}
+.mute{opacity:.75;margin:0 0 14px;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{border:0;border-radius:16px;padding:12px;text-align:left;cursor:pointer;background:linear-gradient(160deg,var(--c1),var(--c2));color:#fff;box-shadow:0 10px 24px #0005}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:12px;background:#0003;display:block}
+.card .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:800}
+.section{margin-bottom:22px}
+.section h2{margin:0 0 10px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.blook{position:relative;background:#221533;border-radius:14px;padding:10px;text-align:center;border:2px solid #ffffff12}
+.blook img{width:72px;height:72px;object-fit:contain;display:block;margin:0 auto 6px}
+.blook .name{font-size:12px;font-weight:700}
+.blook .rar{font-size:11px;opacity:.8}
+.blook .cnt{position:absolute;top:-6px;right:-6px;background:#ffd36a;color:#1a1020;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}
+.blook.lock{opacity:.4;filter:grayscale(.85)}
+.modal-bg{position:fixed;inset:0;background:#000c;z-index:50;display:grid;place-items:center;padding:12px}
+.modal{width:min(560px,100%);max-height:min(92vh,860px);overflow:auto;background:#1b1228;border-radius:18px;border:1px solid #ffffff1a}
+.modal-head{display:flex;gap:12px;align-items:center;padding:14px;background:linear-gradient(160deg,var(--c1),var(--c2))}
+.modal-head img{width:72px;height:72px;object-fit:contain;border-radius:12px;background:#0003}
+.modal-body{padding:14px}
+.odds-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #ffffff10;font-size:13px}
+.odds-row .left{display:flex;gap:8px;align-items:center;min-width:0}
+.odds-row img{width:36px;height:36px;object-fit:contain}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.controls input[type=range]{flex:1;min-width:140px}
+.btn-main{background:#f79a3e;color:#1a1020;border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer;font-size:15px}
+.btn-ghost{background:#2e2044;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer}
+.btn-main:disabled{opacity:.4;cursor:not-allowed}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.empty{opacity:.65;padding:28px 0;text-align:center}
+.err{background:#5a1020;color:#ffd0d0;padding:10px 12px;border-radius:10px;margin:10px 0;font-size:13px}
+.open-stage{min-height:320px;display:grid;place-items:center;padding:20px 10px;position:relative}
+.pack-shake{width:160px;height:160px;object-fit:contain;animation:shake .7s ease-in-out infinite;filter:drop-shadow(0 12px 24px #0008)}
+@keyframes shake{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-8deg) scale(1.04)}40%{transform:rotate(8deg) scale(1.06)}60%{transform:rotate(-6deg) scale(1.03)}80%{transform:rotate(6deg) scale(1.05)}}
+.pack-burst{width:160px;height:160px;object-fit:contain;animation:burst .45s ease-out forwards}
+@keyframes burst{0%{transform:scale(1) rotate(0);opacity:1}60%{transform:scale(1.35) rotate(8deg);opacity:.9}100%{transform:scale(.2) rotate(-12deg);opacity:0}}
+.reveal-wrap{text-align:center;animation:popIn .45s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes popIn{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.reveal-img{width:140px;height:140px;object-fit:contain;display:block;margin:0 auto 10px;filter:drop-shadow(0 0 18px var(--glow,#fff8))}
+.reveal-name{font-size:22px;font-weight:900}
+.reveal-rar{font-size:14px;font-weight:800;margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
+.rarity-flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,var(--glow,#fff5),transparent 55%);animation:flash .6s ease-out}
+@keyframes flash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.multi-queue{font-size:13px;opacity:.8;margin-top:8px}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>Oranget Packs</h1>
+  <div class="tabs">
+    <button type="button" id="tabMarket" class="on">Market</button>
+    <button type="button" id="tabInv">My Blooks</button>
+  </div>
+  <div class="tokens">
+    🪙 <span id="tok">500</span>
+    <button type="button" id="addTok">+100</button>
+  </div>
+</header>
+<main>
+  <section id="viewMarket">
+    <p class="mute">Tap a pack → odds → choose 1–50 → Open. Blooket-style shake + reveal. Inventory by pack.</p>
+    <div id="packGrid" class="grid"></div>
+  </section>
+  <section id="viewInv" hidden>
+    <p class="mute">Your blooks, grouped by pack.</p>
+    <div id="invRoot"></div>
+  </section>
+</main>
+<div id="modalBg" class="modal-bg" hidden></div>
+<script>
+window.PACKS=[{"id": "medieval", "name": "Medieval Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Medieval.webp", "c1": "#d9b36c", "c2": "#4a2c12", "blooks": [{"id": "elf", "name": "Elf", "rarity": "Uncommon", "chance": 13.395, "image": "https://cloaket.softfault.cc/api/content/blooks/Elf.webp?v=9", "sell": 5}, {"id": "fairy", "name": "Fairy", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Fairy.webp?v=9", "sell": 5}, {"id": "slime_monster", "name": "Slime Monster", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Slime%20Monster.webp?v=9", "sell": 5}, {"id": "witch", "name": "Witch", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Witch.webp?v=9", "sell": 5}, {"id": "wizard", "name": "Wizard", "rarity": "Uncommon", "chance": 13.4, "image": "https://cloaket.softfault.cc/api/content/blooks/Wizard.webp?v=9", "sell": 5}, {"id": "dragon", "name": "Dragon", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Dragon.webp?v=9", "sell": 20}, {"id": "jester", "name": "Jester", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Jester.webp?v=9", "sell": 20}, {"id": "queen", "name": "Queen", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Queen.webp?v=9", "sell": 20}, {"id": "unicorn", "name": "Unicorn", "rarity": "Epic", "chance": 5.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Unicorn.webp?v=9", "sell": 75}, {"id": "king", "name": "King", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/King.webp?v=9", "sell": 200}, {"id": "phantom_king", "name": "Phantom King", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Phantom%20King.webp?v=9", "sell": 1000}]}, {"id": "breakfast", "name": "Breakfast Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Breakfast.webp?v=2", "c1": "#ffcf5c", "c2": "#8a4a12", "blooks": [{"id": "breakfast_combo", "name": "Breakfast Combo", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Breakfast%20Combo.webp?v=9", "sell": 5}, {"id": "cereal", "name": "Cereal", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Cereal.webp?v=9", "sell": 5}, {"id": "milk", "name": "Milk", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Milk.webp?v=9", "sell": 5}, {"id": "orange_juice", "name": "Orange Juice", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Orange%20Juice.webp?v=9", "sell": 5}, {"id": "toast", "name": "Toast", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Toast.webp?v=9", "sell": 5}, {"id": "yogurt", "name": "Yogurt", "rarity": "Uncommon", "chance": 12.579, "image": "https://cloaket.softfault.cc/api/content/blooks/Yogurt.webp?v=9", "sell": 5}, {"id": "pancakes", "name": "Pancakes", "rarity": "Rare", "chance": 9.184, "image": "https://cloaket.softfault.cc/api/content/blooks/Pancakes.webp?v=9", "sell": 20}, {"id": "waffle", "name": "Waffle", "rarity": "Rare", "chance": 9.184, "image": "https://cloaket.softfault.cc/api/content/blooks/Waffle.webp?v=9", "sell": 20}, {"id": "french_toast", "name": "French Toast", "rarity": "Epic", "chance": 5.102, "image": "https://cloaket.softfault.cc/api/content/blooks/French%20Toast.webp?v=9", "sell": 75}, {"id": "chocolate_milk", "name": "Chocolate Milk", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Chocolate%20Milk.webp?v=1", "sell": 200}, {"id": "bacon_and_eggs", "name": "Bacon and Eggs", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Bacon%20and%20Eggs.webp?v=1", "sell": 300}, {"id": "rainbow_waffles", "name": "Rainbow Waffles", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Waffles.webp?v=4", "sell": 1000}]}, {"id": "wonderland", "name": "Wonderland Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Wonderland.webp", "c1": "#ff9fd0", "c2": "#5a1240", "blooks": [{"id": "two_of_spades", "name": "Two of Spades", "rarity": "Uncommon", "chance": 15.2, "image": "https://cloaket.softfault.cc/api/content/blooks/Two%20of%20Spades.webp?v=9", "sell": 5}, {"id": "alice", "name": "Alice", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Alice.webp?v=9", "sell": 5}, {"id": "drink_me", "name": "Drink Me", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Drink%20Me.webp?v=9", "sell": 5}, {"id": "eat_me", "name": "Eat Me", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Eat%20Me.webp?v=9", "sell": 5}, {"id": "queen_of_hearts", "name": "Queen of Hearts", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Queen%20of%20Hearts.webp?v=9", "sell": 5}, {"id": "cheshire_cat", "name": "Cheshire Cat", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheshire%20Cat.webp?v=9", "sell": 20}, {"id": "dormouse", "name": "Dormouse", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dormouse.webp?v=9", "sell": 20}, {"id": "white_rabbit", "name": "White Rabbit", "rarity": "Rare", "chance": 6.5, "image": "https://cloaket.softfault.cc/api/content/blooks/White%20Rabbit.webp?v=9", "sell": 20}, {"id": "caterpillar", "name": "Caterpillar", "rarity": "Epic", "chance": 2.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Caterpillar.webp?v=9", "sell": 75}, {"id": "mad_hatter", "name": "Mad Hatter", "rarity": "Epic", "chance": 2.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Mad%20Hatter.webp?v=9", "sell": 75}, {"id": "king_of_hearts", "name": "King of Hearts", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/King%20of%20Hearts.webp?v=9", "sell": 200}]}, {"id": "autumn", "name": "Autumn Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Autumn.webp", "c1": "#ffb35c", "c2": "#6a2f0f", "blooks": [{"id": "black_bear", "name": "Black Bear", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Black%20Bear.webp?v=1", "sell": 5}, {"id": "pumpkin_pie", "name": "Pumpkin Pie", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Pie.webp?v=1", "sell": 5}, {"id": "chipmunk", "name": "Chipmunk", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Chipmunk.webp?v=1", "sell": 5}, {"id": "cornucopia", "name": "Cornucopia", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Cornucopia.webp?v=1", "sell": 5}, {"id": "autumn_cat", "name": "Autumn Cat", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Autumn%20Cat.webp?v=1", "sell": 20}, {"id": "pumpkin_puppy", "name": "Pumpkin Puppy", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Puppy.webp?v=1", "sell": 20}, {"id": "red_squirrel", "name": "Red Squirrel", "rarity": "Rare", "chance": 6.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Red%20Squirrel.webp?v=1", "sell": 20}, {"id": "autumn_crow", "name": "Autumn Crow", "rarity": "Epic", "chance": 2.945, "image": "https://cloaket.softfault.cc/api/content/blooks/Autumn%20Crow.webp?v=1", "sell": 75}, {"id": "turkey", "name": "Turkey", "rarity": "Legendary", "chance": 1.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Turkey.webp?v=1", "sell": 200}, {"id": "goldfinch", "name": "Goldfinch", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Goldfinch.webp?v=1", "sell": 300}, {"id": "aurora_fox", "name": "Aurora Fox", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Aurora%20Fox.webp?v=2", "sell": 1000}]}, {"id": "spooky", "name": "Spooky Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Spooky.webp?v=2", "c1": "#b45cff", "c2": "#3a1052", "blooks": [{"id": "frankenstein", "name": "Frankenstein", "rarity": "Uncommon", "chance": 18.486, "image": "https://cloaket.softfault.cc/api/content/blooks/Frankenstein.webp?v=9", "sell": 5}, {"id": "pumpkin", "name": "Pumpkin", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin.webp?v=9", "sell": 5}, {"id": "swamp_monster", "name": "Swamp Monster", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Swamp%20Monster.webp?v=9", "sell": 5}, {"id": "vampire", "name": "Vampire", "rarity": "Uncommon", "chance": 18.484, "image": "https://cloaket.softfault.cc/api/content/blooks/Vampire.webp?v=9", "sell": 5}, {"id": "caramel_apple", "name": "Caramel Apple", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Caramel%20Apple.webp?v=9", "sell": 20}, {"id": "mummy", "name": "Mummy", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Mummy.webp?v=9", "sell": 20}, {"id": "zombie", "name": "Zombie", "rarity": "Rare", "chance": 6.694, "image": "https://cloaket.softfault.cc/api/content/blooks/Zombie.webp?v=9", "sell": 20}, {"id": "werewolf", "name": "Werewolf", "rarity": "Epic", "chance": 5.196, "image": "https://cloaket.softfault.cc/api/content/blooks/Werewolf.webp?v=9", "sell": 75}, {"id": "ghost", "name": "Ghost", "rarity": "Legendary", "chance": 0.649, "image": "https://cloaket.softfault.cc/api/content/blooks/Ghost.webp?v=9", "sell": 200}, {"id": "haunted_pumpkin", "name": "Haunted Pumpkin", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Haunted%20Pumpkin.webp?v=9", "sell": 300}, {"id": "pumpkin_cookie", "name": "Pumpkin Cookie", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Pumpkin%20Cookie.webp?v=9", "sell": 300}, {"id": "ghost_cookie", "name": "Ghost Cookie", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Ghost%20Cookie.webp?v=9", "sell": 300}, {"id": "spooky_pumpkin", "name": "Spooky Pumpkin", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Pumpkin.webp?v=9", "sell": 300}, {"id": "spooky_mummy", "name": "Spooky Mummy", "rarity": "Chroma", "chance": 0.01, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Mummy.webp?v=9", "sell": 350}, {"id": "spooky_ghost", "name": "Spooky Ghost", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Spooky%20Ghost.webp?v=9", "sell": 1000}]}, {"id": "space", "name": "Space Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Space.webp", "c1": "#8a7fff", "c2": "#12103a", "blooks": [{"id": "earth", "name": "Earth", "rarity": "Uncommon", "chance": 18.676, "image": "https://cloaket.softfault.cc/api/content/blooks/Earth.webp?v=9", "sell": 5}, {"id": "alien", "name": "Alien", "rarity": "Uncommon", "chance": 18.673, "image": "https://cloaket.softfault.cc/api/content/blooks/Alien.webp?v=9", "sell": 5}, {"id": "meteor", "name": "Meteor", "rarity": "Uncommon", "chance": 18.683, "image": "https://cloaket.softfault.cc/api/content/blooks/Meteor.webp?v=9", "sell": 5}, {"id": "stars", "name": "Stars", "rarity": "Uncommon", "chance": 18.678, "image": "https://cloaket.softfault.cc/api/content/blooks/Stars.webp?v=9", "sell": 5}, {"id": "planet", "name": "Planet", "rarity": "Rare", "chance": 9.962, "image": "https://cloaket.softfault.cc/api/content/blooks/Planet.webp?v=9", "sell": 20}, {"id": "ufo", "name": "UFO", "rarity": "Rare", "chance": 9.962, "image": "https://cloaket.softfault.cc/api/content/blooks/UFO.webp?v=9", "sell": 20}, {"id": "spaceship", "name": "Spaceship", "rarity": "Epic", "chance": 4.483, "image": "https://cloaket.softfault.cc/api/content/blooks/Spaceship.webp?v=9", "sell": 75}, {"id": "astronaut", "name": "Astronaut", "rarity": "Legendary", "chance": 0.448, "image": "https://cloaket.softfault.cc/api/content/blooks/Astronaut.webp?v=9", "sell": 200}, {"id": "black_astronaut", "name": "Black Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Black%20Astronaut.webp?v=9", "sell": 300}, {"id": "brown_astronaut", "name": "Brown Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Brown%20Astronaut.webp?v=9", "sell": 300}, {"id": "green_astronaut", "name": "Green Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Green%20Astronaut.webp?v=9", "sell": 300}, {"id": "orange_astronaut", "name": "Orange Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Orange%20Astronaut.webp?v=9", "sell": 300}, {"id": "pink_astronaut", "name": "Pink Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Pink%20Astronaut.webp?v=9", "sell": 300}, {"id": "red_astronaut", "name": "Red Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Red%20Astronaut.webp?v=9", "sell": 300}, {"id": "yellow_astronaut", "name": "Yellow Astronaut", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Yellow%20Astronaut.webp?v=9", "sell": 300}, {"id": "blue_astronaut", "name": "Blue Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Blue%20Astronaut.webp?v=9", "sell": 300}, {"id": "cyan_astronaut", "name": "Cyan Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Cyan%20Astronaut.webp?v=9", "sell": 300}, {"id": "lime_astronaut", "name": "Lime Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Lime%20Astronaut.webp?v=9", "sell": 300}, {"id": "purple_astronaut", "name": "Purple Astronaut", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Purple%20Astronaut.webp?v=9", "sell": 300}, {"id": "rainbow_astronaut", "name": "Rainbow Astronaut", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Astronaut.webp?v=9", "sell": 1000}]}, {"id": "bot", "name": "Bot Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Bot.webp?v=2", "c1": "#b0b8c4", "c2": "#2e3440", "blooks": [{"id": "angry_bot", "name": "Angry Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Angry%20Bot.webp?v=9", "sell": 5}, {"id": "happy_bot", "name": "Happy Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Happy%20Bot.webp?v=9", "sell": 5}, {"id": "lil_bot", "name": "Lil Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lil%20Bot.webp?v=9", "sell": 5}, {"id": "lovely_bot", "name": "Lovely Bot", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lovely%20Bot.webp?v=9", "sell": 5}, {"id": "buddy_bot", "name": "Buddy Bot", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Buddy%20Bot.webp?v=9", "sell": 20}, {"id": "watson", "name": "Watson", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Watson.webp?v=9", "sell": 20}, {"id": "brainy_bot", "name": "Brainy Bot", "rarity": "Epic", "chance": 3.7, "image": "https://cloaket.softfault.cc/api/content/blooks/Brainy%20Bot.webp?v=9", "sell": 75}, {"id": "mega_bot", "name": "Mega Bot", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/Mega%20Bot.webp?v=9", "sell": 200}]}, {"id": "aquatic", "name": "Aquatic Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Aquatic.webp", "c1": "#5fc9ff", "c2": "#0b3a6a", "blooks": [{"id": "old_boot", "name": "Old Boot", "rarity": "Uncommon", "chance": 14.514, "image": "https://cloaket.softfault.cc/api/content/blooks/Old%20Boot.webp?v=9", "sell": 5}, {"id": "clownfish", "name": "Clownfish", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Clownfish.webp?v=9", "sell": 5}, {"id": "crab", "name": "Crab", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Crab.webp?v=9", "sell": 5}, {"id": "frog", "name": "Frog", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Frog.webp?v=9", "sell": 5}, {"id": "jellyfish", "name": "Jellyfish", "rarity": "Uncommon", "chance": 14.563, "image": "https://cloaket.softfault.cc/api/content/blooks/Jellyfish.webp?v=9", "sell": 5}, {"id": "blobfish", "name": "Blobfish", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Blobfish.webp?v=9", "sell": 20}, {"id": "octopus", "name": "Octopus", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Octopus.webp?v=9", "sell": 20}, {"id": "pufferfish", "name": "Pufferfish", "rarity": "Rare", "chance": 6.602, "image": "https://cloaket.softfault.cc/api/content/blooks/Pufferfish.webp?v=9", "sell": 20}, {"id": "narwhal", "name": "Narwhal", "rarity": "Epic", "chance": 3.786, "image": "https://cloaket.softfault.cc/api/content/blooks/Narwhal.webp?v=9", "sell": 75}, {"id": "dolphin", "name": "Dolphin", "rarity": "Epic", "chance": 2.913, "image": "https://cloaket.softfault.cc/api/content/blooks/Dolphin.webp?v=9", "sell": 75}, {"id": "baby_shark", "name": "Baby Shark", "rarity": "Legendary", "chance": 0.485, "image": "https://cloaket.softfault.cc/api/content/blooks/Baby%20Shark.webp?v=9", "sell": 200}, {"id": "megalodon", "name": "Megalodon", "rarity": "Legendary", "chance": 0.194, "image": "https://cloaket.softfault.cc/api/content/blooks/Megalodon.webp?v=9", "sell": 250}, {"id": "golden_blobfish", "name": "Golden Blobfish", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Golden%20Blobfish.webp?v=2", "sell": 300}]}, {"id": "bug", "name": "Bug Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Bug%20Pack.webp?v=2", "c1": "#67c96b", "c2": "#123b47", "blooks": [{"id": "ant", "name": "Ant", "rarity": "Uncommon", "chance": 19.62, "image": "https://cloaket.softfault.cc/api/content/blooks/Ant.svg?v=2", "sell": 5}, {"id": "rhino_beetle", "name": "Rhino Beetle", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Rhino%20Beetle.svg?v=2", "sell": 5}, {"id": "ladybug", "name": "Ladybug", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Ladybug.svg?v=2", "sell": 5}, {"id": "fly", "name": "Fly", "rarity": "Uncommon", "chance": 19.625, "image": "https://cloaket.softfault.cc/api/content/blooks/Fly.svg?v=2", "sell": 5}, {"id": "worm", "name": "Worm", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Worm.svg?v=2", "sell": 20}, {"id": "bee", "name": "Bee", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Bee.svg?v=2", "sell": 20}, {"id": "mantis", "name": "Mantis", "rarity": "Epic", "chance": 2.97, "image": "https://cloaket.softfault.cc/api/content/blooks/Mantis.svg?v=2", "sell": 75}, {"id": "butterfly", "name": "Butterfly", "rarity": "Legendary", "chance": 0.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Butterfly.svg?v=2", "sell": 200}, {"id": "blue_butterfly", "name": "Blue Butterfly", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Blue%20Butterfly.svg?v=2", "sell": 300}, {"id": "spring_butterfly", "name": "Spring Butterfly", "rarity": "Mystical", "chance": 0.005, "image": "https://cloaket.softfault.cc/api/content/blooks/Spring%20Butterfly.webp", "sell": 1000}]}, {"id": "safari", "name": "Safari Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Safari.webp", "c1": "#ffd27f", "c2": "#6a3a0f", "blooks": [{"id": "flamingo", "name": "Flamingo", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Flamingo.webp?v=9", "sell": 5}, {"id": "panda", "name": "Panda", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Panda.webp?v=9", "sell": 5}, {"id": "sloth", "name": "Sloth", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Sloth.webp?v=9", "sell": 5}, {"id": "tenrec", "name": "Tenrec", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Tenrec.webp?v=9", "sell": 5}, {"id": "zebra", "name": "Zebra", "rarity": "Uncommon", "chance": 15.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Zebra.webp?v=9", "sell": 5}, {"id": "elephant", "name": "Elephant", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Elephant.webp?v=9", "sell": 20}, {"id": "lemur", "name": "Lemur", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Lemur.webp?v=9", "sell": 20}, {"id": "peacock", "name": "Peacock", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Peacock.webp?v=9", "sell": 20}, {"id": "chameleon", "name": "Chameleon", "rarity": "Epic", "chance": 3.48, "image": "https://cloaket.softfault.cc/api/content/blooks/Chameleon.webp?v=9", "sell": 75}, {"id": "lion", "name": "Lion", "rarity": "Legendary", "chance": 0.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Lion.webp?v=9", "sell": 200}, {"id": "rainbow_panda", "name": "Rainbow Panda", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Rainbow%20Panda.webp?v=9", "sell": 300}]}, {"id": "dino", "name": "Dino Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Dino.webp", "c1": "#a8d977", "c2": "#2f5d2a", "blooks": [{"id": "amber", "name": "Amber", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Amber.webp?v=9", "sell": 5}, {"id": "dino_egg", "name": "Dino Egg", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dino%20Egg.webp?v=9", "sell": 5}, {"id": "dino_fossil", "name": "Dino Fossil", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dino%20Fossil.webp?v=9", "sell": 5}, {"id": "stegosaurus", "name": "Stegosaurus", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Stegosaurus.webp?v=9", "sell": 5}, {"id": "brontosaurus", "name": "Brontosaurus", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Brontosaurus.webp?v=9", "sell": 20}, {"id": "velociraptor", "name": "Velociraptor", "rarity": "Rare", "chance": 9.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Velociraptor.webp?v=9", "sell": 20}, {"id": "triceratops", "name": "Triceratops", "rarity": "Epic", "chance": 3.7, "image": "https://cloaket.softfault.cc/api/content/blooks/Triceratops.webp?v=9", "sell": 75}, {"id": "tyrannosaurus_rex", "name": "Tyrannosaurus Rex", "rarity": "Legendary", "chance": 0.3, "image": "https://cloaket.softfault.cc/api/content/blooks/Tyrannosaurus%20Rex.webp?v=9", "sell": 200}]}, {"id": "icemonster", "name": "Ice Monster Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Ice%20Monster.webp", "c1": "#7fd8ff", "c2": "#1a4b7a", "blooks": [{"id": "ice_bat", "name": "Ice Bat", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Bat.webp?v=9", "sell": 5}, {"id": "ice_bug", "name": "Ice Bug", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Bug.webp?v=9", "sell": 5}, {"id": "ice_elemental", "name": "Ice Elemental", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Elemental.webp?v=9", "sell": 5}, {"id": "rock_monster", "name": "Rock Monster", "rarity": "Uncommon", "chance": 19.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Rock%20Monster.webp?v=9", "sell": 5}, {"id": "dink", "name": "Dink", "rarity": "Rare", "chance": 8.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Dink.webp?v=9", "sell": 20}, {"id": "donk", "name": "Donk", "rarity": "Rare", "chance": 8.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Donk.webp?v=9", "sell": 20}, {"id": "bush_monster", "name": "Bush Monster", "rarity": "Epic", "chance": 4.5, "image": "https://cloaket.softfault.cc/api/content/blooks/Bush%20Monster.webp?v=9", "sell": 75}, {"id": "yeti", "name": "Yeti", "rarity": "Legendary", "chance": 0.35, "image": "https://cloaket.softfault.cc/api/content/blooks/Yeti.webp?v=9", "sell": 200}, {"id": "ice_slime", "name": "Ice Slime", "rarity": "Chroma", "chance": 0.08, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Slime.webp?v=9", "sell": 300}, {"id": "frozen_fossil", "name": "Frozen Fossil", "rarity": "Chroma", "chance": 0.05, "image": "https://cloaket.softfault.cc/api/content/blooks/Frozen%20Fossil.webp?v=9", "sell": 300}, {"id": "ice_crab", "name": "Ice Crab", "rarity": "Chroma", "chance": 0.02, "image": "https://cloaket.softfault.cc/api/content/blooks/Ice%20Crab.webp?v=9", "sell": 300}]}, {"id": "blizzard", "name": "Blizzard Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Blizzard.webp", "c1": "#9fd8ff", "c2": "#123a6a", "blooks": [{"id": "holiday_gift", "name": "Holiday Gift", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Holiday%20Gift.webp?v=9", "sell": 5}, {"id": "holiday_wreath", "name": "Holiday Wreath", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Holiday%20Wreath.webp?v=9", "sell": 5}, {"id": "hot_chocolate", "name": "Hot Chocolate", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Hot%20Chocolate.webp?v=9", "sell": 5}, {"id": "snow_globe", "name": "Snow Globe", "rarity": "Uncommon", "chance": 14.585, "image": "https://cloaket.softfault.cc/api/content/blooks/Snow%20Globe.webp?v=9", "sell": 5}, {"id": "stocking", "name": "Stocking", "rarity": "Uncommon", "chance": 11.915, "image": "https://cloaket.softfault.cc/api/content/blooks/Stocking.webp?v=9", "sell": 5}, {"id": "gingerbread_house", "name": "Gingerbread House", "rarity": "Rare", "chance": 9.408, "image": "https://cloaket.softfault.cc/api/content/blooks/Gingerbread%20House.webp?v=9", "sell": 20}, {"id": "gingerbread_man", "name": "Gingerbread Man", "rarity": "Rare", "chance": 9.408, "image": "https://cloaket.softfault.cc/api/content/blooks/Gingerbread%20Man.webp?v=9", "sell": 20}, {"id": "reindeer", "name": "Reindeer", "rarity": "Rare", "chance": 5.752, "image": "https://cloaket.softfault.cc/api/content/blooks/Reindeer.webp?v=9", "sell": 20}, {"id": "snowman", "name": "Snowman", "rarity": "Epic", "chance": 4.15, "image": "https://cloaket.softfault.cc/api/content/blooks/Snowman.webp?v=9", "sell": 75}, {"id": "santa_claus", "name": "Santa Claus", "rarity": "Legendary", "chance": 0.822, "image": "https://cloaket.softfault.cc/api/content/blooks/Santa%20Claus.webp?v=9", "sell": 200}, {"id": "egypt_snow_globe", "name": "Egypt Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Egypt%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "japan_snow_globe", "name": "Japan Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Japan%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "london_snow_globe", "name": "London Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/London%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "new_york_snow_globe", "name": "New York Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/New%20York%20Snow%20Globe.webp?v=9", "sell": 300}, {"id": "paris_snow_globe", "name": "Paris Snow Globe", "rarity": "Chroma", "chance": 0.041, "image": "https://cloaket.softfault.cc/api/content/blooks/Paris%20Snow%20Globe.webp?v=9", "sell": 300}]}, {"id": "outback", "name": "Outback Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Outback.webp", "c1": "#ff9e6b", "c2": "#7a2f12", "blooks": [{"id": "dingo", "name": "Dingo", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Dingo.webp?v=9", "sell": 5}, {"id": "echidna", "name": "Echidna", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Echidna.webp?v=9", "sell": 5}, {"id": "koala", "name": "Koala", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Koala.webp?v=9", "sell": 5}, {"id": "kookaburra", "name": "Kookaburra", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Kookaburra.webp?v=9", "sell": 5}, {"id": "joey", "name": "Joey", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Joey.webp?v=9", "sell": 20}, {"id": "kangaroo", "name": "Kangaroo", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Kangaroo.webp?v=9", "sell": 20}, {"id": "platypus", "name": "Platypus", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Platypus.webp?v=9", "sell": 20}, {"id": "crocodile", "name": "Crocodile", "rarity": "Epic", "chance": 3.6, "image": "https://cloaket.softfault.cc/api/content/blooks/Crocodile.webp?v=9", "sell": 75}, {"id": "sugar_glider", "name": "Sugar Glider", "rarity": "Legendary", "chance": 0.37, "image": "https://cloaket.softfault.cc/api/content/blooks/Sugar%20Glider.webp?v=9", "sell": 200}, {"id": "teal_platypus", "name": "Teal Platypus", "rarity": "Chroma", "chance": 0.03, "image": "https://cloaket.softfault.cc/api/content/blooks/Teal%20Platypus.webp?v=9", "sell": 300}]}, {"id": "lunch", "name": "Lunch Pack", "price": 25, "image": "https://cloaket.softfault.cc/api/content/packs/Lunch.webp?v=6", "c1": "#ffd45c", "c2": "#b3541e", "blooks": [{"id": "bananas", "name": "Bananas", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Bananas.webp?v=1", "sell": 5}, {"id": "watermelon", "name": "Watermelon", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Watermelon.webp?v=1", "sell": 5}, {"id": "cheese", "name": "Cheese", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheese.webp?v=1", "sell": 5}, {"id": "doughnut", "name": "Doughnut", "rarity": "Uncommon", "chance": 18.75, "image": "https://cloaket.softfault.cc/api/content/blooks/Doughnut.webp?v=1", "sell": 5}, {"id": "taco", "name": "Taco", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Taco.webp?v=1", "sell": 20}, {"id": "bao", "name": "Bao", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Bao.webp?v=1", "sell": 20}, {"id": "sushi", "name": "Sushi", "rarity": "Rare", "chance": 7.0, "image": "https://cloaket.softfault.cc/api/content/blooks/Sushi.webp?v=1", "sell": 20}, {"id": "cheeseburger", "name": "Cheeseburger", "rarity": "Epic", "chance": 3.31, "image": "https://cloaket.softfault.cc/api/content/blooks/Cheeseburger.webp?v=1", "sell": 75}, {"id": "sandwich", "name": "Sandwich", "rarity": "Legendary", "chance": 0.65, "image": "https://cloaket.softfault.cc/api/content/blooks/Sandwich.webp?v=1", "sell": 200}, {"id": "half_a_sandwich", "name": "Half a Sandwich", "rarity": "Chroma", "chance": 0.04, "image": "https://cloaket.softfault.cc/api/content/blooks/Half%20a%20Sandwich.webp?v=1", "sell": 300}]}];window.RCOLOR={"Uncommon": "#4cc45a", "Rare": "#3b8df0", "Epic": "#b04cf0", "Legendary": "#ffb400", "Chroma": "#00e5ff", "Mystical": "#00f3ff", "Unique": "#ff7a2f"};
+(function () {
+  if (!window.PACKS || !window.PACKS.length) {
+    document.body.innerHTML = '<p style="padding:20px">Pack data failed to load.</p>';
+    return;
+  }
+  var PACKS = window.PACKS;
+  var RCOLOR = window.RCOLOR || {};
+  var LS = 'oranget_packs_v3';
+  var opening = false;
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(LS);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (typeof s.tokens === 'number' && Array.isArray(s.inv)) return s;
+      }
+    } catch (e) {}
+    return { tokens: 500, inv: [] };
+  }
+  function saveState(s) {
+    state = s;
+    try { localStorage.setItem(LS, JSON.stringify(s)); } catch (e) {}
+    document.getElementById('tok').textContent = state.tokens;
+  }
+  var state = loadState();
+  document.getElementById('tok').textContent = state.tokens;
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function roll(pack) {
+    var list = pack.blooks || [];
+    if (!list.length) return null;
+    var total = 0, i;
+    for (i = 0; i < list.length; i++) total += Number(list[i].chance) || 0;
+    if (total <= 0) return list[Math.floor(Math.random() * list.length)];
+    var r = Math.random() * total;
+    for (i = 0; i < list.length; i++) {
+      r -= Number(list[i].chance) || 0;
+      if (r <= 0) return list[i];
+    }
+    return list[list.length - 1];
+  }
+
+  function closeModal() {
+    if (opening) return;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = true;
+    bg.innerHTML = '';
+  }
+
+  function wait(ms) {
+    return new Promise(function (res) { setTimeout(res, ms); });
+  }
+
+  async function playOpenAnim(pack, got) {
+    opening = true;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-body"><div class="open-stage"><img class="pack-shake" src="' + esc(pack.image) + '" alt=""/><div class="multi-queue">Opening ' + got.length + ' pack' + (got.length > 1 ? 's' : '') + '…</div></div></div></div>';
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+    await wait(900);
+
+    var stage = bg.querySelector('.open-stage');
+    if (stage) stage.innerHTML = '<img class="pack-burst" src="' + esc(pack.image) + '" alt=""/>';
+    await wait(400);
+
+    for (var i = 0; i < got.length; i++) {
+      var b = got[i];
+      var col = RCOLOR[b.rarity] || '#fff';
+      bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + ';--glow:' + col + '" id="modalBox"><div class="modal-body"><div class="open-stage"><div class="rarity-flash" style="--glow:' + col + '88"></div><div class="reveal-wrap"><img class="reveal-img" style="--glow:' + col + '" src="' + esc(b.image) + '" alt=""/><div class="reveal-name">' + esc(b.name) + '</div><div class="reveal-rar" style="color:' + col + '">' + esc(b.rarity) + '</div><div class="multi-queue">' + (i + 1) + ' / ' + got.length + '</div></div></div></div></div>';
+      document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+      await wait(got.length === 1 ? 1100 : 650);
+    }
+
+    opening = false;
+    showResults(pack, got);
+  }
+
+  function showResults(pack, got) {
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+    var cards = '';
+    for (var i = 0; i < got.length; i++) {
+      var b = got[i];
+      var col = RCOLOR[b.rarity] || '#fff';
+      cards += '<div class="blook" style="border-color:' + col + '"><img src="' + esc(b.image) + '" alt=""/><div class="name">' + esc(b.name) + '</div><div class="rar" style="color:' + col + '">' + esc(b.rarity) + '</div></div>';
+    }
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-head"><img src="' + esc(pack.image) + '" alt=""/><div><div style="font-size:18px;font-weight:900">You got ' + got.length + '!</div><div>' + esc(pack.name) + '</div></div></div><div class="modal-body"><div class="result-grid">' + cards + '</div><div class="controls"><button type="button" class="btn-main" id="btnAgain">Open ' + got.length + ' more</button><button type="button" class="btn-ghost" id="btnToInv">My Blooks</button><button type="button" class="btn-ghost" id="btnCloseRes">Close</button></div></div></div>';
+    document.getElementById('btnCloseRes').onclick = function (e) { e.preventDefault(); closeModal(); };
+    document.getElementById('btnAgain').onclick = function (e) { e.preventDefault(); doOpen(pack, got.length); };
+    document.getElementById('btnToInv').onclick = function (e) { e.preventDefault(); closeModal(); document.getElementById('tabInv').click(); };
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+  }
+
+  function doOpen(pack, n) {
+    if (opening) return;
+    n = Math.max(1, Math.min(50, parseInt(n, 10) || 1));
+    var cost = pack.price * n;
+    if (state.tokens < cost) {
+      alert('Not enough tokens. You have ' + state.tokens + ', need ' + cost + '. Tap +100.');
+      return;
+    }
+    var got = [];
+    for (var i = 0; i < n; i++) {
+      var b = roll(pack);
+      if (b) got.push(b);
+    }
+    if (!got.length) {
+      alert('Open failed — pack has no blooks.');
+      return;
+    }
+    var inv = state.inv.slice();
+    for (var k = 0; k < got.length; k++) inv.push(got[k].id);
+    saveState({ tokens: state.tokens - cost, inv: inv });
+    playOpenAnim(pack, got);
+  }
+
+  function showPackModal(pack) {
+    if (opening) return;
+    var max = Math.floor(state.tokens / pack.price);
+    if (max < 1) max = 1;
+    if (max > 50) max = 50;
+    var sorted = (pack.blooks || []).slice().sort(function (a, b) {
+      return (Number(b.chance) || 0) - (Number(a.chance) || 0);
+    });
+    var odds = '';
+    for (var i = 0; i < sorted.length; i++) {
+      var b = sorted[i];
+      var col = RCOLOR[b.rarity] || '#aaa';
+      odds += '<div class="odds-row"><div class="left"><img src="' + esc(b.image) + '" alt=""/><div><div style="font-weight:700">' + esc(b.name) + '</div><div style="color:' + col + '">' + esc(b.rarity) + '</div></div></div><div style="font-weight:800">' + (Number(b.chance) || 0).toFixed(3) + '%</div></div>';
+    }
+    var canOpen = state.tokens >= pack.price;
+    var bg = document.getElementById('modalBg');
+    bg.hidden = false;
+    bg.innerHTML = '<div class="modal" style="--c1:' + esc(pack.c1) + ';--c2:' + esc(pack.c2) + '" id="modalBox"><div class="modal-head"><img src="' + esc(pack.image) + '" alt=""/><div><div style="font-size:18px;font-weight:900">' + esc(pack.name) + '</div><div>🪙 ' + pack.price + ' each · open up to 50</div></div></div><div class="modal-body">' + (canOpen ? '' : '<div class="err">Not enough tokens. Tap +100 in the header.</div>') + '<div style="font-weight:800;margin-bottom:8px">Odds per pack</div>' + odds + '<div class="controls"><label>Amount: <strong id="nLabel">1</strong></label><input id="nRange" type="range" min="1" max="' + max + '" value="1"/><span id="costLabel">Cost: ' + pack.price + '</span></div><div class="controls"><button type="button" class="btn-main" id="btnOpen"' + (canOpen ? '' : ' disabled') + '>Open pack</button><button type="button" class="btn-ghost" id="btnClose">Close</button></div></div></div>';
+    var range = document.getElementById('nRange');
+    function sync() {
+      var n = parseInt(range.value, 10) || 1;
+      document.getElementById('nLabel').textContent = n;
+      document.getElementById('costLabel').textContent = 'Cost: ' + (n * pack.price);
+      document.getElementById('btnOpen').disabled = state.tokens < n * pack.price;
+    }
+    range.addEventListener('input', sync);
+    document.getElementById('btnClose').onclick = function (e) { e.preventDefault(); closeModal(); };
+    document.getElementById('btnOpen').onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      doOpen(pack, range.value);
+    };
+    document.getElementById('modalBox').onclick = function (e) { e.stopPropagation(); };
+  }
+
+  function renderMarket() {
+    var root = document.getElementById('packGrid');
+    var html = '';
+    for (var i = 0; i < PACKS.length; i++) {
+      var p = PACKS[i];
+      html += '<button type="button" class="card" style="--c1:' + esc(p.c1) + ';--c2:' + esc(p.c2) + '" data-id="' + esc(p.id) + '"><img src="' + esc(p.image) + '" alt=""/><div class="meta"><span>' + esc(p.name) + '</span><span>🪙 ' + p.price + '</span></div></button>';
+    }
+    root.innerHTML = html;
+    var buttons = root.querySelectorAll('.card');
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var pack = null;
+        for (var k = 0; k < PACKS.length; k++) if (PACKS[k].id === id) pack = PACKS[k];
+        if (pack) showPackModal(pack);
+      });
+    }
+  }
+
+  function renderInv() {
+    var root = document.getElementById('invRoot');
+    var counts = {};
+    for (var i = 0; i < state.inv.length; i++) {
+      var id = state.inv[i];
+      counts[id] = (counts[id] || 0) + 1;
+    }
+    if (!state.inv.length) {
+      root.innerHTML = '<div class="empty">No blooks yet — open packs in Market.</div>';
+      return;
+    }
+    var html = '';
+    for (var p = 0; p < PACKS.length; p++) {
+      var pack = PACKS[p];
+      var owned = 0;
+      for (var b = 0; b < pack.blooks.length; b++) if (counts[pack.blooks[b].id]) owned++;
+      if (!owned) continue;
+      html += '<div class="section"><h2><span>' + esc(pack.name) + '</span><span class="mute">' + owned + '/' + pack.blooks.length + '</span></h2><div class="grid">';
+      for (var j = 0; j < pack.blooks.length; j++) {
+        var bl = pack.blooks[j];
+        var n = counts[bl.id] || 0;
+        if (!n) {
+          html += '<div class="blook lock"><img src="' + esc(bl.image) + '" alt=""/><div class="name">???</div><div class="rar">Locked</div></div>';
+        } else {
+          html += '<div class="blook" style="border-color:' + (RCOLOR[bl.rarity] || '#fff3') + '">' + (n > 1 ? '<span class="cnt">×' + n + '</span>' : '') + '<img src="' + esc(bl.image) + '" alt=""/><div class="name">' + esc(bl.name) + '</div><div class="rar" style="color:' + (RCOLOR[bl.rarity] || '#aaa') + '">' + esc(bl.rarity) + '</div></div>';
+        }
+      }
+      html += '</div></div>';
+    }
+    root.innerHTML = html || '<div class="empty">No blooks yet.</div>';
+  }
+
+  document.getElementById('modalBg').addEventListener('click', function (e) {
+    if (e.target.id === 'modalBg') closeModal();
+  });
+  document.getElementById('tabMarket').onclick = function () {
+    document.getElementById('tabMarket').classList.add('on');
+    document.getElementById('tabInv').classList.remove('on');
+    document.getElementById('viewMarket').hidden = false;
+    document.getElementById('viewInv').hidden = true;
+  };
+  document.getElementById('tabInv').onclick = function () {
+    document.getElementById('tabInv').classList.add('on');
+    document.getElementById('tabMarket').classList.remove('on');
+    document.getElementById('viewMarket').hidden = true;
+    document.getElementById('viewInv').hidden = false;
+    renderInv();
+  };
+  document.getElementById('addTok').onclick = function () {
+    saveState({ tokens: state.tokens + 100, inv: state.inv.slice() });
+  };
+
+  renderMarket();
+  renderInv();
+})();
+
+</script>
+</body>
+</html>
