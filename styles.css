@@ -402,3 +402,19 @@ button.bt:hover{transform:translateY(-3px) scale(1.04)}.bt.lock img{filter:brigh
 100%{transform:translate(-50%,-50%) translateZ(300px) translate(calc(var(--dx)*1.2),calc(var(--rise)*-1.1)) scale(.87);opacity:0}}
 @keyframes chfanflip{0%{transform:rotateY(0deg) rotateZ(0deg)}60%{transform:rotateY(720deg) rotateZ(var(--rz))}100%{transform:rotateY(1080deg) rotateZ(var(--rz))}}
 @media (prefers-reduced-motion:reduce){.ch-idle .ch3,.ch-wob,.ch-beam{animation:none!important}}
+
+/* falling blooks background */
+.app-bg{isolation:isolate}
+.fall-bg{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+@keyframes fall{from{transform:translate3d(0,-25vh,0) rotate(var(--r0))}to{transform:translate3d(var(--sw),125vh,0) rotate(var(--r1))}}
+.fall{position:absolute;top:0;animation:fall linear infinite;will-change:transform}
+@media (prefers-reduced-motion:reduce){.fall{animation:none;top:20%}}
+.avpick{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+/* purple & red theme */
+:root[data-theme=purple]{--ink:#14041f;--panel:#2a0b3d;--line:rgba(255,90,140,.22);--cream:#ffe9f4;--mute:#d3a6e6;--or:#ff2d55;--s1:#4a1670;--s2:#2d0b49;--s3:#12031d;--hi:rgba(255,255,255,.12);--t1:#3d1260;--t2:#1f0833;--tc:#ffe9f4;--tab1:#4a1670;--tab2:#2d0b49;--cwbg:rgba(0,0,0,.28)}
+[data-theme=purple] .app-bg{background:radial-gradient(70% 55% at 6% -8%,rgba(255,40,80,.45),transparent 70%),radial-gradient(65% 55% at 100% 105%,rgba(150,50,255,.45),transparent 70%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(160deg,#1c0630,#14041f 60%,#2a0618)}
+[data-theme=purple] .topbar{background:linear-gradient(180deg,#6a1b9a,#3b0a5e)!important;border-bottom:2px solid rgba(255,45,85,.55)!important}
+[data-theme=purple] .btn.bg-\[\#f7953a\],[data-theme=purple] .btn.bg-\[\#ffb347\],[data-theme=purple] .btn.bg-\[\#fff4d6\]{background:linear-gradient(180deg,#ff3b5c,#b3123a)!important;color:#fff!important}
+[data-theme=purple] .qty.on,[data-theme=purple] .seg button[aria-selected=true]{background:#ff2d55;color:#fff;border-color:#ff2d55}
+[data-theme=purple] .lb-row.me{border-color:#ff2d55}
+[data-theme=purple] *::-webkit-scrollbar-thumb{background:rgba(255,45,85,.5);background-clip:content-box}
