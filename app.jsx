@@ -296,7 +296,7 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
-const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: String(u.name || '').toUpperCase() === 'DEVDRAGON' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
+const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVMASTER' ? 'DEVDRAGON' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -478,19 +478,11 @@ const chat = (() => { // one shared live listener for the whole app
       lastSend = Date.now()
       const data = { user: String(user || '').slice(0, 24), text: t, ts: FB.ts(), uid: authUser.uid }
       if (reply) data.reply = { id: String(reply.id).slice(0, 40), user: String(reply.user).slice(0, 16), text: cleanMsg(String(reply.text)).slice(0, 90) }
-      const write = (d) => {
-        const ref = FB.db.collection('chat').doc()
-        const p = ref.set(d)
-        return Promise.race([p.then(() => 'ok'), new Promise((resolve) => setTimeout(() => resolve('slow'), 8000))])
-      }
       try {
-        let r
-        try { r = await write(data) } catch (e) {
-          // rules may reject extra fields: retry once with the bare minimum
-          if (e && (e.code === 'permission-denied' || e.code === 'invalid-argument')) r = await write({ user: data.user, text: data.text, ts: data.ts })
-          else throw e
-        }
-        // 'slow' = queued locally by Firestore and will sync; the message already shows up in the chat
+        await Promise.race([
+          FB.db.collection('chat').add(data),
+          new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Chat write timed out after 8 seconds.'), { code: 'timeout' })), 8000))
+        ])
         lastError = ''
         return true
       } catch (e) {
@@ -511,7 +503,7 @@ const chat = (() => { // one shared live listener for the whole app
   }
 })()
 
-const OWNER = 'DEVMASTER', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
+const OWNER = 'DEVDRAGON', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
 const ECP = { name: 'ECDSA', namedCurve: 'P-256' }, ECS = { name: 'ECDSA', hash: 'SHA-256' }
 const b64s = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64s = (t) => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
@@ -530,20 +522,22 @@ const BW = new Set(['jeff76']) // black and white animated names
 const JM = new Set(['jeff76']) // can mute players (needs the mute key: /key4 yourkey)
 const PUB4 = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"-gjthSzIZuXUtNt4N14D7O66wkzob9R-gv-TK1DdUzc","y":"hhfSx4BGDIGyreBpNXl6LxP5Xm4dCdhrTze3KOiBZbQ","crv":"P-256"}, MKY = 'oranget_mkey'
 const isBw = (n) => BW.has(lc(n)), isJm = (n) => JM.has(lc(n))
-const HM = new Set(['dxm']) // hardcoded mods, no key needed
+const HM = new Set(['dxm', 'aditya']) // hardcoded mods, no key needed
 const isHm = (n) => HM.has(lc(n))
 const BG = new Set([]) // blue and green animated names (add a lowercase username here)
 const MP = new Set(['dxm']) // magenta and purple animated names
 const isBg = (n) => BG.has(lc(n)), isMp = (n) => MP.has(lc(n))
 const CO = new Set(['ethan32']) // co-owner: badge + blue/white/green animated name only, no commands or mute powers
 const isCo = (n) => CO.has(lc(n))
-const nmCls = (n, fb) => (isRb(n) ? 'rbw' : isBr(n) ? 'brw' : isBw(n) ? 'bwr' : isBg(n) ? 'bgw' : isMp(n) ? 'mpw' : isCo(n) ? 'bwg' : fb || '')
+const AD = new Set(['aditya']) // red and blue animated name
+const DV = new Set(['devdragon', 'devmaster']) // owner: every-color fireworks + electric shock name
+const nmCls = (n, fb) => (DV.has(lc(n)) ? 'dvm' : AD.has(lc(n)) ? 'rbl' : isRb(n) ? 'rbw' : isBr(n) ? 'brw' : isBw(n) ? 'bwr' : isBg(n) ? 'bgw' : isMp(n) ? 'mpw' : isCo(n) ? 'bwg' : fb || '')
 Object.entries(BR_SIGS).forEach(([n, sg]) => verifyCmd('blackred|' + n, sg, PUB3).then((ok) => { if (ok) { BR.add(lc(n)); cmdSubs.forEach((f) => f()) } }))
 Object.entries(AR_SIGS).forEach(([n, sg]) => verifyCmd('artist|' + n, sg, PUB3).then((ok) => { if (ok) { AR.add(lc(n)); cmdSubs.forEach((f) => f()) } }))
 Object.entries(RB_SIGS).forEach(([n, sg]) => verifyCmd('rainbow|' + n, sg, PUB2).then((ok) => { if (ok) { RB.add(lc(n)); if (n === 'DEVMASTER') RB.add('devdragon'); cmdSubs.forEach((f) => f()) } }))
 async function sendCmd(c, arg, as) { // signed with the DEVMASTER key (or the rainbow key)
   const K = { rainbow: 2, unrainbow: 2, blackred: 3, unblackred: 3, artist: 3, unartist: 3, kmute: 4, kunmute: 4 }[c] || 0, pk = K === 2 ? PUB2 : K === 3 ? PUB3 : K === 4 ? PUB4 : PUBJ, ks = K === 2 ? RBK : K === 3 ? BRK : K === 4 ? MKY : DMK
-  if (!(K === 4 && isHm(as)) && !localStorage.getItem(ks)) throw new Error(K ? 'This browser has no key for that. Use /key' + K + ' yourkey first.' : 'This browser does not have the DEVMASTER key. Use /key yourkey first.')
+  if (!(K === 4 && isHm(as)) && !localStorage.getItem(ks)) throw new Error(K ? 'This browser has no key for that. Use /key' + K + ' yourkey first.' : 'This browser does not have the DEVDRAGON key. Use /key yourkey first.')
   arg = String(arg).replace(/[|\u0000-\u001f]/g, '').slice(0, 70); const ts = Date.now().toString(36), p = c + '|' + arg + '|' + ts
   if (!(await chat.send(as || OWNER, '§' + p + '|' + (K === 4 && isHm(as) ? '' : await signCmd(p, pk, ks))))) throw new Error('Command not sent. Wait a moment and try again.')
 }
@@ -744,7 +738,7 @@ function PackModal({ pack, user, onOpen, onClose }) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-2" onClick={onClose}>
       <div className="pm" style={{ '--a': ACC[pack.id] }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${pack.name} odds`}>
-        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={11} />{pack.price} each</div></div></div>
+        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
         <div className="pm-main">
           <div className="pm-top"><h3 className="display text-xl">Odds per pack</h3><button className="text-sm underline" onClick={onClose}>Close</button></div>
           <div className="pm-odds">{groups.map((g) => { const tot = g.list.reduce((s, r) => s + r.p, 0), c = RARITY[g.k].color; return (
@@ -807,7 +801,7 @@ function Market({ user, update }) {
         {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
           <button key={p.id} onClick={() => setPicked(p)} disabled={!!opening} className="pk" style={{ '--a': ACC[p.id] }} aria-label={`${p.name}, ${p.price} Blook Tokens. See odds`}>
             <div className="art"><img src={IMG[p.img]} alt="" /></div>
-            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={11} />{p.price}</div></div>
+            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={16} />{p.price}</div></div>
           </button>
         ))}
       </div>
@@ -1169,15 +1163,15 @@ function Chat({ user, eng, go }) {
     if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (await chat.send(user.name, text, reply)) { setText(''); setReply(null); setErr('') } else setErr(chat.getError()); return }
     setText(''); const [c, a, b] = t.split(/\s+/)
     try {
-      if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVMASTER commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
+      if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return setErr('Mute key saved. Use /mute name minutes and /unmute name.') }
-      if ((c === '/mute' || c === '/unmute') && user.name !== OWNER) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVMASTER or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
+      if ((c === '/mute' || c === '/unmute') && user.name !== OWNER) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVDRAGON or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
       if (c === '/key3') { localStorage.setItem(BRK, a || ''); return setErr('Key saved. Use /blackred and /artist.') }
       if (['/blackred', '/unblackred', '/artist', '/unartist'].includes(c)) { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done.') }
       if (c === '/key2') { localStorage.setItem(RBK, a || ''); return setErr('Rainbow key saved on this browser. Type /rainbow to light up your name.') }
       if (c === '/rainbow' || c === '/unrainbow') { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done. Names update for everyone who sees the message.') }
-      if (c === '/key') { if (user.name !== OWNER) throw new Error('Only the DEVMASTER account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
-      if (user.name !== OWNER) throw new Error('Only DEVMASTER can use commands.')
+      if (c === '/key') { if (user.name !== OWNER) throw new Error('Only the DEVDRAGON account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
+      if (user.name !== OWNER) throw new Error('Only DEVDRAGON can use commands.')
       const map = { '/give': () => [a + ':' + b], '/mute': () => [a + ':' + (b || 10)], '/unmute': () => [a], '/ban': () => [a], '/unban': () => [a], '/mod': () => [a], '/unmod': () => [a], '/announce': () => [t.slice(10)] }
       if (!map[c]) throw new Error('Unknown command. Type /help.')
       if (c !== '/announce' && !a) throw new Error('Add a player name.')
@@ -2069,7 +2063,6 @@ function SettingsModal({ user, update, onLogout, onClose }) {
         <div className="st-body">
           {tab === 'look' && <div className="flex gap-3">
             <button className="swatch" aria-pressed={theme === 'orange'} onClick={() => setTheme('orange')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ffc98a,#fba24d 55%,#f27d2c)' }} />Orange</button>
-            <button className="swatch" aria-pressed={theme === 'purple'} onClick={() => setTheme('purple')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#d9b8ff,#a66cf0 55%,#6d2fc9)' }} />Purple</button>
             <button className="swatch" aria-pressed={theme === 'black'} onClick={() => setTheme('black')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'radial-gradient(70% 90% at 10% 0,rgba(255,122,18,.5),#0e0919 70%)' }} />Black</button></div>}
           {tab === 'acct' && <div className="space-y-3">
             <p>Signed in as <b className={nmCls(user.name)}>{user.name}</b>.</p>
@@ -2187,7 +2180,7 @@ function Dashboard({ user, update, onLogout }) {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <span className="chip"><Coins size={36} />{user.tokens.toLocaleString()}</span>
+          <span className="chip"><Coins size={24} />{user.tokens.toLocaleString()}</span>
           <span className={`chunk hidden sm:block ${nmCls(user.name, 'text-[#fbe9d0]')}`}>{user.name}</span>
           <button onClick={() => setSettings(true)} aria-label="Settings" className="iconbtn rounded-xl p-2"><Gear size={22} /></button>
         </div>
