@@ -10,9 +10,11 @@ const Store = mk(<><path d="m2 7 4.4-4h11.2L22 7" /><path d="M4 12v8a2 2 0 0 0 2
 const MessageCircle = mk(<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />)
 const ArrowLeftRight = mk(<path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4" />)
 const LogOut = mk(<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />)
-const Coins = ({ size = 24, className = '' }) => (
-  <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain' }} />
-)
+// Keep token art compact throughout the game while preserving each icon's general alignment.
+const Coins = ({ size = 24, className = '' }) => {
+  const tokenSize = Math.max(10, Math.round(size * 0.68))
+  return <img src={IMG.blooktoken} width={tokenSize} height={tokenSize} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle' }} />
+}
 const Send = mk(<path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />)
 const Check = mk(<path d="M20 6 9 17l-5-5" />)
 const Lock = mk(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)
@@ -403,27 +405,80 @@ const okMsg = (m, id, fallbackTs) => m && typeof m.user === 'string' && typeof m
 const msgOf = (id, d) => d && typeof d.user === 'string' && typeof d.text === 'string' && d.user ? { id, role: '', user: d.user.slice(0, 16), text: cleanMsg(d.text), ts: d.ts && d.ts.toMillis ? d.ts.toMillis() : Date.now(), edited: !!d.edited, reply: d.reply && typeof d.reply.user === 'string' ? { id: String(d.reply.id || '').slice(0, 40), user: d.reply.user.slice(0, 16), text: cleanMsg(String(d.reply.text || '')).slice(0, 90) } : null } : null
 const pinged = (m, n) => new RegExp('(^|[^A-Za-z0-9_])@' + n + '(?![A-Za-z0-9_])', 'i').test(m.text) || !!(m.reply && String(m.reply.user).toLowerCase() === String(n).toLowerCase())
 const chat = (() => { // one shared live listener for the whole app
-  let list = [], subs = new Set(), started = false, state = '', started2 = false, cache = new Map()
+  let list = [], subs = new Set(), authOff = null, snapOff = null, state = '', cache = new Map()
   const emit = () => subs.forEach((f) => f(list, state))
   const start = () => {
-    if (started || !FB || !FB.auth.currentUser) return; started = true
-    FB.db.collection('chat').where('ts', '>', FB.T.fromMillis(Date.now() - 6 * 3600e3)).orderBy('ts').limitToLast(80).onSnapshot(
-      (snap) => { if (started2 && !snap.docChanges().length) return; started2 = true; list = snap.docs.map((d) => { const raw = d.data({ serverTimestamps: 'estimate' }), sig = d.id + '|' + raw.text + '|' + (raw.edited ? 1 : 0) + '|' + (raw.ts && raw.ts.toMillis ? raw.ts.toMillis() : 0), c = cache.get(d.id); if (c && c.sig === sig) return c.m; const m = msgOf(d.id, raw); cache.set(d.id, { sig, m }); return m }).filter(Boolean); state = ''; emit() },
-      () => { state = "Can't reach the chat server. Retrying…"; emit() })
+    if (!FB || authOff) return
+    const attach = () => {
+      if (!FB.auth.currentUser || snapOff) return
+      state = ''
+      snapOff = FB.db.collection('chat')
+        .where('ts', '>', FB.T.fromMillis(Date.now() - 6 * 3600e3))
+        .orderBy('ts').limitToLast(80)
+        .onSnapshot((snap) => {
+          list = snap.docs.map((d) => {
+            const raw = d.data({ serverTimestamps: 'estimate' })
+            const sig = d.id + '|' + raw.text + '|' + (raw.edited ? 1 : 0) + '|' + (raw.ts && raw.ts.toMillis ? raw.ts.toMillis() : 0)
+            const c = cache.get(d.id)
+            if (c && c.sig === sig) return c.m
+            const m = msgOf(d.id, raw)
+            cache.set(d.id, { sig, m })
+            return m
+          }).filter(Boolean)
+          state = ''
+          emit()
+        }, (e) => {
+          console.warn('Oranget chat listener failed:', e)
+          state = e && e.code === 'permission-denied'
+            ? 'Chat access was blocked by Firebase rules.'
+            : 'Chat connection failed. Check your connection and reload.'
+          emit()
+        })
+    }
+    authOff = FB.auth.onAuthStateChanged((user) => {
+      if (user) {
+        attach()
+      } else {
+        if (snapOff) { snapOff(); snapOff = null }
+        state = 'Sign in again to use chat.'
+        emit()
+      }
+    })
+    // Auth may already be ready before the observer's first callback.
+    attach()
   }
   return {
-    subscribe(set, status) { const f = (l, s) => { set(l); status(s) }; subs.add(f); start(); if (list.length || state) f(list, state); return () => subs.delete(f) },
-    async send(user, text, reply) { // sanitized + rate-limited; React escapes all text when rendering
+    subscribe(set, status) {
+      const f = (l, s) => { set(l); status(s) }
+      subs.add(f); start(); f(list, state)
+      return () => subs.delete(f)
+    },
+    async send(user, text, reply) {
       const t = cleanMsg(text)
       if (!t || !FB || !FB.auth.currentUser || Date.now() - lastSend < 1200) return false
       lastSend = Date.now()
       const data = { user, text: t, ts: FB.ts(), uid: FB.auth.currentUser.uid }
       if (reply) data.reply = { id: String(reply.id).slice(0, 40), user: String(reply.user).slice(0, 16), text: cleanMsg(String(reply.text)).slice(0, 90) }
-      const p = FB.db.collection('chat').add(data)
-      return Promise.race([p.then(() => true, () => false), new Promise((r) => setTimeout(() => r(true), 3000))])
+      try {
+        await Promise.race([
+          FB.db.collection('chat').add(data),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+        ])
+        return true
+      } catch (e) {
+        console.warn('Oranget chat send failed:', e)
+        return false
+      }
     },
-    async edit(id, text) { const t = cleanMsg(text); if (!t || !FB) return false; try { await FB.db.collection('chat').doc(id).update({ text: t, edited: true }); return true } catch { return false } },
-    async remove(id) { try { await FB.db.collection('chat').doc(id).delete(); return true } catch { return false } },
+    async edit(id, text) {
+      const t = cleanMsg(text)
+      if (!t || !FB || !FB.auth.currentUser) return false
+      try { await FB.db.collection('chat').doc(id).update({ text: t, edited: true }); return true } catch (e) { console.warn('Chat edit failed:', e); return false }
+    },
+    async remove(id) {
+      if (!FB || !FB.auth.currentUser) return false
+      try { await FB.db.collection('chat').doc(id).delete(); return true } catch (e) { console.warn('Chat delete failed:', e); return false }
+    },
   }
 })()
 
