@@ -10,11 +10,10 @@ const Store = mk(<><path d="m2 7 4.4-4h11.2L22 7" /><path d="M4 12v8a2 2 0 0 0 2
 const MessageCircle = mk(<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />)
 const ArrowLeftRight = mk(<path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4" />)
 const LogOut = mk(<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />)
-// Keep token art compact throughout the game while preserving each icon's general alignment.
-const Coins = ({ size = 24, className = '' }) => {
-  const tokenSize = Math.max(10, Math.round(size * 0.68))
-  return <img src={IMG.blooktoken} width={tokenSize} height={tokenSize} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle' }} />
-}
+// Keep the original size everywhere; only the Market page opts into smaller token icons.
+const Coins = ({ size = 24, className = '' }) => (
+  <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle' }} />
+)
 const Send = mk(<path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />)
 const Check = mk(<path d="M20 6 9 17l-5-5" />)
 const Lock = mk(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)
@@ -405,8 +404,16 @@ const okMsg = (m, id, fallbackTs) => m && typeof m.user === 'string' && typeof m
 const msgOf = (id, d) => d && typeof d.user === 'string' && typeof d.text === 'string' && d.user ? { id, role: '', user: d.user.slice(0, 16), text: cleanMsg(d.text), ts: d.ts && d.ts.toMillis ? d.ts.toMillis() : Date.now(), edited: !!d.edited, reply: d.reply && typeof d.reply.user === 'string' ? { id: String(d.reply.id || '').slice(0, 40), user: d.reply.user.slice(0, 16), text: cleanMsg(String(d.reply.text || '')).slice(0, 90) } : null } : null
 const pinged = (m, n) => new RegExp('(^|[^A-Za-z0-9_])@' + n + '(?![A-Za-z0-9_])', 'i').test(m.text) || !!(m.reply && String(m.reply.user).toLowerCase() === String(n).toLowerCase())
 const chat = (() => { // one shared live listener for the whole app
-  let list = [], subs = new Set(), authOff = null, snapOff = null, state = '', cache = new Map()
+  let list = [], subs = new Set(), authOff = null, snapOff = null, state = '', cache = new Map(), lastError = ''
   const emit = () => subs.forEach((f) => f(list, state))
+  const errorText = (e) => {
+    const code = (e && e.code) || ''
+    if (code === 'permission-denied' || code === 'firestore/permission-denied') return 'Firebase blocked this message (permission-denied). The Firestore chat rules must allow signed-in users to post.'
+    if (code === 'unauthenticated') return 'Your Firebase session expired. Sign out and sign back in, then retry.'
+    if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'timeout') return 'Chat server timed out. Check your connection and try again.'
+    if (code === 'resource-exhausted') return 'Chat is temporarily rate-limited. Please wait a little and retry.'
+    return `Message failed${code ? ` (${code})` : ''}: ${(e && e.message) || 'check your connection and Firebase settings.'}`
+  }
   const start = () => {
     if (!FB || authOff) return
     const attach = () => {
@@ -429,23 +436,29 @@ const chat = (() => { // one shared live listener for the whole app
           emit()
         }, (e) => {
           console.warn('Oranget chat listener failed:', e)
-          state = e && e.code === 'permission-denied'
-            ? 'Chat access was blocked by Firebase rules.'
-            : 'Chat connection failed. Check your connection and reload.'
+          state = errorText(e)
           emit()
         })
     }
     authOff = FB.auth.onAuthStateChanged((user) => {
-      if (user) {
-        attach()
-      } else {
+      if (user) attach()
+      else {
         if (snapOff) { snapOff(); snapOff = null }
         state = 'Sign in again to use chat.'
         emit()
       }
     })
-    // Auth may already be ready before the observer's first callback.
     attach()
+  }
+  const getUser = () => {
+    if (!FB) return Promise.resolve(null)
+    if (FB.auth.currentUser) return Promise.resolve(FB.auth.currentUser)
+    return new Promise((resolve) => {
+      let done = false, off = null
+      const finish = (u) => { if (done) return; done = true; if (off) off(); clearTimeout(timer); resolve(u || null) }
+      const timer = setTimeout(() => finish(FB.auth.currentUser || null), 5000)
+      off = FB.auth.onAuthStateChanged((u) => finish(u))
+    })
   }
   return {
     subscribe(set, status) {
@@ -453,31 +466,39 @@ const chat = (() => { // one shared live listener for the whole app
       subs.add(f); start(); f(list, state)
       return () => subs.delete(f)
     },
+    getError() { return lastError || 'Message was not sent. Please try again.' },
     async send(user, text, reply) {
       const t = cleanMsg(text)
-      if (!t || !FB || !FB.auth.currentUser || Date.now() - lastSend < 1200) return false
+      lastError = ''
+      if (!t) { lastError = 'Type a message first.'; return false }
+      if (!FB) { lastError = 'Firebase did not load. Reload the page and check the Firebase scripts.'; return false }
+      if (Date.now() - lastSend < 1200) { lastError = 'Please wait a second before sending another message.'; return false }
+      const authUser = await getUser()
+      if (!authUser) { lastError = 'You are not signed in to Firebase. Sign out and sign back in, then retry.'; return false }
       lastSend = Date.now()
-      const data = { user, text: t, ts: FB.ts(), uid: FB.auth.currentUser.uid }
+      const data = { user: String(user || '').slice(0, 24), text: t, ts: FB.ts(), uid: authUser.uid }
       if (reply) data.reply = { id: String(reply.id).slice(0, 40), user: String(reply.user).slice(0, 16), text: cleanMsg(String(reply.text)).slice(0, 90) }
       try {
         await Promise.race([
           FB.db.collection('chat').add(data),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+          new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Chat write timed out after 8 seconds.'), { code: 'timeout' })), 8000))
         ])
+        lastError = ''
         return true
       } catch (e) {
         console.warn('Oranget chat send failed:', e)
+        lastError = errorText(e)
         return false
       }
     },
     async edit(id, text) {
       const t = cleanMsg(text)
       if (!t || !FB || !FB.auth.currentUser) return false
-      try { await FB.db.collection('chat').doc(id).update({ text: t, edited: true }); return true } catch (e) { console.warn('Chat edit failed:', e); return false }
+      try { await FB.db.collection('chat').doc(id).update({ text: t, edited: true }); return true } catch (e) { console.warn('Chat edit failed:', e); lastError = errorText(e); return false }
     },
     async remove(id) {
       if (!FB || !FB.auth.currentUser) return false
-      try { await FB.db.collection('chat').doc(id).delete(); return true } catch (e) { console.warn('Chat delete failed:', e); return false }
+      try { await FB.db.collection('chat').doc(id).delete(); return true } catch (e) { console.warn('Chat delete failed:', e); lastError = errorText(e); return false }
     },
   }
 })()
@@ -715,7 +736,7 @@ function PackModal({ pack, user, onOpen, onClose }) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-2" onClick={onClose}>
       <div className="pm" style={{ '--a': ACC[pack.id] }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${pack.name} odds`}>
-        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={22} />{pack.price} each</div></div></div>
+        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
         <div className="pm-main">
           <div className="pm-top"><h3 className="display text-xl">Odds per pack</h3><button className="text-sm underline" onClick={onClose}>Close</button></div>
           <div className="pm-odds">{groups.map((g) => { const tot = g.list.reduce((s, r) => s + r.p, 0), c = RARITY[g.k].color; return (
@@ -727,7 +748,7 @@ function PackModal({ pack, user, onOpen, onClose }) {
             <div className="flex flex-wrap items-center gap-2"><span className="chunk text-sm">How many?</span>
               {[1, 5, 10, 25].map((k) => <button key={k} disabled={k * pack.price > user.tokens} onClick={() => setN(k)} className={`qty ${q === k ? 'on' : ''}`}>{k}</button>)}
               <button className={`qty ${q === max && ![1, 5, 10, 25].includes(max) ? 'on' : ''}`} disabled={max < 1} onClick={() => setN(max)}>Max {max}</button></div>
-            <button className="btn mt-2 w-full bg-[#f7953a] text-base" disabled={max < 1} onClick={() => onOpen(q)}><span className="inline-flex items-center justify-center gap-2">Open {q} pack{q > 1 ? 's' : ''} for <Coins size={22} />{cost.toLocaleString()}</span></button>
+            <button className="btn mt-2 w-full bg-[#f7953a] text-base" disabled={max < 1} onClick={() => onOpen(q)}><span className="inline-flex items-center justify-center gap-2">Open {q} pack{q > 1 ? 's' : ''} for <Coins size={15} />{cost.toLocaleString()}</span></button>
             {max < 1 && <p className="mute mt-1 text-xs">You need {pack.price} Blook Tokens. Spin the daily wheel on Home for free Blook Tokens.</p>}
           </div>
         </div>
@@ -778,7 +799,7 @@ function Market({ user, update }) {
         {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
           <button key={p.id} onClick={() => setPicked(p)} disabled={!!opening} className="pk" style={{ '--a': ACC[p.id] }} aria-label={`${p.name}, ${p.price} Blook Tokens. See odds`}>
             <div className="art"><img src={IMG[p.img]} alt="" /></div>
-            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={24} />{p.price}</div></div>
+            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={16} />{p.price}</div></div>
           </button>
         ))}
       </div>
@@ -1137,7 +1158,7 @@ function Chat({ user, eng, go }) {
   const send = async (text) => {
     const t = text.trim(); if (!t) return
     if (editing) { if (await chat.edit(editing.id, t)) cancel(); else setErr('Could not edit that message.'); return }
-    if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (await chat.send(user.name, text, reply)) { setText(''); setReply(null); setErr('') } else setErr('Message not sent. Wait a moment and try again.'); return }
+    if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (await chat.send(user.name, text, reply)) { setText(''); setReply(null); setErr('') } else setErr(chat.getError()); return }
     setText(''); const [c, a, b] = t.split(/\s+/)
     try {
       if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
