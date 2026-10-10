@@ -478,11 +478,19 @@ const chat = (() => { // one shared live listener for the whole app
       lastSend = Date.now()
       const data = { user: String(user || '').slice(0, 24), text: t, ts: FB.ts(), uid: authUser.uid }
       if (reply) data.reply = { id: String(reply.id).slice(0, 40), user: String(reply.user).slice(0, 16), text: cleanMsg(String(reply.text)).slice(0, 90) }
+      const write = (d) => {
+        const ref = FB.db.collection('chat').doc()
+        const p = ref.set(d)
+        return Promise.race([p.then(() => 'ok'), new Promise((resolve) => setTimeout(() => resolve('slow'), 8000))])
+      }
       try {
-        await Promise.race([
-          FB.db.collection('chat').add(data),
-          new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Chat write timed out after 8 seconds.'), { code: 'timeout' })), 8000))
-        ])
+        let r
+        try { r = await write(data) } catch (e) {
+          // rules may reject extra fields: retry once with the bare minimum
+          if (e && (e.code === 'permission-denied' || e.code === 'invalid-argument')) r = await write({ user: data.user, text: data.text, ts: data.ts })
+          else throw e
+        }
+        // 'slow' = queued locally by Firestore and will sync; the message already shows up in the chat
         lastError = ''
         return true
       } catch (e) {
@@ -736,7 +744,7 @@ function PackModal({ pack, user, onOpen, onClose }) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-2" onClick={onClose}>
       <div className="pm" style={{ '--a': ACC[pack.id] }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${pack.name} odds`}>
-        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
+        <div className="pm-art"><img src={IMG[pack.img]} alt={pack.name} /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={11} />{pack.price} each</div></div></div>
         <div className="pm-main">
           <div className="pm-top"><h3 className="display text-xl">Odds per pack</h3><button className="text-sm underline" onClick={onClose}>Close</button></div>
           <div className="pm-odds">{groups.map((g) => { const tot = g.list.reduce((s, r) => s + r.p, 0), c = RARITY[g.k].color; return (
@@ -799,7 +807,7 @@ function Market({ user, update }) {
         {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
           <button key={p.id} onClick={() => setPicked(p)} disabled={!!opening} className="pk" style={{ '--a': ACC[p.id] }} aria-label={`${p.name}, ${p.price} Blook Tokens. See odds`}>
             <div className="art"><img src={IMG[p.img]} alt="" /></div>
-            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={16} />{p.price}</div></div>
+            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={11} />{p.price}</div></div>
           </button>
         ))}
       </div>
@@ -2061,6 +2069,7 @@ function SettingsModal({ user, update, onLogout, onClose }) {
         <div className="st-body">
           {tab === 'look' && <div className="flex gap-3">
             <button className="swatch" aria-pressed={theme === 'orange'} onClick={() => setTheme('orange')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ffc98a,#fba24d 55%,#f27d2c)' }} />Orange</button>
+            <button className="swatch" aria-pressed={theme === 'purple'} onClick={() => setTheme('purple')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#d9b8ff,#a66cf0 55%,#6d2fc9)' }} />Purple</button>
             <button className="swatch" aria-pressed={theme === 'black'} onClick={() => setTheme('black')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'radial-gradient(70% 90% at 10% 0,rgba(255,122,18,.5),#0e0919 70%)' }} />Black</button></div>}
           {tab === 'acct' && <div className="space-y-3">
             <p>Signed in as <b className={nmCls(user.name)}>{user.name}</b>.</p>
@@ -2178,7 +2187,7 @@ function Dashboard({ user, update, onLogout }) {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <span className="chip"><Coins size={24} />{user.tokens.toLocaleString()}</span>
+          <span className="chip"><Coins size={36} />{user.tokens.toLocaleString()}</span>
           <span className={`chunk hidden sm:block ${nmCls(user.name, 'text-[#fbe9d0]')}`}>{user.name}</span>
           <button onClick={() => setSettings(true)} aria-label="Settings" className="iconbtn rounded-xl p-2"><Gear size={22} /></button>
         </div>
