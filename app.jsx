@@ -296,7 +296,7 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
-const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
+const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVDRAGON' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -503,7 +503,7 @@ const chat = (() => { // one shared live listener for the whole app
   }
 })()
 
-const OWNER = 'DEVDRAGON', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
+const OWNER = 'DEVMASTER', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
 const ECP = { name: 'ECDSA', namedCurve: 'P-256' }, ECS = { name: 'ECDSA', hash: 'SHA-256' }
 const b64s = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64s = (t) => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
