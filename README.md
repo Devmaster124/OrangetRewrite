@@ -1,20 +1,20 @@
-# OrangetRewrite — multi-page build
+# Oranget — split HTML project
 
-This project uses the Oranget game code from the supplied original HTML, separated into individual page entry files like the GitHub examples.
+This project splits the uploaded Oranget_22_6.html into separate page shells and shared assets.
 
 ## Pages
-- `index.html` — Vercel default entry point (same landing route as `Index.html`)
-- `Index.html` — landing / entry page
-- `Login.html` and `Register.html` — direct login and registration entry pages
-- `Home.html`, `Blooks.html`, `Market.html`, `Bazaar.html`, `Trade.html`, `Chat.html`, `Ranks.html` — separate game pages
-- `Settings.html` — settings entry page
+- `index.html` — default Vercel entry point
+- `Home.html` — home/dashboard
+- `Login.html` — opens the login dialog when logged out
+- `Register.html` — opens the sign-up dialog when logged out
+- `Blooks.html`, `Market.html`, `Bazaar.html`, `Trade.html`, `Chat.html`, `Ranks.html`, `Settings.html`
 
 ## Shared files
-- `app.jsx` — shared React game logic and page routing
-- `styles.css` — shared Oranget styling
-- `bootstrap.js` — startup/loading error handling
+- `app.jsx` — original React/Babel game logic
+- `styles.css` — extracted CSS
+- `bootstrap.js` — startup error/loading handling
 
-Keep all files in the same folder when uploading/deploying. `index.html` is lowercase on purpose because static hosts such as Vercel expect that as the default entry file. Pages use React, Babel, Tailwind and Firebase compatibility libraries from their CDNs, like the original.
+## Deploy
+Keep all files together in the repository root. `index.html` is lowercase intentionally because static hosting providers such as Vercel expect that filename as the default entry point. The page shells load React, Babel, Tailwind, and Firebase from their existing CDNs. `window.ORANGET_BACKEND` remains an empty string, matching the uploaded source.
 
-## Important
-This is a front-end code split. `window.ORANGET_BACKEND` remains empty as in the supplied source, so backend-dependent features still need the correct backend configuration. The generated package has been structurally checked, but not fully browser-tested against live Firebase/backend services.
+The app has been split and basic file integrity checked, but it has not been browser-tested. External CDN access and any required backend/Firebase configuration still affect runtime behavior.

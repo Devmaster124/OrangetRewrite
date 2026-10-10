@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Bowlby+One&family=Figtree:wght@500;700;800&family=Titan+One&display=swap');
 body{font-family:'Nunito',system-ui,sans-serif;font-weight:600;margin:0}
 .chunk{font-family:'Titan One',system-ui,sans-serif;letter-spacing:.02em}
@@ -41,6 +40,9 @@ html,body{overflow-x:hidden}
 .tradebox{background:linear-gradient(160deg,rgba(255,255,255,.62),rgba(255,226,184,.5));border:4px solid rgba(255,255,255,.6);box-shadow:0 8px 0 rgba(120,50,0,.16)}
 .brw{background:linear-gradient(90deg,#000,#ff1010,#000,#ff1010,#000);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 2.5s linear infinite}
 .rbw{background:linear-gradient(90deg,#ff3b3b,#ffb000,#ffe600,#2ee05a,#22c5ff,#8a4dff,#ff3bd4,#ff3b3b);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 3s linear infinite}@keyframes rbw{to{background-position:300% 0}}
+.bwr{background:linear-gradient(90deg,#000,#fff,#000,#fff,#000);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 2.5s linear infinite;filter:drop-shadow(0 0 1px #888)}
+.bgw{background:linear-gradient(90deg,#1e90ff,#00e5ff,#1de97a,#8dff3a,#1de97a,#00e5ff,#1e90ff);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 2.8s linear infinite;filter:drop-shadow(0 0 5px rgba(40,220,170,.55))}
+.mpw{background:linear-gradient(90deg,#ff2bd6,#d23cff,#7b3dff,#d23cff,#ff2bd6);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 2.8s linear infinite;filter:drop-shadow(0 0 5px rgba(210,60,255,.6))}
 .msg-in:hover{transform:none!important}.msg-in button{width:auto}
 .chatpanel{background:linear-gradient(160deg,rgba(255,140,40,.55),rgba(190,70,0,.45));border:4px solid rgba(255,255,255,.45);box-shadow:0 12px 0 rgba(120,50,0,.2)}
 @keyframes msgin{from{opacity:0;transform:translateY(16px) scale(.92)}to{opacity:1;transform:none}}.msg-in{animation:msgin .35s cubic-bezier(.2,1.6,.4,1) both}
@@ -293,11 +295,11 @@ input[type=range]{background:transparent!important;border:0!important;padding:0;
 .ba-glitch .bo{background:repeating-linear-gradient(0deg,transparent 0 6px,rgba(255,255,255,.22) 6px 8px);animation:baScan 1.2s linear infinite}
 @keyframes zfGlow{0%,100%{filter:drop-shadow(0 0 7px #ff6a1f) drop-shadow(-5px 0 9px rgba(127,233,255,.45))}50%{filter:drop-shadow(0 0 12px #7fe9ff) drop-shadow(5px 0 12px rgba(255,106,31,.55))}}
 @keyframes zfFlame{from{background-position:0 0}to{background-position:0 -110%}}
-@keyframes zfEm{to{background-position:0 -60px,11px -62px}}
+@keyframes zfEm{to{background-position:0 -106px,17px -59px,29px -122px}}
 .zf,.ba-fireice,.fx-zero{animation:zfGlow 3.2s ease-in-out infinite}
 .zf-ice{clip-path:polygon(0 0,56% 0,44% 100%,0 100%);background:linear-gradient(115deg,transparent 20%,rgba(190,245,255,.9) 50%,transparent 80%);background-size:260% 100%;animation:baSweep 2.6s linear infinite}
 .zf-fire{clip-path:polygon(56% 0,100% 0,100% 100%,44% 100%);background:linear-gradient(0deg,rgba(255,60,0,0) 0%,rgba(255,150,30,.85) 40%,rgba(255,235,120,.95) 65%,rgba(255,150,30,0) 100%);background-size:100% 220%;animation:zfFlame .9s linear infinite}
-.zf-em{position:absolute;inset:-6% -6% 0;pointer-events:none;mix-blend-mode:screen;opacity:.8;background:radial-gradient(circle,#ffb347 0 2px,transparent 3px) 0 0/22px 30px,radial-gradient(circle,#9ff0ff 0 2px,transparent 3px) 11px 15px/26px 34px;animation:zfEm 2.2s linear infinite;-webkit-mask:linear-gradient(#000 55%,transparent);mask:linear-gradient(#000 55%,transparent)}
+.zf-em{position:absolute;inset:-6% -6% 0;pointer-events:none;mix-blend-mode:screen;opacity:.8;background:radial-gradient(circle,#ffb347 0 1.6px,transparent 2.6px) 0 0/37px 53px,radial-gradient(circle,#9ff0ff 0 2px,transparent 3px) 17px 23px/53px 59px,radial-gradient(circle,#ffe08a 0 1.2px,transparent 2.2px) 29px 7px/29px 61px;animation:zfEm 2.8s linear infinite;-webkit-mask:linear-gradient(#000 55%,transparent);mask:linear-gradient(#000 55%,transparent)}
 .rz{background:linear-gradient(90deg,#ff5a1f,#ffc24a,#9ff3ff,#3a9bff,#ff5a1f);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:rzFlow 3s linear infinite}
 @keyframes rzFlow{to{background-position:300% 0}}
 .ro{color:#2bff88;text-shadow:0 0 6px #0b0,1px 0 0 #000,-1px 0 0 #000,0 1px 0 #000,0 -1px 0 #000}
@@ -320,9 +322,15 @@ button.bt:hover{transform:translateY(-3px) scale(1.04)}.bt.lock img{filter:brigh
 @keyframes rfAurora{from{transform:translate(-6%,2%) scale(1)}to{transform:translate(6%,-3%) scale(1.15)}}
 .rf-legendary{inset:-50%;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,210,80,.38) 0 7deg,transparent 7deg 20deg);animation:rfSpin 16s linear infinite;-webkit-mask:radial-gradient(circle,#000 0,transparent 55%);mask:radial-gradient(circle,#000 0,transparent 55%)}
 .rf-mystical{background:radial-gradient(42% 32% at 28% 40%,rgba(0,243,255,.5),transparent 70%),radial-gradient(42% 32% at 72% 58%,rgba(120,160,255,.45),transparent 70%);animation:rfAurora 5s ease-in-out infinite alternate;filter:blur(16px)}
-.rf-zero{inset:-40%;background:conic-gradient(from 0deg at 50% 50%,#ff5a1f,#ffd27a,#7fe9ff,#3a9bff,#7fe9ff,#ffd27a,#ff5a1f);mix-blend-mode:screen;opacity:.7;animation:rfSpin 9s linear infinite;filter:blur(46px)}
+.rbg:has(.rf-zero){background:#07040d}
+.rf-zero{inset:-40%;background:conic-gradient(from 0deg at 50% 50%,#ff5a1f,#ffd27a,#7fe9ff,#3a9bff,#7fe9ff,#ffd27a,#ff5a1f);mix-blend-mode:screen;opacity:.8;animation:rfSpin 9s linear infinite;filter:blur(38px);-webkit-mask:radial-gradient(circle at 50% 50%,#000 0,transparent 62%);mask:radial-gradient(circle at 50% 50%,#000 0,transparent 62%)}
 .rf-og{background:var(--rain) 0 0/90px 160px,radial-gradient(circle at 50% 45%,rgba(0,0,0,0) 20%,rgba(0,0,0,.88) 85%);animation:baRain 1.6s linear infinite}
 @media (prefers-reduced-motion:reduce){.ba,.ba>img,.bo,.bo2,.zf,.zf-ice,.zf-fire,.zf-em,.rz,.rbg i,.rf{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.zd,.zd>img,.zs,.zt,.mcard,.pbtn.ready,.wheel.spin .bulb{animation:none}}
 @media (prefers-reduced-motion:reduce){.pack-shake,.rays,.pop,.page-in,.bob,.coin-spin,.coin-flip,.dot,.pulse2,.merge-l,.merge-r,.fx-legendary,.fx-mystical,.fx-zero,.ptc,.floatdmg,.lunge,.hitshake{animation:none}}
-
+@keyframes chromaGlow{0%,100%{filter:drop-shadow(0 0 6px #33c5f5)}33%{filter:drop-shadow(0 0 11px #b06bff)}66%{filter:drop-shadow(0 0 11px #3dffb0)}}
+.fx-chroma{animation:chromaGlow 3.4s linear infinite}
+.rf-chroma{background:radial-gradient(42% 32% at 30% 42%,rgba(51,197,245,.5),transparent 70%),radial-gradient(42% 32% at 70% 58%,rgba(176,107,255,.45),transparent 70%),radial-gradient(36% 28% at 52% 78%,rgba(61,255,176,.35),transparent 70%);animation:rfAurora 5s ease-in-out infinite alternate;filter:blur(16px)}
+.rch{background:linear-gradient(90deg,#33c5f5,#c4f3ff,#b06bff,#3dffb0,#33c5f5);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:rzFlow 3s linear infinite}
+.bwg{background:linear-gradient(90deg,#1e90ff,#ffffff,#1de97a,#ffffff,#1e90ff);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:none!important;animation:rbw 2.8s linear infinite;filter:drop-shadow(0 0 4px rgba(60,200,220,.7))}
+@media (prefers-reduced-motion:reduce){.fx-chroma,.rf-chroma,.rch,.bwg{animation:none!important}}
