@@ -296,7 +296,7 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
-const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVMASTER' ? 'DEVDRAGON' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
+const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVMASTER' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -511,7 +511,7 @@ const chat = (() => { // one shared live listener for the whole app
   }
 })()
 
-const OWNER = 'DEVDRAGON', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
+const OWNER = 'DEVMASTER', PUBJ = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"zQCQGTwpKY_LNRO17bwDOPlet81YUoq1lnqw3GFXsyA","y":"6ZRO9l-iBkVjp_o-lw0oM3edUnOweyPtcoZU9DbfKPw","crv":"P-256"}, DMK = 'oranget_dmkey', CM = 'oranget_cmdstate'
 const ECP = { name: 'ECDSA', namedCurve: 'P-256' }, ECS = { name: 'ECDSA', hash: 'SHA-256' }
 const b64s = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64s = (t) => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
@@ -543,7 +543,7 @@ Object.entries(AR_SIGS).forEach(([n, sg]) => verifyCmd('artist|' + n, sg, PUB3).
 Object.entries(RB_SIGS).forEach(([n, sg]) => verifyCmd('rainbow|' + n, sg, PUB2).then((ok) => { if (ok) { RB.add(lc(n)); if (n === 'DEVMASTER') RB.add('devdragon'); cmdSubs.forEach((f) => f()) } }))
 async function sendCmd(c, arg, as) { // signed with the DEVMASTER key (or the rainbow key)
   const K = { rainbow: 2, unrainbow: 2, blackred: 3, unblackred: 3, artist: 3, unartist: 3, kmute: 4, kunmute: 4 }[c] || 0, pk = K === 2 ? PUB2 : K === 3 ? PUB3 : K === 4 ? PUB4 : PUBJ, ks = K === 2 ? RBK : K === 3 ? BRK : K === 4 ? MKY : DMK
-  if (!(K === 4 && isHm(as)) && !localStorage.getItem(ks)) throw new Error(K ? 'This browser has no key for that. Use /key' + K + ' yourkey first.' : 'This browser does not have the DEVDRAGON key. Use /key yourkey first.')
+  if (!(K === 4 && isHm(as)) && !localStorage.getItem(ks)) throw new Error(K ? 'This browser has no key for that. Use /key' + K + ' yourkey first.' : 'This browser does not have the DEVMASTER key. Use /key yourkey first.')
   arg = String(arg).replace(/[|\u0000-\u001f]/g, '').slice(0, 70); const ts = Date.now().toString(36), p = c + '|' + arg + '|' + ts
   if (!(await chat.send(as || OWNER, '§' + p + '|' + (K === 4 && isHm(as) ? '' : await signCmd(p, pk, ks))))) throw new Error('Command not sent. Wait a moment and try again.')
 }
@@ -1169,15 +1169,15 @@ function Chat({ user, eng, go }) {
     if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (await chat.send(user.name, text, reply)) { setText(''); setReply(null); setErr('') } else setErr(chat.getError()); return }
     setText(''); const [c, a, b] = t.split(/\s+/)
     try {
-      if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
+      if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVMASTER commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return setErr('Mute key saved. Use /mute name minutes and /unmute name.') }
-      if ((c === '/mute' || c === '/unmute') && user.name !== OWNER) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVDRAGON or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
+      if ((c === '/mute' || c === '/unmute') && user.name !== OWNER) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVMASTER or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
       if (c === '/key3') { localStorage.setItem(BRK, a || ''); return setErr('Key saved. Use /blackred and /artist.') }
       if (['/blackred', '/unblackred', '/artist', '/unartist'].includes(c)) { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done.') }
       if (c === '/key2') { localStorage.setItem(RBK, a || ''); return setErr('Rainbow key saved on this browser. Type /rainbow to light up your name.') }
       if (c === '/rainbow' || c === '/unrainbow') { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done. Names update for everyone who sees the message.') }
-      if (c === '/key') { if (user.name !== OWNER) throw new Error('Only the DEVDRAGON account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
-      if (user.name !== OWNER) throw new Error('Only DEVDRAGON can use commands.')
+      if (c === '/key') { if (user.name !== OWNER) throw new Error('Only the DEVMASTER account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
+      if (user.name !== OWNER) throw new Error('Only DEVMASTER can use commands.')
       const map = { '/give': () => [a + ':' + b], '/mute': () => [a + ':' + (b || 10)], '/unmute': () => [a], '/ban': () => [a], '/unban': () => [a], '/mod': () => [a], '/unmod': () => [a], '/announce': () => [t.slice(10)] }
       if (!map[c]) throw new Error('Unknown command. Type /help.')
       if (c !== '/announce' && !a) throw new Error('Add a player name.')
