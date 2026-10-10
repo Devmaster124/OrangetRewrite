@@ -296,7 +296,7 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
-const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVMASTER' ? 'DEVDRAGON' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
+const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -529,6 +529,7 @@ const MP = new Set(['dxm']) // magenta and purple animated names
 const isBg = (n) => BG.has(lc(n)), isMp = (n) => MP.has(lc(n))
 const CO = new Set(['ethan32']) // co-owner: badge + blue/white/green animated name only, no commands or mute powers
 const isCo = (n) => CO.has(lc(n))
+const isOw = (n) => lc(n) === 'devdragon' || lc(n) === 'devmaster'
 const AD = new Set(['aditya']) // red and blue animated name
 const DV = new Set(['devdragon', 'devmaster']) // owner: every-color fireworks + electric shock name
 const nmCls = (n, fb) => (DV.has(lc(n)) ? 'dvm' : AD.has(lc(n)) ? 'rbl' : isRb(n) ? 'rbw' : isBr(n) ? 'brw' : isBw(n) ? 'bwr' : isBg(n) ? 'bgw' : isMp(n) ? 'mpw' : isCo(n) ? 'bwg' : fb || '')
@@ -547,7 +548,7 @@ async function procCmds(list, me, apply) {
     if (!m.text.startsWith('§') || OKC.has(m.id)) continue
     const [c, arg, ts, sig] = m.text.slice(1).split('|'); OKC.set(m.id, null)
     const K = { rainbow: 2, unrainbow: 2, blackred: 3, unblackred: 3, artist: 3, unartist: 3, kmute: 4, kunmute: 4 }[c] || 0
-    if ((!sig && !(K === 4 && isHm(m.user))) || (!K && m.user !== OWNER) || Date.now() - parseInt(ts, 36) > 864e5 * (K && K < 4 ? 3650 : 1) || !((K === 4 && isHm(m.user)) || await verifyCmd(c + '|' + arg + '|' + ts, sig, K === 2 ? PUB2 : K === 3 ? PUB3 : K === 4 ? PUB4 : PUBJ))) continue
+    if ((!sig && !(K === 4 && isHm(m.user))) || (!K && !isOw(m.user)) || Date.now() - parseInt(ts, 36) > 864e5 * (K && K < 4 ? 3650 : 1) || !((K === 4 && isHm(m.user)) || await verifyCmd(c + '|' + arg + '|' + ts, sig, K === 2 ? PUB2 : K === 3 ? PUB3 : K === 4 ? PUB4 : PUBJ))) continue
     OKC.set(m.id, { c, arg }); change = true
     if (CS.seen.includes(m.id)) continue
     CS.seen.push(m.id); const [nm, n] = arg.split(':'), mine = lc(nm) === lc(me.name)
@@ -559,7 +560,7 @@ async function procCmds(list, me, apply) {
     if (c === 'unrainbow') delete CS.rainbow[lc(arg)]
     if (c === 'mute') CS.muted[lc(nm)] = Date.now() + Math.min(Number(n) || 10, 10080) * 60000
     if (c === 'unmute' || c === 'kunmute') delete CS.muted[lc(nm)]
-    if (c === 'kmute' && lc(nm) !== lc(OWNER) && !isJm(nm) && !isHm(nm) && !CS.mods[lc(nm)]) CS.muted[lc(nm)] = Date.now() + Math.min(Number(n) || 10, 1440) * 60000
+    if (c === 'kmute' && !isOw(nm) && !isJm(nm) && !isHm(nm) && !CS.mods[lc(nm)]) CS.muted[lc(nm)] = Date.now() + Math.min(Number(n) || 10, 1440) * 60000
     if (c === 'mod') CS.mods[lc(arg)] = 1
     if (c === 'unmod') delete CS.mods[lc(arg)]
     if (c === 'ban') CS.banned[lc(arg)] = 1
@@ -1034,7 +1035,7 @@ function Codex({ user }) {
 }
 
 function Blooks({ user, update, eng }) {
-  const [open, setOpen] = useState(null), [tab, setTab] = useState('all'), dev = user.name === OWNER // DEVMASTER only: click a locked blook to get it free
+  const [open, setOpen] = useState(null), [tab, setTab] = useState('all'), dev = isOw(user.name) // DEVMASTER only: click a locked blook to get it free
   const counts = user.inv.reduce((m, id) => ((m[id] = (m[id] || 0) + 1), m), {})
   const score = scoreOf(user), unique = Object.keys(counts).filter((x) => !isLab(x)).length, found = SECRETS.filter((b) => counts[b.id]).length
   const tile = (b, secret) => counts[b.id] ? (
@@ -1165,13 +1166,13 @@ function Chat({ user, eng, go }) {
     try {
       if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return setErr('Mute key saved. Use /mute name minutes and /unmute name.') }
-      if ((c === '/mute' || c === '/unmute') && user.name !== OWNER) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVDRAGON or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
+      if ((c === '/mute' || c === '/unmute') && !isOw(user.name)) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVDRAGON or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
       if (c === '/key3') { localStorage.setItem(BRK, a || ''); return setErr('Key saved. Use /blackred and /artist.') }
       if (['/blackred', '/unblackred', '/artist', '/unartist'].includes(c)) { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done.') }
       if (c === '/key2') { localStorage.setItem(RBK, a || ''); return setErr('Rainbow key saved on this browser. Type /rainbow to light up your name.') }
       if (c === '/rainbow' || c === '/unrainbow') { await sendCmd(c.slice(1), a || user.name, user.name); return setErr('Done. Names update for everyone who sees the message.') }
-      if (c === '/key') { if (user.name !== OWNER) throw new Error('Only the DEVDRAGON account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
-      if (user.name !== OWNER) throw new Error('Only DEVDRAGON can use commands.')
+      if (c === '/key') { if (!isOw(user.name)) throw new Error('Only the DEVDRAGON account can use a key.'); localStorage.setItem(DMK, a || ''); return setErr('Key saved on this browser.') }
+      if (!isOw(user.name)) throw new Error('Only DEVDRAGON can use commands.')
       const map = { '/give': () => [a + ':' + b], '/mute': () => [a + ':' + (b || 10)], '/unmute': () => [a], '/ban': () => [a], '/unban': () => [a], '/mod': () => [a], '/unmod': () => [a], '/announce': () => [t.slice(10)] }
       if (!map[c]) throw new Error('Unknown command. Type /help.')
       if (c !== '/announce' && !a) throw new Error('Add a player name.')
@@ -1180,7 +1181,7 @@ function Chat({ user, eng, go }) {
   }
   const onReply = useCallback((m) => { setReply({ id: m.id, user: m.user, text: m.text }); setEditing(null); if (comp.current) { comp.current.setText((t) => (t.startsWith('@' + m.user) ? t : '@' + m.user + ' ' + t)); comp.current.focus() } }, [])
   const onEdit = useCallback((m) => { setEditing({ id: m.id }); setReply(null); if (comp.current) { comp.current.setText(m.text); comp.current.focus() } }, [])
-  const view = useMemo(() => msgs.filter((m) => (!m.text.startsWith('§') || (OKC.get(m.id) || {}).c === 'announce') && !CS.banned[lc(m.user)] && !((CS.muted[lc(m.user)] || 0) > Date.now())).map((m) => ({ m, role: m.user === OWNER ? 'owner' : isCo(m.user) ? 'co' : CS.mods[lc(m.user)] || isJm(m.user) || isHm(m.user) ? 'mod' : '', ann: m.text.startsWith('§') ? OKC.get(m.id).arg : null, artist: isArtist(m.user), ping: m.user !== user.name && pinged(m, user.name) })), [msgs, ct, user.name])
+  const view = useMemo(() => msgs.filter((m) => (!m.text.startsWith('§') || (OKC.get(m.id) || {}).c === 'announce') && !CS.banned[lc(m.user)] && !((CS.muted[lc(m.user)] || 0) > Date.now())).map((m) => ({ m, role: isOw(m.user) ? 'owner' : isCo(m.user) ? 'co' : CS.mods[lc(m.user)] || isJm(m.user) || isHm(m.user) ? 'mod' : '', ann: m.text.startsWith('§') ? OKC.get(m.id).arg : null, artist: isArtist(m.user), ping: m.user !== user.name && pinged(m, user.name) })), [msgs, ct, user.name])
   const pres = hub.pres(), now = Date.now(), online = Object.keys(pres).filter((n) => n !== user.name && now - pres[n].at < 130000)
   const snapOf2 = (n) => (n === user.name ? snapOf(user) : pres[n] && pres[n].s), avOf = (n) => { const s = snapOf2(n); return s ? s.av : null }
   const known = useMemo(() => [...new Set([...Object.keys(pres), ...msgs.map((m) => m.user)])].filter((n) => n !== user.name), [msgs])
