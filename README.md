@@ -23,3 +23,6 @@ The app has been split and basic file integrity checked, but it has not been bro
 - `aditya` is a hardcoded moderator (`HM`): /mute and /unmute work with no key.
 - `aditya` name: animated red and blue (`.rbl`).
 - `DEVMASTER`/`DEVDRAGON` name: cycles every name color with firework bursts and an electric shock effect (`.dvm`).
+
+- Shop packs are now 3D CSS chests (`Chest3D`) themed from each pack's colors and art. Opening any number of packs: tap the chest 5 times, the lid pops with a white glow, a card shoots out and flips to show the pull (`ChestStage`).
+- 12 extra packs (Medieval, Wonderland, Autumn, Bot, Aquatic, Bug, Safari, Dino, Ice Monster, Blizzard, Outback, Lunch) were merged from `Packs_html.txt` into `app.jsx` (`NEW_PACKS`), using the same odds. They show in the shop, odds popup, My Blooks, the market and the 3D chest opening. Their art loads from the URLs in that data.
