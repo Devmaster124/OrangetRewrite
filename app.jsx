@@ -1,6 +1,6 @@
 (function () {
 const { useState, useEffect, useRef, useMemo, useCallback } = React
-document.documentElement.dataset.theme = (() => { try { return localStorage.getItem('oranget_theme') || 'purple' } catch { return 'orange' } })()
+document.documentElement.dataset.theme = (() => { try { return localStorage.getItem('oranget_theme') || 'orange' } catch { return 'orange' } })()
 const mk = (p) => ({ size = 24, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{p}</svg>
 )
@@ -538,7 +538,7 @@ const MP = new Set(['dxm']) // magenta and purple animated names
 const isBg = (n) => BG.has(lc(n)), isMp = (n) => MP.has(lc(n))
 const CO = new Set(['ethan32']) // co-owner: badge + blue/white/green animated name only, no commands or mute powers
 const isCo = (n) => CO.has(lc(n))
-const ETHAN = 'ethan32' // exact username (capital letters matter)
+const ETHAN = 'Ethan32' // exact username (capital letters matter)
 const isOw = (n) => n === 'DEVMASTER' || n === 'DEVDRAGON'
 const isEt = (n) => n === ETHAN
 const isProt = (n) => isOw(n) || isHm(n) || isJm(n) || !!CS.mods[lc(n)]
@@ -607,15 +607,12 @@ const FIELD = 'w-full rounded-2xl border-b-4 border-black/15 bg-white px-4 py-3 
 
 /* ---------- Landing ---------- */
 function FallingBlooks() {
-  const items = useMemo(() => Array.from({ length: 34 }, (_, i) => {
-    const z = Math.random(), size = 34 + z * 70
-    return { id: BLOOKS[Math.floor(Math.random() * BLOOKS.length)].id, left: Math.random() * 100, dur: 22 - z * 12 + Math.random() * 5, delay: -Math.random() * 30, size, op: 0.18 + z * 0.5, blur: z < 0.3 ? 2.5 : 0, sw: (Math.random() - 0.5) * 18, r0: Math.random() * 40 - 20, r1: Math.random() * 360 - 180 }
-  }), [])
+  const items = useMemo(() => Array.from({ length: 30 }, () => ({ id: BLOOKS[Math.floor(Math.random() * BLOOKS.length)].id, left: Math.random() * 96, dur: 14 + Math.random() * 14, delay: -Math.random() * 28, op: 0.1 + Math.random() * 0.14, sw: (Math.random() - 0.5) * 14, r0: Math.random() * 40 - 20, r1: Math.random() * 300 - 150 })), [])
   return (
     <div className="fall-bg" aria-hidden>
       {items.map((b, i) => (
-        <div key={i} className="fall" style={{ left: `${b.left}%`, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s`, opacity: b.op, filter: b.blur ? `blur(${b.blur}px)` : undefined, '--sw': `${b.sw}vw`, '--r0': `${b.r0}deg`, '--r1': `${b.r1}deg` }}>
-          <Blook id={b.id} size={b.size} />
+        <div key={i} className="fall" style={{ left: `${b.left}%`, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s`, opacity: b.op, '--sw': `${b.sw}vw`, '--r0': `${b.r0}deg`, '--r1': `${b.r1}deg` }}>
+          <Blook id={b.id} size={72} />
         </div>
       ))}
     </div>
@@ -773,11 +770,11 @@ function Chest3D({ id, src, size = 160, lid = 0, glow = 0, idle = false, shake =
 }
 // Interactive chest used by every pack opening: tap it 5 times (any pack count), the lid pops, white light pours out.
 function ChestStage({ pack, stage, clicks, wob, onTap, hint, children }) {
-  const size = useMemo(() => Math.round(Math.min(innerWidth * 0.86, innerHeight * 0.46, 400)), [])
+  const size = useMemo(() => Math.round(Math.min(innerWidth * 0.66, innerHeight * 0.36, 340)), [])
   const open = stage !== 'chest'
   return (
-    <div className="relative z-[1] m-auto flex flex-col items-center text-center text-white">
-      <div className="ch-stage" style={{ '--cw': Math.round(size * 0.4) + 'px', '--rise': Math.round(size * 0.62) + 'px' }}>
+    <div className="relative z-[1] m-auto flex w-full flex-col items-center justify-center px-4 pt-[10dvh] text-center text-white">
+      <div className="ch-stage"  style={{ '--cw': Math.round(size * 0.4) + 'px', '--rise': Math.round(size * 0.62) + 'px' }}>
         <button type="button" className="ch-hit" disabled={open} onClick={onTap} aria-label={open ? `${pack.name} chest opening` : `Tap the ${pack.name} chest (${clicks} of 5)`}>
           <Chest3D id={pack.id} src={IMG[pack.img]} size={size} lid={open ? 112 : clicks * 5} glow={open ? 1 : clicks * 0.11} shake={wob} amp={0.5 + clicks * 0.35} beam={open} />
         </button>
@@ -801,12 +798,13 @@ function PackOpening({ pack, blook, canAgain, onAgain, onClose }) {
   }, [stage])
   useEffect(() => { const el = document.documentElement, ov = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ov } }, [])
   const r = RARITY[blook.rarity], en = entranceOf(blook.id)
-  const big = Math.round(Math.min(460, innerWidth * 0.8, innerHeight * 0.5))
+  const big = Math.round(Math.min(420, innerWidth * 0.7, innerHeight * 0.34))
   const cols = Math.ceil(innerWidth / 84), rows = Math.ceil(innerHeight / 84), sq = useMemo(() => Array.from({ length: cols * rows }, () => Math.random() * 2.4), [])
   const sparks = useMemo(() => Array.from({ length: 26 }, (_, i) => ({ a: (i / 26) * 360 + Math.random() * 10, d: 150 + Math.random() * 260, s: 6 + Math.random() * 12, t: Math.random() * 0.4 })), [])
   return ReactDOM.createPortal(
     <div className="force-dark fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col items-center justify-center overflow-hidden bg-[#07060d]" style={{ top: 0, left: 0, width: '100vw', height: '100dvh' }} role="dialog" aria-label="Opening pack">
       <RevealBG pack={pack.id} rarity={stage === 'reveal' ? blook.rarity : null} />
+      <button className="btn bg-white/25 text-white" style={{ position: 'absolute', top: 'max(env(safe-area-inset-top),12px)', right: 12, zIndex: 5, padding: '.35rem .9rem' }} onClick={onClose} aria-label="Close">✕ Close</button>
       {['chest', 'open', 'shoot'].includes(stage) && (
         <ChestStage pack={pack} stage={stage} clicks={clicks} wob={wob} onTap={tap} hint={chestHint(stage, clicks)}>
           {stage === 'shoot' && <>
@@ -952,10 +950,12 @@ const WHEEL = [50, 75, 100, 150, 250, 400, 600, 1000]
 const WHEEL_W = [28, 22, 17, 12, 9, 6, 4, 2]
 const WCOL = ['#43b02a', '#2f7de1', '#6a3fd6', '#c03fd0', '#e23b2e', '#f5832a', '#e8b21e', '#7fcf2a']
 const pt = (a, r) => [160 + r * Math.sin((a * Math.PI) / 180), 160 - r * Math.cos((a * Math.PI) / 180)]
+const WPAL = { orange: ['#ffb347', '#ff9a3d', '#f7822e', '#e8590c', '#ffc861', '#ffa028', '#f06a1a', '#ffd27a'], purple: ['#c77dff', '#9d4edd', '#7b2cbf', '#e0aaff', '#8e3fd6', '#6a22b8', '#b562f5', '#5a189a'], red: ['#ff6b6b', '#e63946', '#c1121f', '#ff8787', '#d62839', '#a4161a', '#ff4d4d', '#e5383b'] }
+const WCOLS_NOW = () => WPAL[document.documentElement.dataset.theme] || WCOL
 const shade = (h, f) => '#' + h.slice(1).match(/../g).map((x) => Math.round(Math.min(255, parseInt(x, 16) * f)).toString(16).padStart(2, '0')).join('')
 
 function WheelModal({ user, update, onClose }) {
-  const now = useNow(1000), [rot, setRot] = useState(0), [spinning, setSpinning] = useState(false), [won, setWon] = useState(null)
+  const now = useNow(1000), [rot, setRot] = useState(0), [spinning, setSpinning] = useState(false), [won, setWon] = useState(null), WCOLS = WCOLS_NOW()
   const left = Math.max(0, (user.lastSpin || 0) + 86400000 - now)
   const clock = [Math.floor(left / 3600000), Math.floor(left / 60000) % 60, Math.floor(left / 1000) % 60].map((n) => String(n).padStart(2, '0')).join(':')
   useEffect(() => { const f = (e) => e.key === 'Escape' && !spinning && onClose(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [spinning])
@@ -974,34 +974,35 @@ function WheelModal({ user, update, onClose }) {
       <div className="wm" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Daily wheel">
         <h3 className="display text-2xl sm:text-3xl">Spin the Daily Wheel!</h3>
         <div className={`wheel ${spinning ? 'spin' : ''}`}>
-          <svg viewBox="0 0 320 356" style={{ width: '100%', maxHeight: '50dvh', display: 'block', margin: '0 auto' }} role="img" aria-label="Daily wheel">
+          <svg viewBox="-18 -22 356 394" style={{ width: '100%', maxHeight: '52dvh', display: 'block', margin: '0 auto' }} role="img" aria-label="Daily wheel">
             <defs>
-              <radialGradient id="wRim" cx="50%" cy="50%" r="50%"><stop offset=".86" stopColor="#ffe28a" /><stop offset="1" stopColor="#c98a12" /></radialGradient>
-              <linearGradient id="wStand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6b6f7a" /><stop offset="1" stopColor="#3a3d46" /></linearGradient>
-              <radialGradient id="wHub" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fff2b0" /><stop offset="1" stopColor="#e09a14" /></radialGradient>
-              <radialGradient id="wGloss" cx="35%" cy="25%" r="75%"><stop offset="0" stopColor="#fff" stopOpacity=".35" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
-              {WCOL.map((c, k) => <radialGradient key={k} id={`ws${k}`} cx="160" cy="160" r="132" gradientUnits="userSpaceOnUse"><stop offset=".2" stopColor={shade(c, 0.62)} /><stop offset="1" stopColor={shade(c, 1.08)} /></radialGradient>)}
+              <linearGradient id="wStand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5a63ff" /><stop offset="1" stopColor="#2b2fd0" /></linearGradient>
+              <linearGradient id="wRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#b9c0d0" /></linearGradient>
+              <radialGradient id="wGloss" cx="35%" cy="25%" r="75%"><stop offset="0" stopColor="#fff" stopOpacity=".3" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
+              <radialGradient id="wHub" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#ffd08a" /><stop offset="1" stopColor="var(--or,#ff8a1f)" /></radialGradient>
+              {WCOLS.map((c, k) => <radialGradient key={k} id={`ws${k}`} cx="160" cy="160" r="136" gradientUnits="userSpaceOnUse"><stop offset=".25" stopColor={shade(c, 0.82)} /><stop offset="1" stopColor={shade(c, 1.06)} /></radialGradient>)}
             </defs>
-            <ellipse cx="160" cy="346" rx="86" ry="8" fill="rgba(0,0,0,.28)" />
-            <path d="M104 344 L160 168 L216 344 Z" fill="url(#wStand)" stroke="#23252c" strokeWidth="3" strokeLinejoin="round" />
+            <ellipse cx="160" cy="364" rx="92" ry="7" fill="rgba(0,0,0,.25)" />
+            <path d="M112 352 L160 168 L208 352 Z" fill="url(#wStand)" />
+            <rect x="92" y="344" width="136" height="16" rx="5" fill="#2b2fd0" /><rect x="92" y="344" width="136" height="6" rx="3" fill="#6a72ff" />
             <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: '160px 160px', transition: spinning ? 'transform 5s cubic-bezier(.1,.72,.12,1)' : 'none' }}>
-              <circle cx="160" cy="160" r="158" fill="url(#wRim)" stroke="#7a4d05" strokeWidth="3" />
-              {Array.from({ length: 16 }, (_, i) => { const [x, y] = pt(i * 22.5, 148); return <circle key={i} className={`bulb ${i % 2 ? 'b2' : ''}`} cx={x} cy={y} r="4.6" fill="#fff6c2" stroke="#b9801a" strokeWidth="1" /> })}
-              <circle cx="160" cy="160" r="138" fill="#2a1a08" />
-              {WHEEL.map((v, k) => { const [x0, y0] = pt(k * 45 - 22.5, 132), [x1, y1] = pt(k * 45 + 22.5, 132); return (
+              {Array.from({ length: 16 }, (_, i) => { const [x, y] = pt(i * 22.5 + 5, 168); return <circle key={i} className={`bulb ${i % 2 ? 'b2' : ''}`} cx={x} cy={y} r="6.5" fill="#ffe98a" fillOpacity=".9" /> })}
+              <circle cx="160" cy="160" r="158" fill="url(#wRing)" stroke="#9aa3b5" strokeWidth="2" />
+              <circle cx="160" cy="160" r="146" fill="#fff" fillOpacity=".7" />
+              {WHEEL.map((v, k) => { const [x0, y0] = pt(k * 45 - 22.5, 138), [x1, y1] = pt(k * 45 + 22.5, 138); return (
                 <g key={k}>
-                  <path d={`M160 160 L${x0} ${y0} A132 132 0 0 1 ${x1} ${y1}Z`} fill={`url(#ws${k})`} stroke="#2a1a08" strokeWidth="2.5" strokeLinejoin="round" />
+                  <path d={`M160 160 L${x0} ${y0} A138 138 0 0 1 ${x1} ${y1}Z`} fill={`url(#ws${k})`} stroke="#fff" strokeOpacity=".55" strokeWidth="2" strokeLinejoin="round" />
                   <g transform={`rotate(${k * 45} 160 160)`}>
-                    <circle cx="160" cy="52" r="12" fill="#ffd34d" stroke="#a85f06" strokeWidth="2.2" /><circle cx="160" cy="52" r="5.2" fill="none" stroke="#ff8a1f" strokeWidth="3" />
-                    <text x="160" y="92" textAnchor="middle" fontFamily="Figtree, sans-serif" fontWeight="800" fontSize="23" fill="#fff" stroke="rgba(0,0,0,.55)" strokeWidth="3.4" paintOrder="stroke">{v}</text>
+                    <image href={IMG.blooktoken} x="143" y="30" width="34" height="34" />
+                    <text x="160" y="96" textAnchor="middle" fontFamily="Figtree, sans-serif" fontWeight="800" fontSize="19" letterSpacing="1" fill="#fff" stroke="rgba(0,0,0,.35)" strokeWidth="2.6" paintOrder="stroke">{'+ ' + (v >= 1000 ? v / 1000 + 'K' : v)}</text>
                   </g>
                 </g>) })}
-              <circle cx="160" cy="160" r="132" fill="url(#wGloss)" />
-              <circle cx="160" cy="160" r="33" fill="url(#wHub)" stroke="#8a4a05" strokeWidth="4" />
-              <circle cx="160" cy="160" r="14" fill="none" stroke="#b8520a" strokeWidth="9" /><circle cx="160" cy="160" r="14" fill="none" stroke="#ff8a1f" strokeWidth="6.5" />
+              <circle cx="160" cy="160" r="138" fill="url(#wGloss)" />
+              <circle cx="160" cy="160" r="40" fill="#fff" stroke="#c9d0de" strokeWidth="5" />
+              <circle cx="160" cy="160" r="26" fill="url(#wHub)" /><circle cx="160" cy="160" r="12" fill="#fff" />
             </g>
-            <path d="M143 4 Q160 -4 177 4 L160 46 Z" fill="#ff4a3a" stroke="#fff" strokeWidth="3.5" strokeLinejoin="round" />
-            <circle cx="160" cy="13" r="4.5" fill="#fff" fillOpacity=".85" />
+            <path d="M142 -14 Q160 -22 178 -14 L178 8 Q178 20 160 34 Q142 20 142 8 Z" fill="#5560ff" stroke="#fff" strokeWidth="3.5" strokeLinejoin="round" />
+            <path d="M150 -6 L170 -6 L170 6 Q170 13 160 22 Q150 13 150 6 Z" fill="#8a93ff" />
           </svg>
         </div>
         <div className="min-h-[2.2rem]" role="status">{won !== null && <p className="chunk flex items-center justify-center gap-2 text-2xl">You won <Coins size={30} />{won}!</p>}</div>
@@ -1061,14 +1062,13 @@ function Profile({ user, update, go }) {
           <div className="mt-3"><WheelButton user={user} update={update} og /></div>
         </section>
       </div>
-      {pick && (
-        <div className="fixed inset-0 z-20 grid place-items-center bg-black/50 p-4" onClick={() => setPick(false)}>
-          <div className="avpick max-h-[80vh] w-full max-w-md overflow-y-auto rounded-[2rem] bg-[#fba852] p-5" style={{ maxHeight: '80dvh', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="chunk mb-3 text-2xl text-white">Choose your avatar</h3>
+      {pick && ReactDOM.createPortal(
+        <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => setPick(false)}>
+          <div className="avpick w-full max-w-md overflow-y-auto rounded-[2rem] bg-[#fba852] p-4" style={{ maxHeight: '86dvh', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between"><h3 className="chunk text-2xl text-white">Choose your avatar</h3><button className="btn bg-white/30 text-white" style={{ padding: '.3rem .9rem' }} onClick={() => setPick(false)}>Close</button></div>
             <div className="grid grid-cols-4 gap-2">{uniq.map((id) => <button key={id} aria-label={byId(id).name} onClick={() => { update({ ...user, avatar: id }); setPick(false) }} className="grid place-items-center rounded-3xl p-1 transition hover:scale-110"><Blook id={id} size={64} /></button>)}</div>
           </div>
-        </div>
-      )}
+        </div>, document.body)}
     </div>
   )
 }
@@ -1283,7 +1283,7 @@ const Composer = React.forwardRef(function Composer({ known, onSend }, ref) { //
 })
 function Chat({ user, eng, go }) {
   const [msgs, setMsgs] = useState([]), [err, setErr] = useState(''), [who, setWho] = useState(null), [reply, setReply] = useState(null), [editing, setEditing] = useState(null), [showOn, setShowOn] = useState(false), [ct, setCt] = useState(0)
-  const comp = useRef(), end = useRef(), first = useRef(true)
+  const comp = useRef(), end = useRef(), first = useRef(true), sendingRef = useRef(false)
   useEffect(() => { const f = () => setCt((n) => n + 1); cmdSubs.add(f); return () => cmdSubs.delete(f) }, [])
   useEffect(() => chat.subscribe(setMsgs, setErr), [])
   useEffect(() => { const p = end.current && end.current.parentElement; if (!p) return; if (first.current || p.scrollHeight - p.scrollTop - p.clientHeight < 240) { p.scrollTop = p.scrollHeight; if (msgs.length) first.current = false } }, [msgs])
@@ -1292,7 +1292,7 @@ function Chat({ user, eng, go }) {
   const send = async (text) => {
     const t = text.trim(); if (!t) return
     if (editing) { if (await chat.edit(editing.id, t)) cancel(); else setErr('Could not edit that message.'); return }
-    if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (await chat.send(user.name, text, reply)) { setText(''); setReply(null); setErr('') } else setErr(chat.getError()); return }
+    if (t[0] !== '/') { if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return } if (sendingRef.current) return; sendingRef.current = true; setText(''); let ok = false; try { ok = await chat.send(user.name, text, reply) } finally { sendingRef.current = false } if (ok) { setReply(null); setErr('') } else { setText(text); setErr(chat.getError()) } return }
     setText(''); const [c, a, b] = t.split(/\s+/)
     try {
       if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
@@ -2187,7 +2187,7 @@ function SettingsModal({ user, update, onLogout, onClose }) {
   const [tab, setTab] = useState('look')
   useEffect(() => { const f = (e) => e.key === 'Escape' && onClose(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [])
   const setTheme = (t) => { try { localStorage.setItem('oranget_theme', t) } catch {} update({ ...user, theme: t }) }
-  const theme = user.theme || 'purple'
+  const theme = user.theme || 'orange'
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-3" onClick={onClose}>
       <div className="st" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
@@ -2195,7 +2195,8 @@ function SettingsModal({ user, update, onLogout, onClose }) {
         <div className="seg self-start" role="tablist">{[['look', 'Theme'], ['acct', 'Account']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}</div>
         <div className="st-body">
           {tab === 'look' && <div className="flex flex-wrap gap-3">
-            <button className="swatch" aria-pressed={theme === 'purple'} onClick={() => setTheme('purple')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ff2d55,#7b1fa2 55%,#1a0526)' }} />Purple &amp; Red</button>
+            <button className="swatch" aria-pressed={theme === 'purple'} onClick={() => setTheme('purple')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#c77dff,#7b2cbf 55%,#240046)' }} />Purple</button>
+            <button className="swatch" aria-pressed={theme === 'red'} onClick={() => setTheme('red')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ff6b6b,#c1121f 55%,#2a0508)' }} />Red</button>
             <button className="swatch" aria-pressed={theme === 'orange'} onClick={() => setTheme('orange')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ffc98a,#fba24d 55%,#f27d2c)' }} />Orange</button>
             <button className="swatch" aria-pressed={theme === 'black'} onClick={() => setTheme('black')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'radial-gradient(70% 90% at 10% 0,rgba(255,122,18,.5),#0e0919 70%)' }} />Black</button></div>}
           {tab === 'acct' && <div className="space-y-3">
@@ -2343,7 +2344,7 @@ function App() {
   const update = (u) => { saveUser(u); setUser(u) }
   const [, bumpImg] = useState(0)
   useEffect(() => { const f = () => bumpImg((n) => n + 1); thumbSubs.add(f); return () => thumbSubs.delete(f) }, [])
-  useEffect(() => { document.documentElement.dataset.theme = (user && user.theme) || read('oranget_theme', 'purple') }, [user && user.theme])
+  useEffect(() => { document.documentElement.dataset.theme = (user && user.theme) || read('oranget_theme', 'orange') }, [user && user.theme])
   useEffect(() => {
     if (!document.querySelector('script[src*="tailwindcss"]') && !document.querySelector('style[data-tw]')) {
       const s = document.createElement('script'); s.src = 'https://cdn.tailwindcss.com'; document.head.appendChild(s)

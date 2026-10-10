@@ -403,18 +403,29 @@ button.bt:hover{transform:translateY(-3px) scale(1.04)}.bt.lock img{filter:brigh
 @keyframes chfanflip{0%{transform:rotateY(0deg) rotateZ(0deg)}60%{transform:rotateY(720deg) rotateZ(var(--rz))}100%{transform:rotateY(1080deg) rotateZ(var(--rz))}}
 @media (prefers-reduced-motion:reduce){.ch-idle .ch3,.ch-wob,.ch-beam{animation:none!important}}
 
-/* falling blooks background */
+/* falling blooks background (silhouettes) */
 .app-bg{isolation:isolate}
 .fall-bg{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
-@keyframes fall{from{transform:translate3d(0,-25vh,0) rotate(var(--r0))}to{transform:translate3d(var(--sw),125vh,0) rotate(var(--r1))}}
-.fall{position:absolute;top:0;animation:fall linear infinite;will-change:transform}
+@keyframes fall{from{transform:translate3d(0,-20vh,0) rotate(var(--r0))}to{transform:translate3d(var(--sw),115vh,0) rotate(var(--r1))}}
+.fall{position:absolute;top:0;animation:fall linear infinite;will-change:transform;filter:brightness(0) invert(1)}
+[data-theme=orange] .fall{filter:brightness(0)}
 @media (prefers-reduced-motion:reduce){.fall{animation:none;top:20%}}
 .avpick{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
-/* purple & red theme */
-:root[data-theme=purple]{--ink:#14041f;--panel:#2a0b3d;--line:rgba(255,90,140,.22);--cream:#ffe9f4;--mute:#d3a6e6;--or:#ff2d55;--s1:#4a1670;--s2:#2d0b49;--s3:#12031d;--hi:rgba(255,255,255,.12);--t1:#3d1260;--t2:#1f0833;--tc:#ffe9f4;--tab1:#4a1670;--tab2:#2d0b49;--cwbg:rgba(0,0,0,.28)}
-[data-theme=purple] .app-bg{background:radial-gradient(70% 55% at 6% -8%,rgba(255,40,80,.45),transparent 70%),radial-gradient(65% 55% at 100% 105%,rgba(150,50,255,.45),transparent 70%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(160deg,#1c0630,#14041f 60%,#2a0618)}
-[data-theme=purple] .topbar{background:linear-gradient(180deg,#6a1b9a,#3b0a5e)!important;border-bottom:2px solid rgba(255,45,85,.55)!important}
-[data-theme=purple] .btn.bg-\[\#f7953a\],[data-theme=purple] .btn.bg-\[\#ffb347\],[data-theme=purple] .btn.bg-\[\#fff4d6\]{background:linear-gradient(180deg,#ff3b5c,#b3123a)!important;color:#fff!important}
-[data-theme=purple] .qty.on,[data-theme=purple] .seg button[aria-selected=true]{background:#ff2d55;color:#fff;border-color:#ff2d55}
-[data-theme=purple] .lb-row.me{border-color:#ff2d55}
-[data-theme=purple] *::-webkit-scrollbar-thumb{background:rgba(255,45,85,.5);background-clip:content-box}
+.pk img[alt="Blook Tokens"]{width:22px!important;height:22px!important;max-width:none;filter:none!important;transform:none!important;flex:none}
+.pk .chunk{white-space:nowrap;flex:none}
+/* purple theme */
+:root[data-theme=purple]{--ink:#12051f;--panel:#25103d;--line:rgba(200,140,255,.22);--cream:#f3e6ff;--mute:#c9a8e8;--or:#b45cff;--s1:#4a1c78;--s2:#2b1048;--s3:#10051c;--hi:rgba(255,255,255,.12);--t1:#3d1763;--t2:#1f0a35;--tc:#f3e6ff;--tab1:#4a1c78;--tab2:#2b1048;--cwbg:rgba(0,0,0,.28)}
+[data-theme=purple] .app-bg{background:radial-gradient(70% 55% at 6% -8%,rgba(180,92,255,.4),transparent 70%),radial-gradient(65% 55% at 100% 105%,rgba(110,50,220,.4),transparent 70%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(160deg,#1c0832,#12051f 70%)}
+[data-theme=purple] .topbar{background:linear-gradient(180deg,#6a2bb0,#3b1470)!important;border-bottom:2px solid rgba(200,140,255,.5)!important}
+[data-theme=purple] .btn.bg-\[\#f7953a\],[data-theme=purple] .btn.bg-\[\#ffb347\],[data-theme=purple] .btn.bg-\[\#fff4d6\]{background:linear-gradient(180deg,#a855f7,#6d28d9)!important;color:#fff!important}
+[data-theme=purple] .qty.on,[data-theme=purple] .seg button[aria-selected=true]{background:#8b3fe0;color:#fff;border-color:#8b3fe0}
+[data-theme=purple] .lb-row.me{border-color:#b45cff}
+[data-theme=purple] *::-webkit-scrollbar-thumb{background:rgba(180,92,255,.5);background-clip:content-box}
+/* red theme */
+:root[data-theme=red]{--ink:#1c0508;--panel:#3a0d12;--line:rgba(255,110,110,.22);--cream:#ffe8e8;--mute:#e8a8a8;--or:#ff3b3b;--s1:#7a1219;--s2:#4a0a10;--s3:#1a0306;--hi:rgba(255,255,255,.12);--t1:#6b0f16;--t2:#35070c;--tc:#ffe8e8;--tab1:#7a1219;--tab2:#4a0a10;--cwbg:rgba(0,0,0,.28)}
+[data-theme=red] .app-bg{background:radial-gradient(70% 55% at 6% -8%,rgba(255,50,50,.42),transparent 70%),radial-gradient(65% 55% at 100% 105%,rgba(190,20,40,.4),transparent 70%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(160deg,#2a0709,#1c0508 70%)}
+[data-theme=red] .topbar{background:linear-gradient(180deg,#c1121f,#7a0c14)!important;border-bottom:2px solid rgba(255,120,120,.5)!important}
+[data-theme=red] .btn.bg-\[\#f7953a\],[data-theme=red] .btn.bg-\[\#ffb347\],[data-theme=red] .btn.bg-\[\#fff4d6\]{background:linear-gradient(180deg,#ff4d4d,#b3121f)!important;color:#fff!important}
+[data-theme=red] .qty.on,[data-theme=red] .seg button[aria-selected=true]{background:#e63946;color:#fff;border-color:#e63946}
+[data-theme=red] .lb-row.me{border-color:#ff3b3b}
+[data-theme=red] *::-webkit-scrollbar-thumb{background:rgba(255,60,60,.5);background-clip:content-box}
