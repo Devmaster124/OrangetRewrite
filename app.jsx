@@ -697,6 +697,20 @@ function ForestBg() {
     </div>
   )
 }
+function OceanBg() {
+  const fish = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ e: ['🐟', '🐠', '🐡', '🦈', '🐙', '🐢', '🐳', '🦑', '🐟', '🪼', '🐠', '🦭', '🐡', '🐟'][i], t: 56 + Math.random() * 38, d: 16 + Math.random() * 22, de: -Math.random() * 36, s: 22 + Math.random() * 28, r: i % 2 })), [])
+  const jumps = [{ e: '🐬', l: 14, d: 11, de: 0 }, { e: '🐋', l: 58, d: 16, de: -6 }, { e: '🐬', l: 80, d: 13, de: -9 }]
+  return (
+    <div className="forest-bg ocean-bg" aria-hidden>
+      <i className="oc-sun" /><i className="oc-cloud oc-c1" /><i className="oc-cloud oc-c2" /><i className="oc-glit" />
+      <i className="oc-wave oc-w1" />
+      {jumps.map((v, i) => <i key={'j' + i} className="oc-jump" style={{ left: v.l + '%', animationDuration: v.d + 's', animationDelay: v.de + 's' }}>{v.e}</i>)}
+      <i className="oc-wave oc-w2" />
+      {fish.map((v, i) => <i key={i} className="oc-fish" style={{ top: v.t + '%', fontSize: v.s, animationName: v.r ? 'ocswimr' : 'ocswiml', animationDuration: v.d + 's', animationDelay: v.de + 's' }}>{v.e}</i>)}
+      <i className="oc-wave oc-w3" />
+    </div>
+  )
+}
 function FallingBlooks({ off }) {
   const items = useMemo(() => { const pool = FALL_POOL(); return Array.from({ length: 10 }, () => ({ id: pool[Math.floor(Math.random() * pool.length)].id, left: Math.random() * 92, dur: 18 + Math.random() * 14, delay: -Math.random() * 28, op: 0.1 + Math.random() * 0.12, sw: (Math.random() - 0.5) * 12, r0: Math.random() * 40 - 20, r1: Math.random() * 240 - 120 })) }, [])
   if (off) return null
@@ -1212,6 +1226,7 @@ function Profile({ user, update, go }) {
         <div className="min-w-[220px] flex-1">
           <h2 className={`chunk text-4xl ${nmCls(user.name)}`}>{user.name}</h2>
           {ab && <div className="chunk text-sm">{ab.name} · <RLabel k={ab.rarity} /></div>}
+          <div className="text-sm">Account created {fmtD(user.created || joinedOf())}</div>
           <div className="mt-2 flex items-center gap-3">
             <span className="chunk rounded-full bg-[#f7953a] px-3 py-1 text-white">Lv {level}</span>
             <div className="h-4 flex-1 overflow-hidden rounded-full bg-white/60" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-[#f7953a]" style={{ width: pct + '%' }} /></div>
@@ -1408,7 +1423,7 @@ function ProfileCard({ name, me, snap, onClose, onTrade }) {
         </div>
         {snap ? (
           <div className="mt-4 grid grid-cols-2 gap-2 text-center text-[#4a1f06]">
-            {tile('Blooks Unlocked', `${snap.ub} / ${BLOOKS.length}`)}{tile('Blook Score', snap.sc)}{tile('Chests Opened', snap.pk)}{tile('Messages Sent', snap.ms)}{tile('Trades Made', snap.tr)}
+            {tile('Blooks Unlocked', `${snap.ub} / ${BLOOKS.length}`)}{tile('Blook Score', snap.sc)}{tile('Chests Opened', snap.pk)}{tile('Messages Sent', snap.ms)}{tile('Trades Made', snap.tr)}{tile('Joined', fmtD(snap.cr))}
           </div>
         ) : <p className="mt-4">No profile info yet. Profiles appear while a player has Oranget open.</p>}
         <div className="mt-4 flex gap-2">
@@ -1431,7 +1446,7 @@ const ChatRow = React.memo(function ChatRow({ m, me, av, role, ann, artist, ping
         <div className="flex flex-wrap items-center gap-x-2">
           <button onClick={() => onProfile(m.user)} style={{ display: 'inline-block', width: 'auto', flex: 'none', transform: 'none' }} className={`chunk hover:underline ${nmCls(m.user, mine ? 'text-[#1d5fd0]' : 'text-[#b34a0e]')}`}>{m.user}</button>
           {role === 'mod' ? <img src={IMG.modbadge} alt="Mod" title="Mod" width="22" height="22" className="inline-block shrink-0" draggable={false} /> : role && <span className="rounded-full px-2 py-0.5 text-xs text-white" style={role === 'co' ? { background: 'linear-gradient(90deg,#1e6fe8,#14b88a)', boxShadow: 'inset 0 0 0 1.5px #fff' } : { background: role === 'owner' ? '#e11d48' : '#2563eb' }}>{role === 'owner' ? 'OWNER' : 'CO-OWNER'}</span>}
-          {lc(m.user) === 'dxm' && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold text-white" style={{ background: 'linear-gradient(90deg,#7b3dff,#ff2bd6)' }}><img src="data:image/png;base64,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" alt="" width="16" height="16" style={{ width: 16, height: 16 }} />ARTIST</span>}
+          {lc(m.user) === 'dxm' && <img src="data:image/png;base64,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" alt="Artist" title="Artist" width="24" height="24" className="inline-block shrink-0" draggable={false} />}
           {artist && <span className="rounded-full px-2 py-0.5 text-xs text-white" style={{ background: 'linear-gradient(90deg,#f5b301,#ff8a00)', color: '#3a1d00', fontWeight: 800 }}>GOAT</span>}
           <span className="mute text-xs">{new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>{m.edited && <span className="mute text-xs">(edited)</span>}
         </div>
@@ -1495,7 +1510,7 @@ function Chat({ user, eng, go }) {
   }
   const onReply = useCallback((m) => { setReply({ id: m.id, user: m.user, text: m.text }); setEditing(null); if (comp.current) { comp.current.setText((t) => (t.startsWith('@' + m.user) ? t : '@' + m.user + ' ' + t)); comp.current.focus() } }, [])
   const onEdit = useCallback((m) => { setEditing({ id: m.id }); setReply(null); if (comp.current) { comp.current.setText(m.text); comp.current.focus() } }, [])
-  const view = useMemo(() => msgs.filter((m) => (!m.text.startsWith('§') || (OKC.get(m.id) || {}).c === 'announce') && !CS.banned[lc(m.user)] && !((CS.muted[lc(m.user)] || 0) > Date.now())).map((m) => ({ m, role: isOw(m.user) ? 'owner' : isCo(m.user) ? 'co' : CS.mods[lc(m.user)] || isJm(m.user) || isHm(m.user) ? 'mod' : '', ann: m.text.startsWith('§') ? OKC.get(m.id).arg : null, artist: isArtist(m.user), ping: m.user !== user.name && pinged(m, user.name) })), [msgs, ct, user.name])
+  const view = useMemo(() => msgs.filter((m) => (!m.text.startsWith('§') || (OKC.get(m.id) || {}).c === 'announce') && !CS.banned[lc(m.user)] && !((CS.muted[lc(m.user)] || 0) > Date.now())).map((m) => ({ m, role: isOw(m.user) ? 'owner' : isCo(m.user) ? 'co' : CS.mods[lc(m.user)] || isJm(m.user) || isHm(m.user) ? 'mod' : '', ann: m.text.startsWith('§') ? OKC.get(m.id).arg : null, artist: isArtist(m.user), ping: m.user !== user.name && (pinged(m, user.name) || (user.name === 'DEVMASTER' && pinged(m, 'DEVDRAGON'))) })), [msgs, ct, user.name])
   const pres = hub.pres(), now = Date.now(), online = Object.keys(pres).filter((n) => n !== user.name && now - pres[n].at < 130000)
   const snapOf2 = (n) => (n === user.name ? snapOf(user) : pres[n] && pres[n].s), avOf = (n) => { const s = snapOf2(n); return s ? s.av : null }
   const known = useMemo(() => [...new Set([...Object.keys(pres), ...msgs.map((m) => m.user)])].filter((n) => n !== user.name), [msgs])
@@ -1528,7 +1543,9 @@ const sv = (x) => (Number.isFinite(x) ? Math.max(0, Math.min(10000000, Math.floo
 const xpOf = (u) => (u.packs || 0) * 10 + (u.msgs || 0) * 2 + (u.trades || 0) * 25
 const levelOf = (u) => 1 + Math.floor(xpOf(u) / 100)
 const scoreOf = (u) => u.inv.reduce((s, id) => s + (PTS[byId(id)?.rarity] || 0), 0)
-const snapOf = (u) => ({ av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '' })
+const joinedOf = () => { try { const t = FB && FB.auth.currentUser && FB.auth.currentUser.metadata.creationTime; return t ? Date.parse(t) || 0 : 0 } catch { return 0 } }
+const fmtD = (t) => (t ? new Date(t).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown')
+const snapOf = (u) => ({ av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '', cr: u.created || joinedOf() })
 
 const hub = (() => {
   let log = [], pres = {}, ids = new Set(), subs = new Set(), started = false, status = '', queued = false, state = 'retry'
@@ -1603,7 +1620,7 @@ function derive(log, me, pres) {
 }
 
 // Bazaar listings, rebuilt from the log. First valid buyer wins; a stalled sale reopens after 8 minutes.
-const BZ_CLEAR = 1791677098570 // Bazaar wiped: anything listed before this moment is ignored and returned
+const BZ_CLEAR = 1791761500000 // Bazaar wiped: anything listed before this moment is ignored and returned
 function deriveBazaar(log) {
   const now = Date.now(), L = new Map()
   for (const m of log) {
@@ -1733,7 +1750,7 @@ function useTradeEngine(user, update) {
 function Trade({ user, eng }) {
   const { view, status } = eng
   const now = useNow(300)
-  const [sel, setSel] = useState([]), [tk, setTk] = useState(0), [who, setWho] = useState(''), [closed, setClosed] = useState(null), [say, setSay] = useState(''), chatEnd = useRef()
+  const [ts, setTs] = useState(''), [sel, setSel] = useState([]), [tk, setTk] = useState(0), [who, setWho] = useState(''), [closed, setClosed] = useState(null), [say, setSay] = useState(''), chatEnd = useRef()
   const act = view.act && view.act.id !== closed ? view.act : null
   useEffect(() => { chatEnd.current?.scrollIntoView({ block: 'nearest' }) }, [act?.chat.length])
   useEffect(() => { // restore my selection when a session opens
@@ -1797,26 +1814,30 @@ function Trade({ user, eng }) {
   )
   return (
     <div className="space-y-4 text-[#4a1f06]">
-      <div className="flex items-center gap-3"><h2 className="chunk text-4xl">Trading with {act.partner}</h2><StatusDot ok={eng.conn === 'ok'} /></div>
+      <div className="flex items-center gap-3 text-white"><h2 className="chunk text-4xl">Trading with {act.partner}</h2><StatusDot ok={eng.conn === 'ok'} /></div>
       {warn}
       {act.done ? (
         <div className={box + ' text-center'}><p className="chunk text-3xl">Trade complete!</p><p className="mt-1">Your new blooks are in your collection.</p>
           <button className="btn mt-4 bg-[#f7953a] text-white" onClick={() => setClosed(act.id)}>Done</button></div>
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[230px_1fr_230px]">
-            {side(user.name, snapOf(user).av, myIds, (k) => (k < sel.length ? toggle(sel[k]) : setTokens(0)), act.myLock)}
-            <div className={box}><h3 className="chunk mb-2 text-xl">Your blooks (tap to offer, up to 4)</h3>
-              {!act.done && <label className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-black/10 p-2"><Coins size={26} /><span className="chunk">Offer Blook Tokens</span><input type="number" min="0" max={user.tokens} value={tk || ''} placeholder="0" onChange={(e) => setTokens(e.target.value)} className="w-28 rounded-xl px-2 py-1 text-[#4a1f06]" /><button type="button" className="btn bg-white/70 px-3 py-1 text-sm text-[#5a2608]" onClick={() => setTokens(user.tokens)}>All {user.tokens.toLocaleString()}</button></label>}
-              <div className="grid max-h-[26rem] grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2 overflow-y-auto">
-                {Object.entries(user.inv.reduce((g, id, i) => { (g[id] ||= []).push(i); return g }, {})).map(([id, idx]) => { const free = idx.filter((i) => !sel.includes(i)); return <button key={id} onClick={() => toggle(free.length ? free[0] : idx[idx.length - 1])} aria-label={byId(id).name} className={`relative grid h-20 place-items-center rounded-2xl transition hover:-translate-y-1 ${free.length < idx.length ? 'ring-4 ring-amber-400' : ''}`}><Blook id={id} size={60} />{idx.length > 1 && <span className="absolute -right-1 -top-1 rounded-full bg-[#4a1f06] px-1.5 text-xs text-white">x{free.length}</span>}</button> })}
+          <div className="trd">
+            <div className="trav ma"><Blook id={snapOf(user).av} size={150} />{act.myLock && <span className="chunk absolute -right-1 -top-1 rounded-full bg-emerald-400 px-3 py-1 text-sm text-slate-900">Accepted</span>}</div>
+            <div className="trslots ms">{[0, 1, 2, 3].map((k) => <button key={k} disabled={!myIds[k]} onClick={() => (k < sel.length ? toggle(sel[k]) : setTokens(0))} aria-label={myIds[k] ? (myIds[k].startsWith('tk:') ? myIds[k].slice(3) + ' Blook Tokens' : byId(myIds[k]).name) : 'Empty slot'}>{myIds[k] && (myIds[k].startsWith('tk:') ? <span className="chunk flex flex-col items-center text-xs"><Coins size={26} />{Number(myIds[k].slice(3)).toLocaleString()}</span> : <Blook id={myIds[k]} size={56} />)}</button>)}</div>
+            <div className="trp trinv inv">
+              <input className="trsearch" value={ts} onChange={(e) => setTs(e.target.value)} placeholder="Search" aria-label="Search your blooks" />
+              <div className="trgrid">
+                {Object.entries(user.inv.reduce((g, id, i) => { (g[id] ||= []).push(i); return g }, {})).filter(([id]) => byId(id).name.toLowerCase().includes(ts.trim().toLowerCase())).map(([id, idx]) => { const free = idx.filter((i) => !sel.includes(i)); return <button key={id} onClick={() => toggle(free.length ? free[0] : idx[idx.length - 1])} aria-label={byId(id).name} className={free.length < idx.length ? 'ring-4 ring-amber-400' : ''}><Blook id={id} size={50} />{idx.length > 1 && <span className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1.5 text-xs text-white">x{free.length}</span>}</button> })}
               </div>
             </div>
-            {side(act.partner, ps ? ps.av : 'toast', act.theirs, null, act.theirLock)}
+            <div className="trslots ts">{[0, 1, 2, 3].map((k) => <button key={k} disabled aria-label={act.theirs[k] ? (act.theirs[k].startsWith('tk:') ? act.theirs[k].slice(3) + ' Blook Tokens' : byId(act.theirs[k]).name) : 'Empty slot'}>{act.theirs[k] && (act.theirs[k].startsWith('tk:') ? <span className="chunk flex flex-col items-center text-xs"><Coins size={26} />{Number(act.theirs[k].slice(3)).toLocaleString()}</span> : <Blook id={act.theirs[k]} size={56} />)}</button>)}</div>
+            <div className="trav ta"><Blook id={ps ? ps.av : 'toast'} size={150} />{act.theirLock && <span className="chunk absolute -left-1 -top-1 rounded-full bg-emerald-400 px-3 py-1 text-sm text-slate-900">Accepted</span>}</div>
+            <div className="mn"><div className="trname">{user.name}</div><label className="trtok mt-2"><Coins size={26} /><input type="number" min="0" max={user.tokens} value={tk || ''} placeholder="0" onChange={(e) => setTokens(e.target.value)} aria-label="Offer Blook Tokens" /><button type="button" className="text-sm underline" onClick={() => setTokens(user.tokens)}>All</button></label></div>
+            <div className="tn text-right"><div className="trname">{act.partner}</div><div className="trtok mt-2 ml-auto">{Number(((act.theirs.find((x) => x.startsWith('tk:')) || 'tk:0')).slice(3)).toLocaleString()}<Coins size={26} /></div></div>
           </div>
-          <div className={box}>
+          <div className="trchat">
             <h3 className="chunk mb-2 text-xl">Trade chat</h3>
-            <div className="mb-2 max-h-40 space-y-1 overflow-y-auto rounded-2xl bg-white/40 p-3" aria-live="polite">
+            <div className="mb-2 max-h-40 space-y-1 overflow-y-auto rounded-2xl bg-black/25 p-3" aria-live="polite">
               {act.chat.length === 0 && <p className="text-sm">Say hi, or agree on the deal here.</p>}
               {act.chat.map((m) => <div key={m.key}><span className={`chunk ${m.from === user.name ? 'text-[#1d5fd0]' : 'text-[#b34a0e]'}`}>{m.from}</span> {m.text}</div>)}<div ref={chatEnd} />
             </div>
@@ -1825,7 +1846,7 @@ function Trade({ user, eng }) {
               <button className="btn bg-[#f7953a] text-white" aria-label="Send"><Send size={20} /></button>
             </form>
           </div>
-          <button className="btn w-full bg-green-600 text-xl text-white disabled:opacity-50" disabled={!act.myLock && (!canAccept || left > 0)} onClick={() => eng.lock(act.id, act.myLock ? '' : act.h)}>
+          <button className="tracc" disabled={!act.myLock && (!canAccept || left > 0)} onClick={() => eng.lock(act.id, act.myLock ? '' : act.h)}>
             {act.myLock ? `Accepted. Waiting for ${act.partner} (tap to undo)` : !canAccept ? 'Both players need to offer something' : left > 0 ? `Accept (${left})` : 'Accept'}
           </button>
           <button className="btn w-full bg-red-600 text-xl text-white" onClick={() => eng.cancel(act.id)}>Decline</button>
@@ -1847,25 +1868,16 @@ function Bazaar({ user, eng }) {
   const tab = (k, l) => <button key={k} onClick={() => setView(k)} className={`bzt ${view === k ? 'on' : ''}`}>{l}</button>
   return (
     <div className="bzp flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1 text-[#4a1f06]">
-      <div className="flex flex-wrap items-center gap-3"><h2 className="chunk text-5xl text-white">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} /></div>
-      {eng.status && <p className="rounded-2xl bg-amber-100 p-3 text-sm" role="alert">{eng.status}</p>}
-      {msg && <p className="rounded-2xl bg-white/60 p-3 text-sm" role="status">{msg}</p>}
-      <div className="flex gap-2">{tab('blooks', 'Blooks')}{tab('listings', 'Listings')}</div>
+      {eng.status && <p className="rounded-2xl bg-amber-100 p-3 text-sm text-[#4a1f06]" role="alert">{eng.status}</p>}
+      {msg && <p className="rounded-2xl bg-white/70 p-3 text-sm text-[#4a1f06]" role="status">{msg}</p>}
+      <div className="bzhead">
+        <div className="bzleft"><h2 className="chunk bztitle">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} />{tab('blooks', 'Blooks')}{tab('listings', 'Listings')}</div>
+        {view === 'blooks' && <div className="bzstrip">{PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
+          <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={58} /></button>
+        ))}</div>}
+        {view === 'blooks' && <div className="bzright"><input className="bzsearch" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search blook or seller" /><select className="bzsearch" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings"><option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option></select><button className="bzt" onClick={() => { setQ(''); setPack('all'); setSort('new') }}>Clear</button></div>}
+      </div>
       {view === 'blooks' && <>
-        <div className="bzpanel">
-          <div className="bzchests">
-            {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
-              <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={62} /><span className="bzcl">{p.name.replace(/ (Pack|Chest)$/, '')}</span></button>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input className={FIELD + ' max-w-xs flex-1'} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search blook or seller" />
-          <select className="rounded-2xl bg-white px-3 py-2" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings">
-            <option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option>
-          </select>
-          <button className="bzt" onClick={() => { setQ(''); setPack('all'); setSort('new') }}>Clear</button>
-        </div>
         <h3 className="chunk text-center text-3xl text-white">Results:</h3>
         <div className="bzpanel">
           {rows.length === 0 && <p className="p-6 text-center text-white/80">No listings here yet. List one from the My Blooks page!</p>}
@@ -2407,6 +2419,7 @@ function SettingsModal({ user, update, onLogout, onClose }) {
           {tab === 'look' && <div className="flex flex-wrap gap-3">
             <button className="swatch" aria-pressed={theme === 'purple'} onClick={() => setTheme('purple')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#c77dff,#7b2cbf 55%,#240046)' }} />Purple</button>
             <button className="swatch" aria-pressed={theme === 'red'} onClick={() => setTheme('red')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#ff6b6b,#c1121f 55%,#2a0508)' }} />Red</button>
+            <button className="swatch" aria-pressed={theme === 'ocean'} onClick={() => setTheme('ocean')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(180deg,#8fd8ff 0 45%,#0a7fb5 45%,#03314f)' }} />Ocean</button>
             <button className="swatch" aria-pressed={theme === 'forest'} onClick={() => setTheme('forest')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(180deg,#bfe3c0,#4f9a5c 50%,#0f3a1d)' }} />Forest</button>
             <button className="swatch" aria-pressed={theme === 'blue'} onClick={() => setTheme('blue')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'linear-gradient(140deg,#7cc4ff,#2f7be0 55%,#071a38)' }} />Blue</button>
             <button className="swatch" aria-pressed={theme === 'matrix'} onClick={() => setTheme('matrix')}><div className="mb-2 h-16 rounded-xl" style={{ background: 'repeating-linear-gradient(90deg,rgba(0,255,65,.8) 0 2px,transparent 2px 9px),#020a04' }} />Matrix{(user.inv || []).includes('matrix') ? ' (animated)' : ''}</button>
@@ -2452,16 +2465,18 @@ const WORLDS_AT = Date.parse('2026-10-18T12:00:00-04:00')
 function Worlds() {
   const now = useNow(1000), left = Math.max(0, WORLDS_AT - now), box = [['Days', Math.floor(left / 864e5)], ['Hours', Math.floor(left / 36e5) % 24], ['Minutes', Math.floor(left / 6e4) % 60], ['Seconds', Math.floor(left / 1000) % 60]]
   return (
-    <div className="grid h-full place-items-center overflow-y-auto p-3 text-center text-[#4a1f06]">
-      <div className="tradebox w-full max-w-2xl rounded-[2rem] p-6 sm:p-10">
+    <div className="h-full overflow-y-auto p-3 text-center text-[#4a1f06]"><div className="wl-grid">
+      <div className="tradebox wl-box wl-casino"><div className="wl-e">🎰</div><div className="chunk wl-w">Casino</div></div>
+      <div className="tradebox wl-box wl-fish"><div className="wl-e">🎣</div><div className="chunk wl-w">Fishing</div></div>
+      <div className="tradebox wl-box wl-duel"><div className="wl-e">⚔️</div><div className="chunk wl-w">Duels</div></div>
+      <div className="tradebox wl-main rounded-[2rem] p-6 sm:p-10">
         <div className="mx-auto w-fit"><Blook id="earth" size={120} /></div>
         <h2 className="chunk mt-3 text-5xl sm:text-6xl">Worlds</h2>
         <p className="mt-2 text-lg">{left > 0 ? 'Something big is being built. Worlds opens in:' : 'Worlds is almost ready!'}</p>
-        <div className="chunk mt-5 text-3xl text-center worldword">🎰 Casino</div>
-        <div className="mt-3 grid items-center gap-3 sm:grid-cols-[auto_1fr_auto]"><div className="chunk text-3xl worldword">🎣 Fishing</div><div className="grid grid-cols-4 gap-2 sm:gap-4">{box.map(([l, v]) => <div key={l} className="rounded-2xl bg-black/15 p-2 sm:p-4"><div className="chunk text-4xl tabular-nums sm:text-6xl">{String(v).padStart(2, '0')}</div><div className="text-xs uppercase tracking-wide sm:text-sm">{l}</div></div>)}</div><div className="chunk text-3xl worldword">⚔️ Duels</div></div>
+        <div className="mt-5 grid grid-cols-4 gap-2 sm:gap-4">{box.map(([l, v]) => <div key={l} className="rounded-2xl bg-black/15 p-2 sm:p-4"><div className="chunk text-4xl tabular-nums sm:text-6xl">{String(v).padStart(2, '0')}</div><div className="text-xs uppercase tracking-wide sm:text-sm">{l}</div></div>)}</div>
         <p className="mt-6 text-sm opacity-80">Keep opening chests, we will let you know here.</p>
       </div>
-    </div>
+    </div></div>
   )
 }
 // Shared app can be opened directly from the individual HTML pages.
@@ -2538,7 +2553,7 @@ function Dashboard({ user, update, onLogout }) {
   const pending = eng.view.invites.length
   if (CS.banned[lc(user.name)]) return <div className="grid h-[100dvh] place-items-center bg-[#5a2608] p-6 text-center text-white"><div><h1 className="chunk text-5xl">Banned</h1><p className="mt-3">This account was banned from Oranget.</p><button className="btn mt-5 bg-white/20" onClick={onLogout}>Log out</button></div></div>
   return (
-    <div className="app-bg relative flex h-[100dvh] flex-col overflow-hidden">{user.theme === 'forest' ? <ForestBg /> : <FallingBlooks off={tab === 'chat' || tab === 'blooks' || !!user.perf} />}
+    <div className="app-bg relative flex h-[100dvh] flex-col overflow-hidden">{user.theme === 'forest' ? <ForestBg /> : user.theme === 'ocean' ? <OceanBg /> : <FallingBlooks off={tab === 'chat' || tab === 'blooks' || !!user.perf} />}
       <header className="topbar sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 sm:px-6">
         <div className="logo">Oranget</div>
         <nav className="order-3 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto sm:flex-1">
