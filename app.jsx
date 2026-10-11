@@ -12,7 +12,7 @@ const ArrowLeftRight = mk(<path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4" />
 const LogOut = mk(<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />)
 // Keep the original size everywhere; only the Market page opts into smaller token icons.
 const Coins = ({ size = 24, className = '' }) => (
-  <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle' }} />
+  <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle', width: size, height: size, maxWidth: 'none', maxHeight: 'none', filter: 'none', transform: 'none' }} />
 )
 const Send = mk(<path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />)
 const Check = mk(<path d="M20 6 9 17l-5-5" />)
@@ -855,7 +855,7 @@ function PackModal({ pack, user, onOpen, onClose }) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-2" onClick={onClose}>
       <div className="pm" style={{ '--a': ACC[pack.id] }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${pack.name} odds`}>
-        <div className="pm-art"><Chest3D id={pack.id} src={IMG[pack.img]} size={innerWidth < 640 ? 84 : 170} idle /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
+        <div className="pm-art"><Chest3D id={pack.id} src={IMG[pack.img]} size={innerWidth < 720 ? 96 : 250} idle /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
         <div className="pm-main">
           <div className="pm-top"><h3 className="display text-xl">Odds per pack</h3><button className="text-sm underline" onClick={onClose}>Close</button></div>
           <div className="pm-odds">{groups.map((g) => { const tot = g.list.reduce((s, r) => s + r.p, 0), c = RARITY[g.k].color; return (
@@ -1251,7 +1251,7 @@ const ChatRow = React.memo(function ChatRow({ m, me, av, role, ann, artist, ping
         <div className="flex flex-wrap items-center gap-x-2">
           <button onClick={() => onProfile(m.user)} style={{ display: 'inline-block', width: 'auto', flex: 'none', transform: 'none' }} className={`chunk hover:underline ${nmCls(m.user, mine ? 'text-[#1d5fd0]' : 'text-[#b34a0e]')}`}>{m.user}</button>
           {role && <span className="rounded-full px-2 py-0.5 text-xs text-white" style={role === 'co' ? { background: 'linear-gradient(90deg,#1e6fe8,#14b88a)', boxShadow: 'inset 0 0 0 1.5px #fff' } : { background: role === 'owner' ? '#e11d48' : '#2563eb' }}>{role === 'owner' ? 'OWNER' : role === 'co' ? 'CO-OWNER' : 'MOD'}</span>}
-          {artist && <span className="rounded-full px-2 py-0.5 text-xs text-white" style={{ background: '#8b2fc9' }}>ARTIST</span>}
+          {artist && <span className="rounded-full px-2 py-0.5 text-xs text-white" style={{ background: 'linear-gradient(90deg,#f5b301,#ff8a00)', color: '#3a1d00', fontWeight: 800 }}>GOAT</span>}
           <span className="mute text-xs">{new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>{m.edited && <span className="mute text-xs">(edited)</span>}
         </div>
         {m.reply ? <div className="ch-reply"><div className="mute text-xs">From @{m.reply.user}: {m.reply.text}</div>{body}</div> : body}
@@ -1421,19 +1421,21 @@ function derive(log, me, pres) {
 }
 
 // Bazaar listings, rebuilt from the log. First valid buyer wins; a stalled sale reopens after 8 minutes.
+const BZ_CLEAR = 1791677098570 // Bazaar wiped: anything listed before this moment is ignored and returned
 function deriveBazaar(log) {
   const now = Date.now(), L = new Map()
   for (const m of log) {
+    if (m.at < BZ_CLEAR) continue
     if (m.t === 'list') { if (byId(m.blook) && Number.isInteger(m.price) && m.price >= 1 && m.price <= 1000000 && typeof m.id === 'string' && !L.has(m.id)) L.set(m.id, { id: m.id, seller: m.from, blook: m.blook, price: m.price, at: m.at, state: 'open', buyer: null, buyAt: 0 }); continue }
     const l = L.get(m.id)
     if (!l) continue
-    if (l.state === 'pending' && m.t === 'buy' && m.at - l.buyAt > 8 * 60000) { l.state = 'open'; l.buyer = null }
+    if (l.state === 'pending' && m.t === 'buy' && m.at - l.buyAt > 12 * 3600000) { l.state = 'open'; l.buyer = null }
     if (m.t === 'unlist' && m.from === l.seller && l.state === 'open') l.state = 'gone'
     else if (m.t === 'buy' && m.from !== l.seller && l.state === 'open') { l.state = 'pending'; l.buyer = m.from; l.buyAt = m.at }
     else if (m.t === 'sold' && m.from === l.seller && l.state === 'pending' && m.to === l.buyer) l.state = 'sold'
   }
   for (const l of L.values()) {
-    if (l.state === 'pending' && now - l.buyAt > 8 * 60000) { l.state = 'open'; l.buyer = null }
+    if (l.state === 'pending' && now - l.buyAt > 12 * 3600000) { l.state = 'open'; l.buyer = null }
     if (l.state === 'open' && now - l.at > 11 * 3600000) l.state = 'expired'
   }
   return { list: [...L.values()], byId: Object.fromEntries(L) }
@@ -1458,7 +1460,7 @@ function useTradeEngine(user, update) {
   useEffect(() => { // seller side: confirm a sale, hand over the escrowed blook, collect the Blook Tokens
     const u = latest.current; let nu = u
     for (const l of bz.list) {
-      if (l.seller !== u.name || l.state !== 'pending' || Date.now() - l.buyAt > 5 * 60000) continue
+      if (l.seller !== u.name || l.state !== 'pending' || Date.now() - l.buyAt > 12 * 3600000) continue
       const e = (nu.escrow || []).find((x) => x.id === l.id)
       if (!e) continue
       nu = { ...nu, escrow: nu.escrow.filter((x) => x.id !== l.id), tokens: nu.tokens + Math.floor(e.price * 0.95), sales: (nu.sales || 0) + 1 }
@@ -1467,7 +1469,7 @@ function useTradeEngine(user, update) {
     if (nu !== u) update(nu)
   }, [k1])
   useEffect(() => { // listings that outlive the relay history come back to the seller
-    const u = latest.current, old = (u.escrow || []).filter((e) => Date.now() - e.at > 11.5 * 3600000)
+    const u = latest.current, old = (u.escrow || []).filter((e) => e.at < BZ_CLEAR || Date.now() - e.at > 11.5 * 3600000)
     if (!old.length) return
     update({ ...u, escrow: u.escrow.filter((e) => !old.includes(e)), inv: [...u.inv, ...old.map((e) => e.blook)] })
     old.forEach((e) => hub.send({ t: 'unlist', id: e.id, from: u.name }))
@@ -1480,7 +1482,7 @@ function useTradeEngine(user, update) {
     for (const e of u.buying) {
       const l = bz.byId[e.id]
       if (l && l.state === 'sold' && l.buyer === u.name) { nu.inv = [...nu.inv, e.blook]; changed = true }
-      else if ((l && (l.state === 'gone' || l.state === 'expired' || (l.buyer && l.buyer !== u.name))) || Date.now() - e.at > 8 * 60000) { nu.tokens += e.price; changed = true }
+      else if ((l && (l.state === 'gone' || l.state === 'expired' || (l.buyer && l.buyer !== u.name))) || e.at < BZ_CLEAR || Date.now() - e.at > 12 * 3600000) { nu.tokens += e.price; changed = true }
       else nu.buying.push(e)
     }
     if (changed) update(nu)
@@ -1655,13 +1657,13 @@ function Bazaar({ user, eng }) {
   const rows = bz.list.filter((l) => (l.state === 'open' || l.state === 'pending') && !String(l.blook).startsWith('fuse:') && (pack === 'all' || byId(l.blook).pack === pack) && (qq === '' || byId(l.blook).name.toLowerCase().includes(qq) || l.seller.toLowerCase().includes(qq)))
     .sort((a, b) => sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : sort === 'rarity' ? RO.indexOf(byId(b.blook).rarity) - RO.indexOf(byId(a.blook).rarity) : b.at - a.at)
   const online = (n) => n === user.name || now - ((pres[n] || {}).at || 0) < 130000
-  const chip = (id, label, img) => <button key={id} onClick={() => setPack(id)} className={`btn flex items-center gap-2 px-3 py-2 text-base ${pack === id ? 'bg-[#f7953a] text-white' : 'bg-white/60 text-[#5a2608]'}`}>{img && <Chest3D id={id} src={IMG[img]} size={42} />}{label}</button>
+  const chip = (id, label, img) => <button key={id} onClick={() => setPack(id)} className={`btn flex shrink-0 items-center gap-2 px-3 py-2 text-base ${pack === id ? 'bg-[#f7953a] text-white' : 'bg-white/60 text-[#5a2608]'}`}>{img && <img src={IMG[img]} alt="" width={28} height={28} draggable={false} style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 6 }} />}<span className="whitespace-nowrap">{label}</span></button>
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 text-[#4a1f06]">
       <div className="flex items-center gap-3"><h2 className="chunk text-5xl text-white">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} /></div>
       {eng.status && <p className="rounded-2xl bg-amber-100 p-3 text-sm" role="alert">{eng.status}</p>}
       {msg && <p className="rounded-2xl bg-white/60 p-3 text-sm" role="status">{msg}</p>}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch', flex: 'none' }}>
         {chip('all', 'All packs')}{PACKS.filter((p) => !p.lab && !p.secret).map((p) => chip(p.id, p.name, p.img))}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -1674,7 +1676,7 @@ function Bazaar({ user, eng }) {
         {rows.length === 0 && <p>No listings here yet. List one from the My Blooks page!</p>}
         {rows.map((l) => {
           const b = byId(l.blook), p = PACKS.find((x) => x.id === b.pack), mine = l.seller === user.name
-          const why = l.state !== 'open' ? 'Sale in progress' : !online(l.seller) ? 'Seller offline' : user.tokens < l.price ? 'Not enough Blook Tokens' : null
+          const why = l.state !== 'open' ? 'Sale in progress' : user.tokens < l.price ? 'Not enough Blook Tokens' : null
           return (
             <div key={l.id} className="bzcard rounded-[2rem] border-b-8 border-black/20 bg-white/60 p-3 text-center" style={{ boxShadow: `0 0 0 4px ${RARITY[b.rarity].color}88, 0 10px 0 rgba(0,0,0,.12)` }}>
               <div className="mx-auto grid h-24 w-24 place-items-center"><Blook id={l.blook} size={72} /></div>
@@ -1683,7 +1685,7 @@ function Bazaar({ user, eng }) {
               <div className="text-sm">by {l.seller}</div>
               <div className="chunk flex items-center justify-center gap-1 text-xl"><Coins size={24} />{l.price.toLocaleString()}</div>
               {mine ? <button className="btn mt-2 w-full bg-white/70 text-[#5a2608] disabled:opacity-50" disabled={l.state !== 'open'} onClick={() => setMsg(eng.unlist(l.id) ? 'Listing cancelled. The blook is back in your collection.' : 'Could not cancel that listing.')}>Cancel listing</button>
-                : ask === l.id ? <div className="mt-2 flex gap-2"><button className="btn flex-1 bg-emerald-500 px-2 text-white" onClick={() => { setMsg(eng.buy(l) ? 'Purchase sent. The blook arrives when the seller confirms, usually within seconds.' : 'Could not buy that one.'); setAsk(null) }}>Yes</button><button className="btn flex-1 bg-white/70 px-2 text-[#5a2608]" onClick={() => setAsk(null)}>No</button></div>
+                : ask === l.id ? <div className="mt-2 flex gap-2"><button className="btn flex-1 bg-emerald-500 px-2 text-white" onClick={() => { setMsg(eng.buy(l) ? 'Purchase sent. If the seller is offline, the blook arrives when they next open Oranget (your tokens are refunded if it falls through).' : 'Could not buy that one.'); setAsk(null) }}>Yes</button><button className="btn flex-1 bg-white/70 px-2 text-[#5a2608]" onClick={() => setAsk(null)}>No</button></div>
                 : <button className="btn mt-2 w-full bg-[#f7953a] text-white disabled:opacity-50" disabled={!!why} onClick={() => setAsk(l.id)}>{why || 'Buy'}</button>}
             </div>
           )
@@ -1697,7 +1699,7 @@ function Bazaar({ user, eng }) {
             {user.buying.map((e) => <div key={e.id} className="flex items-center gap-2 py-1"><Blook id={e.blook} size={40} /><span className="chunk">{byId(e.blook).name}</span> for {e.price.toLocaleString()} (refunded automatically if it falls through)</div>)}</>}
         </section>
       )}
-      <p className="text-sm">Sellers must have Oranget open to complete a sale, and listings last up to 11 hours. Listed blooks are held safely until they sell or you cancel. A 5% tax is taken from each sale.</p>
+      <p className="text-sm">You can buy even when the seller is offline; the sale finishes when they next open Oranget. Listings last up to 11 hours. Listed blooks are held safely until they sell or you cancel. A 5% tax is taken from each sale.</p>
     </div>
   )
 }

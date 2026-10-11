@@ -429,3 +429,9 @@ button.bt:hover{transform:translateY(-3px) scale(1.04)}.bt.lock img{filter:brigh
 [data-theme=red] .qty.on,[data-theme=red] .seg button[aria-selected=true]{background:#e63946;color:#fff;border-color:#e63946}
 [data-theme=red] .lb-row.me{border-color:#ff3b3b}
 [data-theme=red] *::-webkit-scrollbar-thumb{background:rgba(255,60,60,.5);background-clip:content-box}
+
+.pk .art{padding:.6rem;overflow:hidden}
+.pk .art>*{max-width:100%}
+
+
+.pm-art .ch3,.pm-art .ch-wrap{max-width:100%}
