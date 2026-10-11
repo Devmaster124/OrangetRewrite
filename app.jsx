@@ -770,10 +770,10 @@ function Chest3D({ id, src, size = 160, lid = 0, glow = 0, idle = false, shake =
 }
 // Interactive chest used by every pack opening: tap it 5 times (any pack count), the lid pops, white light pours out.
 function ChestStage({ pack, stage, clicks, wob, onTap, hint, children }) {
-  const size = useMemo(() => Math.round(Math.min(innerWidth * 0.66, innerHeight * 0.36, 340)), [])
+  const size = useMemo(() => Math.round(Math.min(innerWidth * 0.9, innerHeight * 0.5, 460)), [])
   const open = stage !== 'chest'
   return (
-    <div className="relative z-[1] m-auto flex w-full flex-col items-center justify-center px-4 pt-[10dvh] text-center text-white">
+    <div className="relative z-[1] m-auto flex w-full flex-col items-center justify-center px-2 pt-[6dvh] text-center text-white">
       <div className="ch-stage"  style={{ '--cw': Math.round(size * 0.4) + 'px', '--rise': Math.round(size * 0.62) + 'px' }}>
         <button type="button" className="ch-hit" disabled={open} onClick={onTap} aria-label={open ? `${pack.name} chest opening` : `Tap the ${pack.name} chest (${clicks} of 5)`}>
           <Chest3D id={pack.id} src={IMG[pack.img]} size={size} lid={open ? 112 : clicks * 5} glow={open ? 1 : clicks * 0.11} shake={wob} amp={0.5 + clicks * 0.35} beam={open} />
@@ -930,8 +930,8 @@ function Market({ user, update }) {
       <div className="mt-4 grid gap-3 sm:mt-6 sm:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))]">
         {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
           <button key={p.id} onClick={() => setPicked(p)} disabled={!!opening} className="pk" style={{ '--a': ACC[p.id] }} aria-label={`${p.name}, ${p.price} Blook Tokens. See odds`}>
-            <div className="art"><Chest3D id={p.id} src={IMG[p.img]} size={innerWidth < 640 ? 130 : 190} idle /></div>
-            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={16} />{p.price}</div></div>
+            <div className="art"><Chest3D id={p.id} src={IMG[p.img]} size={innerWidth < 640 ? 110 : 140} idle /></div>
+            <div className="flex flex-col gap-1 p-3 sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{p.name}</div><div className="mute text-xs">See odds · open up to 50</div></div><div className="chunk flex items-center gap-1 text-lg sm:text-xl"><Coins size={16} />{p.price}</div></div>
           </button>
         ))}
       </div>
