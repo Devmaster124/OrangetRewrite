@@ -460,3 +460,8 @@ button.bt:hover{transform:translateY(-3px) scale(1.04)}.bt.lock img{filter:brigh
 .frmain{display:flex;align-items:center;gap:10px;min-width:0;color:#fff;cursor:pointer}
 .frx{display:flex;gap:6px}
 .frb{font-family:'Titan One',system-ui,sans-serif;font-size:.85rem;color:#fff;background:rgba(0,0,0,.28);border-radius:8px;padding:.25rem .8rem;cursor:pointer}.frb:disabled{opacity:.4}.frb.ok{background:#16a34a}
+
+.bkanim .ba-lite,.bkanim .ba-lite *{animation-play-state:running!important}
+.zf{display:block;margin-left:auto;margin-right:auto}
+.grid>.zf,.grid>.ba{justify-self:center;align-self:center}
+.fall{contain:layout paint}

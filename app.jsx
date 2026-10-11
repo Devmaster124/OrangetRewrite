@@ -1,6 +1,7 @@
 (function () {
 const { useState, useEffect, useRef, useMemo, useCallback } = React
 document.documentElement.dataset.theme = (() => { try { return localStorage.getItem('oranget_theme') || 'orange' } catch { return 'orange' } })()
+;(() => { const u = 'data:image/png;base64,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'; document.querySelectorAll('link[rel~=icon],link[rel=apple-touch-icon]').forEach((l) => l.remove()); ['icon', 'apple-touch-icon'].forEach((r) => { const l = document.createElement('link'); l.rel = r; l.href = u; document.head.appendChild(l) }) })()
 const mk = (p) => ({ size = 24, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{p}</svg>
 )
@@ -14,7 +15,6 @@ const LogOut = mk(<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5
 const Coins = ({ size = 24, className = '' }) => (
   <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle', width: size, height: size, maxWidth: 'none', maxHeight: 'none', filter: 'none', transform: 'none' }} />
 )
-const UsersIcon = mk(<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>)
 const Send = mk(<path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />)
 const Check = mk(<path d="M20 6 9 17l-5-5" />)
 const Lock = mk(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)
@@ -89,8 +89,8 @@ BLOOKS.push( // Blooket Royalty Pack
   { id: 'cheshireduke', name: 'Cheshire Duke', rarity: 'rare', pack: 'royalty' }, { id: 'lemurlord', name: 'Lemur Lord', rarity: 'rare', pack: 'royalty' },
   { id: 'caterpillarking', name: 'Caterpillar King', rarity: 'epic', pack: 'royalty' }, { id: 'unicornqueen', name: 'Unicorn Queen', rarity: 'epic', pack: 'royalty' },
   { id: 'kingbrokenhearts', name: 'King of Broken Hearts', rarity: 'chroma', pack: 'royalty' }, { id: 'ghoulking', name: 'Ghoul King', rarity: 'chroma', pack: 'royalty' },
-  { id: 'z_margaritamaster', name: 'Zero Margarita Master', rarity: 'zero', pack: 'royalty', inv: 'margaritamaster', spr: 'margaritamaster_a' },
-  { id: 'z_crablord', name: 'Zero Crab Lord', rarity: 'zero', pack: 'royalty', inv: 'crablord', spr: 'crablord_a' },
+  { id: 'margaritamaster', name: 'Margarita Master', rarity: 'legendary', pack: 'royalty' },
+  { id: 'crablord', name: 'Crab Lord', rarity: 'legendary', pack: 'royalty' },
 )
 const PACKS = [
   { id: 'breakfast', name: 'Breakfast Pack', price: 25, img: 'pack', bg: 'from-[#ffd9ac] to-[#fbae5c]' },
@@ -99,7 +99,7 @@ const PACKS = [
   { id: 'dragon', name: 'Dragon Pack', price: 25, img: 'dragonpack', bg: 'from-[#ff8f8f] to-[#a3102a]' },
   { id: 'orange', name: 'Orange Pack', price: 25, img: 'orangepack', bg: 'from-[#ffd29a] to-[#e8590c]' },
   // fixed odds (weights are normalised to 100%): the two Zeros are far rarer than anything else, Chromas are under 1%
-  { id: 'royalty', name: 'Blooket Royalty Pack', price: 25, img: 'royaltypack', bg: 'from-[#ffb3f2] to-[#8a1fc4]', odds: { dogprince: 25, catprincess: 20, hamsterprincess: 20, cheshireduke: 12, lemurlord: 8, caterpillarking: 7, unicornqueen: 5, kingbrokenhearts: 0.5, ghoulking: 0.5, z_margaritamaster: 0.004, z_crablord: 0.004 } },
+  { id: 'royalty', name: 'Blooket Royalty Pack', price: 25, img: 'royaltypack', bg: 'from-[#ffb3f2] to-[#8a1fc4]', odds: { dogprince: 25, catprincess: 20, hamsterprincess: 20, cheshireduke: 12, lemurlord: 8, caterpillarking: 7, unicornqueen: 5, margaritamaster: 1, crablord: 1, kingbrokenhearts: 0.5, ghoulking: 0.5 } },
   { id: 'secret', name: '???', price: 0, img: null, bg: 'from-[#0b0b0b] to-[#0f7a3a]', secret: true },
   { id: 'lab', name: 'Blook Lab', price: 0, img: null, bg: 'from-[#b8f2c8] to-[#3fae7a]', lab: true },
 ]
@@ -226,12 +226,32 @@ function ScaleDragon({ size, className = '', style, label }) { // the black drag
   const src = IMG.blackdragon
   return <span className={`zd bk ${className}`} role="img" aria-label={label} style={{ width: size, height: size, '--img': `url(${src})`, '--sc': SCALE_TILE, '--ts': `${Math.max(10, size / 5.5)}px auto`, ...style }}><img src={src} alt="" draggable={false} /><i className="zs" /><i className="zs zs2" /><i className="zt" /></span>
 }
-const IMG_T = {}, thumbSubs = new Set()
+function fixInverted(keys) { // these two were stored lightness-inverted; undo it once at startup (invert + hue-rotate 180 is its own inverse)
+  const M = [[-0.574, 1.43, 0.144], [0.426, 0.43, 0.144], [0.426, 1.43, -0.856]]
+  return Promise.all(keys.map((k) => new Promise((res) => {
+    const src = IMG[k]; if (!src) return res()
+    const im = new Image(); im.onerror = () => res(); im.onload = () => {
+      try {
+        const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight
+        const x = cv.getContext('2d'); x.drawImage(im, 0, 0); const id = x.getImageData(0, 0, cv.width, cv.height), d = id.data
+        for (let i = 0; i < d.length; i += 4) { const r = 1 - d[i] / 255, g = 1 - d[i + 1] / 255, b = 1 - d[i + 2] / 255; let o = [0, 1, 2].map((c) => Math.max(0, Math.min(1, M[c][0] * r + M[c][1] * g + M[c][2] * b)))
+          if (k === 'kingbrokenhearts') { const mx = Math.max(...o), mn = Math.min(...o), dl = mx - mn; let h = 0; if (dl) { h = mx === o[0] ? ((o[1] - o[2]) / dl + 6) % 6 : mx === o[1] ? (o[2] - o[0]) / dl + 2 : (o[0] - o[1]) / dl + 4; h *= 60 }
+            let sa = mx ? dl / mx : 0, v = mx; if (h >= 15 && h <= 60 && sa > 0.22) { sa = Math.min(1, sa * 1.9); h = (h + 10) % 360; v = Math.min(1, v * 1.04); const f = (n) => { const kk = (n + h / 60) % 6; return v - v * sa * Math.max(0, Math.min(kk, 4 - kk, 1)) }; o = [f(5), f(3), f(1)] } }
+          for (let c = 0; c < 3; c++) d[i + c] = o[c] * 255 }
+        x.putImageData(id, 0, 0); IMG[k] = cv.toDataURL('image/png'); IMG['z_' + k] = IMG[k]
+      } catch {}
+      res()
+    }; im.src = src
+  })))
+}
+const IMG_T = {}, thumbSubs = new Set(), NREL = {}
+const normScale = (k) => { const r = NREL[k], t = NREL.toast; return r && t ? Math.max(0.6, Math.min(1.7, t / r)) : 1 }
 const imgSrc = (k, size) => (size <= 96 && IMG_T[k]) || IMG[k]
 function makeThumbs() { // small copies for lists and chat, so 150 messages never decode 500px art
   const by = new Map(); Object.keys(IMG).forEach((k) => { const s = IMG[k]; if (typeof s !== 'string' || !s.startsWith('data:')) return; if (!by.has(s)) by.set(s, []); by.get(s).push(k) })
   let t; const kick = () => { clearTimeout(t); t = setTimeout(() => thumbSubs.forEach((f) => f()), 250) }
-  by.forEach((keys, s) => { const im = new Image(); im.onload = () => { const S = 192, r = im.naturalHeight / im.naturalWidth, cv = document.createElement('canvas'); cv.width = S; cv.height = Math.max(8, Math.round(S * r)); const x = cv.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, cv.width, cv.height); cv.toBlob((b) => { if (b) { const u = URL.createObjectURL(b); keys.forEach((k) => (IMG_T[k] = u)); kick() } }, 'image/webp', 0.92) }; im.src = s })
+  by.forEach((keys, s) => { const im = new Image(); im.onload = () => { const S = 192, r = im.naturalHeight / im.naturalWidth, cv = document.createElement('canvas'); cv.width = S; cv.height = Math.max(8, Math.round(S * r)); const x = cv.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, cv.width, cv.height);
+    try { const d = x.getImageData(0, 0, cv.width, cv.height).data; let x0 = cv.width, y0 = cv.height, x1 = 0, y1 = 0; for (let yy = 0; yy < cv.height; yy++) for (let xx = 0; xx < cv.width; xx++) if (d[(yy * cv.width + xx) * 4 + 3] > 24) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy } if (x1 > x0 && y1 > y0) { const rel = Math.max(x1 - x0 + 1, y1 - y0 + 1) / Math.max(cv.width, cv.height); keys.forEach((k) => (NREL[k] = rel)) } } catch {} cv.toBlob((b) => { if (b) { const u = URL.createObjectURL(b); keys.forEach((k) => (IMG_T[k] = u)); kick() } }, 'image/webp', 0.92) }; im.src = s })
 }
 const fxFilter = (b) => (b.hue != null ? `hue-rotate(${b.hue}deg) saturate(${b.sat}) brightness(${b.bri})` : undefined)
 function AnimBlook({ b, size, className = '', style }) {
@@ -244,13 +264,14 @@ function AnimBlook({ b, size, className = '', style }) {
   )
 }
 function ZeroFx({ b, size, className = '', style }) { // every Zero: the art flips to its inverse, with ice on one side and fire on the other
-  const stat = imgSrc(b.inv, size), src = b.spr && size > 96 ? IMG[b.spr] : stat // big Zeros play their animation
+  const stat = imgSrc(b.inv, size), src = b.spr && (size > 96 || String(className).includes('live')) ? IMG[b.spr] : stat // big Zeros play their animation
   return <span className={`zf ${size <= 96 ? 'ba-lite' : ''} bk ${className}`} role="img" aria-label={b.name} style={{ width: size, height: size, '--img': `url(${stat})`, ...style }}><img src={src} alt="" draggable={false} style={{ filter: 'invert(1) hue-rotate(180deg)' }} /><i className="zf-ice" /><i className="zf-fire" /><i className="zf-em" /></span>
 }
 const RLabel = ({ k }) => { const r = RARITY[k]; return <span className={k === 'zero' ? 'rz' : k === 'og' ? 'ro' : k === 'chroma' ? 'rch' : ''} style={k === 'zero' || k === 'og' || k === 'chroma' ? undefined : { color: r.color }}>{r.label}</span> }
 function Blook({ id, size = 80, className = '', style }) {
   const b = byId(id) || BLOOKS[0]
   const cls = `bk fx-${b.rarity} ${className}`
+  const ns = normScale(b.inv || b.img || b.id); if (ns !== 1 && !b.anim && !b.parts) style = { ...style, transform: `scale(${ns})` }
   if (b.anim) return <ScaleDragon size={size} className={className} style={style} label={b.name} />
   if (b.parts) return <FusedCanvas a={b.parts[0]} b={b.parts[1]} size={size} className={cls} style={style} label={b.name} />
   if (b.rarity === 'zero' && b.inv) return <ZeroFx b={b} size={size} className={className} style={style} />
@@ -306,7 +327,7 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
-const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVDRAGON' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
+const norm = (u) => ({ packs: 0, msgs: 0, trades: 0, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVDRAGON' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), inv: (u.inv || []).map((id) => (id === 'z_margaritamaster' ? 'margaritamaster' : id === 'z_crablord' ? 'crablord' : id)).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -347,8 +368,17 @@ const getDeviceId = () => {
 }
 const ipHash = async () => { try { const r = await Promise.race([fetch('https://api.ipify.org?format=json'), new Promise((_, no) => setTimeout(no, 3500))]), j = await r.json(), d = await crypto.subtle.digest('SHA-256', enc.encode('oranget|' + j.ip)); return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('') } catch { return null } }
 const altErr = (name) => Object.assign(new Error(`This device already has an Oranget account${name ? ' (' + name + ')' : ''}. Log in to it instead of making a new one.`), { alt: true })
-const registerDevice = async (uid, name) => { try { await FB.db.doc('devices/' + getDeviceId()).set({ uid, name, at: FB.ts() }) } catch {} } // existing players get their device recorded when they next log in
-async function putNew(uid, user) { await FB.db.doc('users/' + uid).set({ name: user.name, nameLower: user.name.toLowerCase(), blob: JSON.stringify(strip(user)), saved: user.saved, at: FB.ts() }) }
+const registerDevice = async (uid, name) => { const dev = getDeviceId(); try { await FB.db.doc('users/' + uid).set({ dev, ih: (await ipHash()) || null }, { merge: true }) } catch {} } // alts are allowed; device + network are logged so DEVMASTER can run /altcheck
+async function altCheck(name) {
+  needFB(); name = String(name || '').trim().toLowerCase(); if (!name) return 'Usage: /altcheck username'
+  const q = await FB.db.collection('users').where('nameLower', '==', name).get(); if (q.empty) return 'No player named ' + name + '.'
+  const d = q.docs[0].data(), me = q.docs[0].id, same = {}
+  for (const [f, v, label] of [['dev', d.dev, 'device'], ['ih', d.ih, 'network']]) { if (!v) continue; const r = await FB.db.collection('users').where(f, '==', v).get(); r.docs.forEach((x) => { if (x.id !== me) (same[x.data().name] ||= []).push(label) }) }
+  const names = Object.keys(same)
+  if (!d.dev && !d.ih) return d.name + ': no device data yet (they must log in once).'
+  return names.length ? d.name + ' is ALTING. Linked accounts: ' + names.map((n) => n + ' (same ' + same[n].join(' + ') + ')').join(', ') : d.name + ' is not alting.'
+} // existing players get their device recorded when they next log in
+async function putNew(uid, user, extra) { await FB.db.doc('users/' + uid).set({ name: user.name, nameLower: user.name.toLowerCase(), blob: JSON.stringify(strip(user)), saved: user.saved, at: FB.ts(), ...(extra || {}) }) }
 async function signUp(name, pass) {
   name = name.trim()
   if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) throw new Error('Username: 3 to 16 letters, numbers or underscores.')
@@ -356,15 +386,10 @@ async function signUp(name, pass) {
   if (pass.length < 8 || !/[A-Za-z]/.test(pass) || !/\d/.test(pass)) throw new Error('Password: at least 8 characters with a letter and a number.')
   needFB()
   const dev = getDeviceId()
-  try { const d = await FB.db.doc('devices/' + dev).get(); if (d.exists) throw altErr(d.data().name) } catch (x) { if (x.alt) throw x } // checked before anything is created
   let cred; try { cred = await FB.auth.createUserWithEmailAndPassword(emailOf(name), pass) } catch (x) { throw fbErr(x) }
-  const undo = async (e) => { try { await cred.user.delete() } catch {} throw e }
-  const ih = await ipHash(); let ipRef = null, n = 0
-  if (ih) { ipRef = FB.db.doc('ipc/' + ih); try { const s = await ipRef.get(); n = s.exists ? s.data().n || 0 : 0 } catch { ipRef = null } if (ipRef && n >= MAX_PER_IP) await undo(new Error('Too many accounts have been made on this network. Ask a grown-up or friend to log in to an existing one.')) }
-  try { await FB.db.doc('devices/' + dev).set({ uid: cred.user.uid, name, at: FB.ts() }) } catch (x) { if (x.code === 'permission-denied') { let who = ''; try { who = (await FB.db.doc('devices/' + dev).get()).data().name } catch {} await undo(altErr(who)) } }
-  if (ipRef) { try { await ipRef.set({ n: n + 1 }) } catch {} }
+  const ih = await ipHash()
   const user = { name, tokens: 100, inv: ['toast', 'cereal'], lastBonus: 0, saved: Date.now() }
-  try { await putNew(cred.user.uid, user) } catch (x) { throw fbErr(x) }
+  try { await putNew(cred.user.uid, user, { dev, ih: ih || null }) } catch (x) { throw fbErr(x) }
   latest = user; return norm(user)
 }
 async function logIn(name, pass) {
@@ -607,13 +632,15 @@ let onMsgSent = null
 const FIELD = 'w-full rounded-2xl border-b-4 border-black/15 bg-white px-4 py-3 text-slate-800 placeholder:text-slate-400'
 
 /* ---------- Landing ---------- */
-function FallingBlooks() {
-  const items = useMemo(() => Array.from({ length: 30 }, () => ({ id: BLOOKS[Math.floor(Math.random() * BLOOKS.length)].id, left: Math.random() * 96, dur: 14 + Math.random() * 14, delay: -Math.random() * 28, op: 0.1 + Math.random() * 0.14, sw: (Math.random() - 0.5) * 14, r0: Math.random() * 40 - 20, r1: Math.random() * 300 - 150 })), [])
+const FALL_POOL = () => BLOOKS.filter((b) => !b.anim && !b.fxa && b.hue == null && b.rarity !== 'zero' && !b.inv)
+function FallingBlooks({ off }) {
+  const items = useMemo(() => { const pool = FALL_POOL(); return Array.from({ length: 10 }, () => ({ id: pool[Math.floor(Math.random() * pool.length)].id, left: Math.random() * 92, dur: 18 + Math.random() * 14, delay: -Math.random() * 28, op: 0.1 + Math.random() * 0.12, sw: (Math.random() - 0.5) * 12, r0: Math.random() * 40 - 20, r1: Math.random() * 240 - 120 })) }, [])
+  if (off) return null
   return (
     <div className="fall-bg" aria-hidden>
       {items.map((b, i) => (
         <div key={i} className="fall" style={{ left: `${b.left}%`, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s`, opacity: b.op, '--sw': `${b.sw}vw`, '--r0': `${b.r0}deg`, '--r1': `${b.r1}deg` }}>
-          <Blook id={b.id} size={72} />
+          <img src={imgSrc(b.id, 72)} alt="" width="72" height="72" draggable={false} style={{ width: 72, height: 72, objectFit: 'contain' }} />
         </div>
       ))}
     </div>
@@ -735,7 +762,7 @@ function Chest3D({ id, src, size = 160, lid = 0, glow = 0, idle = false, shake =
   }), [])
   const band = <><i className="ch-band top" /><i className="ch-band bot" /></>
   return (
-    <div className={`ch-wrap ${idle ? 'ch-idle' : ''}`} style={{ width: size, height: size * 0.82, '--k': size / 300, '--a': th[0], '--p': th[2], '--g': glow }} aria-hidden="true">
+    <div className={`ch-wrap ${idle ? 'ch-idle' : ''}`} style={{ width: size, height: size * 0.82, '--k': size / 300, '--a': `color-mix(in srgb, ${th[0]} 45%, var(--or, #ff8a1f))`, '--p': th[2], '--g': glow }} aria-hidden="true">
       <div className="ch-halo" />
       <div className="ch-persp">
         <div className="ch-scene">
@@ -1018,7 +1045,7 @@ function WheelButton({ user, update, og }) {
   return <><button className={og ? `btn bg-[#f7953a] text-white ${left === 0 ? 'ready' : ''}` : `pbtn g ${left === 0 ? 'ready' : ''}`} onClick={() => setOpen(true)}>{left === 0 ? (og ? 'Spin the wheel!' : 'Daily Wheel') : `Next spin ${clock}`}</button>{open && <WheelModal user={user} update={update} onClose={() => setOpen(false)} />}</>
 }
 
-function Profile({ user, update, go, fr, eng }) {
+function Profile({ user, update, go }) {
   const [pick, setPick] = useState(false)
   const uniq = [...new Set(user.inv)]
   const avatar = uniq.includes(user.avatar) ? user.avatar : user.inv[0]
@@ -1033,7 +1060,7 @@ function Profile({ user, update, go, fr, eng }) {
         <button onClick={() => setPick(true)} className="bob p-1 transition hover:scale-105" aria-label="Change avatar">{avatar && <Blook id={avatar} size={96} />}</button>
         <div className="min-w-[220px] flex-1">
           <h2 className={`chunk text-4xl ${nmCls(user.name)}`}>{user.name}</h2>
-          {ab && <div className="chunk text-sm" style={{ color: RARITY[ab.rarity].color }}>{ab.name} · {RARITY[ab.rarity].label}</div>}
+          {ab && <div className="chunk text-sm">{ab.name} · <RLabel k={ab.rarity} /></div>}
           <div className="mt-2 flex items-center gap-3">
             <span className="chunk rounded-full bg-[#f7953a] px-3 py-1 text-white">Lv {level}</span>
             <div className="h-4 flex-1 overflow-hidden rounded-full bg-white/60" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-[#f7953a]" style={{ width: pct + '%' }} /></div>
@@ -1063,7 +1090,6 @@ function Profile({ user, update, go, fr, eng }) {
           <div className="mt-3"><WheelButton user={user} update={update} og /></div>
         </section>
       </div>
-      {fr && <Friends user={user} fr={fr} eng={eng} go={go} />}
       {pick && ReactDOM.createPortal(
         <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => setPick(false)}>
           <div className="avpick w-full max-w-md overflow-y-auto rounded-[2rem] bg-[#fba852] p-4" style={{ maxHeight: '86dvh', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }} onClick={(e) => e.stopPropagation()}>
@@ -1095,13 +1121,13 @@ function BlookModal({ id, user, update, eng, onClose }) {
     if (!(p >= 1 && p <= 1000000)) { setMsg('Enter a price from 1 to 1,000,000 Blook Tokens.'); return }
     let ok = 0; for (let i = 0; i < n; i++) if (eng.list(id, p)) ok++; if (ok) onClose(); else setMsg('Could not list that blook.')
   }
-  return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/55 p-4" onClick={onClose}>
+  return ReactDOM.createPortal(
+    <div className="fixed left-0 top-0 z-30 grid w-screen place-items-center bg-black/55 p-4" style={{ height: '100dvh' }} onClick={onClose}>
       <div className="w-full max-w-sm overflow-hidden rounded-[2rem] bg-[#fff4d6] shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={b.name}>
         <div className={`bg-gradient-to-b ${pack.bg} p-6`}><Blook id={id} size={200} className="mx-auto drop-shadow-[0_8px_8px_rgba(0,0,0,.3)]" /></div>
         <div className="p-5 text-center text-[#4a1f06]">
           <div className="chunk text-3xl">{b.name}</div>
-          <div className="chunk" style={{ color: r.color }}>{r.label} · {pack.name}</div>
+          <div className="chunk"><RLabel k={b.rarity} /> · {pack.name}</div>
           <div className="text-sm">You own {count}</div>
           {mode === null && (
             <div className="mt-4 flex gap-3">
@@ -1122,7 +1148,7 @@ function BlookModal({ id, user, update, eng, onClose }) {
           <button className="mt-4 text-sm underline" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   )
 }
 
@@ -1173,7 +1199,7 @@ function Blooks({ user, update, eng }) {
   const score = scoreOf(user), unique = Object.keys(counts).filter((x) => !isLab(x)).length, found = SECRETS.filter((b) => counts[b.id]).length
   const tile = (b, secret) => counts[b.id] ? (
     <button key={b.id} onClick={() => setOpen(b.id)} title={`${b.name} (${RARITY[b.rarity].label})`} aria-label={b.name} className="relative grid h-24 w-24 place-items-center transition hover:-translate-y-1 hover:scale-110">
-      <Blook id={b.id} size={80} />
+      <Blook id={b.id} size={80} className="live" />
       {counts[b.id] > 1 && <span className="chunk absolute -right-1 -top-1 rounded-full bg-amber-300 px-2 text-xs text-slate-900">×{counts[b.id]}</span>}
     </button>
   ) : (
@@ -1182,7 +1208,7 @@ function Blooks({ user, update, eng }) {
     </div>
   )
   return (
-    <div className="flex flex-col gap-6 xl:flex-row">
+    <div className="bkanim flex flex-col gap-6 xl:flex-row">
       <div className="flex-1">
         <h2 className="chunk text-5xl text-[#4a1f06]">My Blooks</h2>
         <p className="mt-1 text-sm text-[#7a3409]">Tap a blook to see it bigger, sell it, or list it on the Bazaar.{(user.escrow || []).length > 0 ? ` ${user.escrow.length} listed on the Bazaar.` : ''}</p>
@@ -1220,7 +1246,6 @@ function Blooks({ user, update, eng }) {
 }
 
 function ProfileCard({ name, me, snap, onClose, onTrade }) {
-  const [, rr] = useState(0), F = FRIENDS
   const tile = (label, v) => <div className="rounded-2xl bg-white/70 p-2"><div className="text-xs">{label}</div><div className="chunk text-xl">{v}</div></div>
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4" onClick={onClose}>
@@ -1236,7 +1261,6 @@ function ProfileCard({ name, me, snap, onClose, onTrade }) {
         ) : <p className="mt-4">No profile info yet. Profiles appear while a player has Oranget open.</p>}
         <div className="mt-4 flex gap-2">
           {name !== me && <button className="btn bg-white/80 text-[#5a2608]" onClick={onTrade}>Request trade</button>}
-          {name !== me && F && <button className="btn bg-emerald-500 text-white disabled:opacity-60" disabled={F.isFriend(name) || F.isOut(name)} onClick={() => { F.add(name); rr((n) => n + 1) }}>{F.isFriend(name) ? 'Friends ✓' : F.isOut(name) ? 'Request sent' : F.isIn(name) ? 'Accept friend' : 'Add friend'}</button>}
           <button className="btn bg-white/30 text-white" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -1300,6 +1324,7 @@ function Chat({ user, eng, go }) {
     setText(''); const [c, a, b] = t.split(/\s+/)
     try {
       if (c === '/help') return setErr('Mods: /mute name minutes, /unmute name (after /key4 key). DEVDRAGON commands: /give name amount, /mute name minutes, /unmute name, /ban name, /unban name, /mod name, /unmod name, /announce message. Rainbow key: /key2 key, then /rainbow or /unrainbow')
+      if (c === '/altcheck') { if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /altcheck.'); setErr('Checking…'); return setErr(await altCheck(a)) }
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return setErr('Mute key saved. Use /mute name minutes and /unmute name.') }
       if ((c === '/mute' || c === '/unmute') && !isOw(user.name) && !isEt(user.name)) { if (!isJm(user.name) && !isHm(user.name)) throw new Error('Only DEVDRAGON or a moderator can mute.'); if (!a) throw new Error('Add a player name.'); await sendCmd(c === '/mute' ? 'kmute' : 'kunmute', c === '/mute' ? a + ':' + (b || 10) : a, user.name); return setErr('Done: ' + t) }
       if (c === '/key3') { localStorage.setItem(BRK, a || ''); return setErr('Key saved. Use /blackred and /artist.') }
@@ -1654,6 +1679,7 @@ function Trade({ user, eng }) {
   )
 }
 
+const shortName = (n) => { if (n.length <= 11) return n; const parts = n.split(/[_\s]+|(?<=[a-z])(?=[A-Z])/).filter(Boolean), last = parts[parts.length - 1]; return '…' + (last.length >= 3 && last.length <= 10 ? last : n.slice(-9)) }
 function Bazaar({ user, eng }) {
   const { bz } = eng, pres = hub.pres(), now = useNow(5000)
   const [view, setView] = useState('blooks'), [pack, setPack] = useState('all'), [sort, setSort] = useState('new'), [q, setQ] = useState(''), [ask, setAsk] = useState(null), [msg, setMsg] = useState('')
@@ -1692,7 +1718,7 @@ function Bazaar({ user, eng }) {
               return (
                 <button key={l.id} className="bztile" style={{ boxShadow: `inset 0 -3px 0 ${RARITY[b.rarity].color}` }} onClick={() => setAsk(l.id)} aria-label={`${b.name} by ${l.seller} for ${l.price}`}>
                   <Blook id={l.blook} size={72} />
-                  <span className="bzn">{l.seller}</span>
+                  <span className="bzn" title={l.seller}>{shortName(l.seller)}</span>
                   <span className="bzp2"><span>{l.price.toLocaleString()}</span><Coins size={16} /></span>
                 </button>
               )
@@ -2294,87 +2320,6 @@ function FitBox({ children }) { // shrinks a page to fit any screen, so nothing 
   })
   return <div ref={o} className="h-full w-full overflow-y-auto overflow-x-hidden"><div ref={i} style={{ width: 100 / sc + '%', transform: `scale(${sc})`, transformOrigin: '0 0' }}>{children}</div></div>
 }
-// ---------- Friends ----------
-let FRIENDS = null
-function useFriends(user, update) {
-  const [, tick] = useState(0), ref = useRef(user); ref.current = user
-  const run = () => {
-    const u = ref.current, seen = new Set(u.fseen || []); let fr = [...(u.friends || [])], inn = [...(u.freqIn || [])], out = [...(u.freqOut || [])], ch = false
-    const has = (a, n) => a.some((x) => lc(x) === lc(n)), del = (a, n) => a.filter((x) => lc(x) !== lc(n))
-    for (const m of hub.log()) {
-      if (!m.mid || seen.has(m.mid) || !m.to || lc(m.to) !== lc(u.name) || !['freq', 'facc', 'fno', 'frem'].includes(m.t)) continue
-      seen.add(m.mid); ch = true
-      if (m.t === 'freq') { if (has(fr, m.from)) continue; if (has(out, m.from)) { fr.push(m.from); out = del(out, m.from) } else if (!has(inn, m.from)) inn.push(m.from) }
-      else if (m.t === 'facc') { if (!has(fr, m.from)) fr.push(m.from); out = del(out, m.from) }
-      else if (m.t === 'fno') { out = del(out, m.from); inn = del(inn, m.from) }
-      else if (m.t === 'frem') { fr = del(fr, m.from); inn = del(inn, m.from); out = del(out, m.from) }
-    }
-    if (ch) update({ ...u, friends: fr, freqIn: inn, freqOut: out, fseen: [...seen].slice(-150) })
-    tick((n) => n + 1)
-  }
-  useEffect(() => hub.sub(run), [])
-  const me = () => ref.current.name, snd = (t, to) => hub.send({ t, to, from: me(), mid: crypto.randomUUID().replace(/-/g, '').slice(0, 10) })
-  const L = (k) => ref.current[k] || [], has = (k, n) => L(k).some((x) => lc(x) === lc(n)), del = (k, n) => L(k).filter((x) => lc(x) !== lc(n))
-  const api = {
-    friends: L('friends'), inn: L('freqIn'), out: L('freqOut'),
-    isFriend: (n) => has('friends', n), isOut: (n) => has('freqOut', n), isIn: (n) => has('freqIn', n),
-    add: (n) => {
-      n = String(n || '').trim()
-      if (!NAME_OK.test(n)) return 'Type a valid username.'
-      if (lc(n) === lc(me())) return 'You cannot friend yourself.'
-      if (has('friends', n)) return n + ' is already your friend.'
-      if (has('freqIn', n)) { api.accept(n); return 'You are now friends with ' + n + '!' }
-      if (has('freqOut', n)) return 'Request already sent.'
-      snd('freq', n); update({ ...ref.current, freqOut: [...L('freqOut'), n] }); return 'Friend request sent to ' + n + '.'
-    },
-    accept: (n) => { snd('facc', n); update({ ...ref.current, friends: has('friends', n) ? L('friends') : [...L('friends'), n], freqIn: del('freqIn', n) }) },
-    decline: (n) => { snd('fno', n); update({ ...ref.current, freqIn: del('freqIn', n) }) },
-    cancel: (n) => { snd('fno', n); update({ ...ref.current, freqOut: del('freqOut', n) }) },
-    remove: (n) => { snd('frem', n); update({ ...ref.current, friends: del('friends', n) }) },
-  }
-  FRIENDS = api
-  return api
-}
-function Friends({ user, fr, eng, go }) {
-  const [name, setName] = useState(''), [msg, setMsg] = useState(''), [who, setWho] = useState(null), [view, setView] = useState('friends'), now = useNow(5000), pres = hub.pres()
-  const ps = (n) => pres[Object.keys(pres).find((k) => lc(k) === lc(n))]
-  const on = (n) => { const p = ps(n); return !!p && now - p.at < 130000 }
-  const snapOfName = (n) => { const p = ps(n); return p ? p.s : null }
-  const tile = (n, extra) => { const s = snapOfName(n); return (
-    <div key={n} className="frtile">
-      <button className="frmain" onClick={() => setWho(n)}><Blook id={s ? s.av : 'toast'} size={44} /><span className="min-w-0 text-left"><span className={`chunk block truncate ${nmCls(n)}`}>{n}<span className={`odot ${on(n) ? 'on' : ''}`} title={on(n) ? 'Online' : 'Offline'} /></span><span className="block text-xs opacity-80">{s ? `Level ${s.lv}` : 'Offline'}</span></span></button>
-      {extra && <div className="frx">{extra}</div>}
-    </div>) }
-  const sorted = [...fr.friends].sort((a, b) => Number(on(b)) - Number(on(a)) || a.localeCompare(b))
-  return (
-    <section>
-      <div className="flex items-end justify-between gap-2">
-        <button className={`frtab ${view === 'friends' ? 'on' : ''}`} onClick={() => setView('friends')}>Friends</button>
-        <button className={`frtab ${view === 'requests' ? 'on' : ''}`} onClick={() => setView('requests')}>Requests{fr.inn.length > 0 ? ` (${fr.inn.length})` : ''}</button>
-      </div>
-      <div className="frpanel">
-        <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setMsg(fr.add(name)); setName('') }}>
-          <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a friend by username" maxLength={16} aria-label="Friend username" />
-          <button className="btn bg-[#f7953a] text-white">Add</button>
-        </form>
-        {msg && <p className="mb-3 rounded-xl bg-white/20 p-2 text-sm" role="status">{msg}</p>}
-        {view === 'friends' && <div className="frgrid">
-          {sorted.length === 0 && <p className="opacity-80">No friends yet. Add someone above, or tap a player on Ranks or in Chat.</p>}
-          {sorted.map((n) => tile(n, <><button className="frb" disabled={!on(n)} onClick={() => { eng.invite(n); go('trade') }}>Trade</button><button className="frb" onClick={() => { if (confirm('Remove ' + n + '?')) fr.remove(n) }}>Remove</button></>))}
-        </div>}
-        {view === 'requests' && <div>
-          <div className="frgrid">
-            {fr.inn.length === 0 && <p className="opacity-80">No friend requests right now.</p>}
-            {fr.inn.map((n) => tile(n, <><button className="frb ok" onClick={() => fr.accept(n)}>Accept</button><button className="frb" onClick={() => fr.decline(n)}>Decline</button></>))}
-          </div>
-          {fr.out.length > 0 && <><h4 className="chunk mb-2 mt-4 text-lg">Sent</h4><div className="frgrid">{fr.out.map((n) => tile(n, <button className="frb" onClick={() => fr.cancel(n)}>Cancel</button>))}</div></>}
-        </div>}
-      </div>
-      {who && <ProfileCard name={who} me={user.name} snap={snapOfName(who)} onClose={() => setWho(null)} onTrade={() => { eng.invite(who); setWho(null); go('trade') }} />}
-    </section>
-  )
-}
-
 function Dashboard({ user, update, onLogout }) {
   const [tab, setTab] = useState(ROUTE.get()), [loading, setLoading] = useState(false), [settings, setSettings] = useState(() => (location.pathname.split('/').pop() || '').toLowerCase() === 'settings.html'), [pings, setPings] = useState(0)
   const tabRef = useRef(tab); tabRef.current = tab
@@ -2407,11 +2352,10 @@ function Dashboard({ user, update, onLogout }) {
   useEffect(() => { if (localStorage.getItem('oranget_chatseen') == null) localStorage.setItem('oranget_chatseen', String(Date.now())) ; return chat.subscribe((l) => { if (tabRef.current === 'chat') { localStorage.setItem('oranget_chatseen', String(Date.now())); setPings(0) } else { const seen = Number(localStorage.getItem('oranget_chatseen')) || 0; setPings(l.filter((m) => m.ts > seen && m.user !== uref.current.name && pinged(m, uref.current.name)).length) } }, () => {}) }, [])
   useEffect(() => { if (tab === 'chat') { localStorage.setItem('oranget_chatseen', String(Date.now())); setPings(0) } }, [tab])
   const eng = useTradeEngine(user, update)
-  const fr = useFriends(user, update)
   const pending = eng.view.invites.length
   if (CS.banned[lc(user.name)]) return <div className="grid h-[100dvh] place-items-center bg-[#5a2608] p-6 text-center text-white"><div><h1 className="chunk text-5xl">Banned</h1><p className="mt-3">This account was banned from Oranget.</p><button className="btn mt-5 bg-white/20" onClick={onLogout}>Log out</button></div></div>
   return (
-    <div className="app-bg relative flex h-[100dvh] flex-col overflow-hidden"><FallingBlooks />
+    <div className="app-bg relative flex h-[100dvh] flex-col overflow-hidden"><FallingBlooks off={tab === 'chat' || tab === 'blooks'} />
       <header className="topbar sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 sm:px-6">
         <div className="logo">Oranget</div>
         <nav className="order-3 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto sm:flex-1">
@@ -2432,7 +2376,7 @@ function Dashboard({ user, update, onLogout }) {
       <main className={`relative z-10 min-h-0 min-w-0 flex-1 ${tab === 'blooks' || tab === 'leaders' ? 'overflow-y-auto p-5 sm:p-8' : tab === 'chat' || tab === 'market' ? 'overflow-hidden p-0' : 'overflow-hidden p-3 sm:p-5'}`}>
         {loading ? <Loader /> : (
           <Boundary key={tab}><div className="page-in h-full">
-            {tab === 'home' && <FitBox><Profile user={user} update={update} go={go} fr={fr} eng={eng} /></FitBox>}
+            {tab === 'home' && <FitBox><Profile user={user} update={update} go={go} /></FitBox>}
             {tab === 'blooks' && <Blooks user={user} update={update} eng={eng} />}
             {tab === 'market' && <Market user={user} update={update} />}
             {tab === 'bazaar' && <Bazaar user={user} eng={eng} />}
@@ -2466,6 +2410,6 @@ function App() {
   )
 }
 
-makeThumbs()
+fixInverted(['kingbrokenhearts', 'ghoulking']).then(() => { makeThumbs(); thumbSubs.forEach((f) => f()) })
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 })()
