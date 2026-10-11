@@ -1652,54 +1652,75 @@ function Trade({ user, eng }) {
 
 function Bazaar({ user, eng }) {
   const { bz } = eng, pres = hub.pres(), now = useNow(5000)
-  const [pack, setPack] = useState('all'), [sort, setSort] = useState('new'), [q, setQ] = useState(''), [ask, setAsk] = useState(null), [msg, setMsg] = useState('')
+  const [view, setView] = useState('blooks'), [pack, setPack] = useState('all'), [sort, setSort] = useState('new'), [q, setQ] = useState(''), [ask, setAsk] = useState(null), [msg, setMsg] = useState('')
   const RO = Object.keys(RARITY), qq = q.trim().toLowerCase()
   const rows = bz.list.filter((l) => (l.state === 'open' || l.state === 'pending') && !String(l.blook).startsWith('fuse:') && (pack === 'all' || byId(l.blook).pack === pack) && (qq === '' || byId(l.blook).name.toLowerCase().includes(qq) || l.seller.toLowerCase().includes(qq)))
     .sort((a, b) => sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : sort === 'rarity' ? RO.indexOf(byId(b.blook).rarity) - RO.indexOf(byId(a.blook).rarity) : b.at - a.at)
-  const online = (n) => n === user.name || now - ((pres[n] || {}).at || 0) < 130000
-  const chip = (id, label, img) => <button key={id} onClick={() => setPack(id)} className={`btn flex shrink-0 items-center gap-2 px-3 py-2 text-base ${pack === id ? 'bg-[#f7953a] text-white' : 'bg-white/60 text-[#5a2608]'}`}>{img && <img src={IMG[img]} alt="" width={28} height={28} draggable={false} style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 6 }} />}<span className="whitespace-nowrap">{label}</span></button>
+  const sel = ask && bz.byId[ask]
+  const tab = (k, l) => <button key={k} onClick={() => setView(k)} className={`bzt ${view === k ? 'on' : ''}`}>{l}</button>
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 text-[#4a1f06]">
-      <div className="flex items-center gap-3"><h2 className="chunk text-5xl text-white">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} /></div>
+    <div className="bzp flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1 text-[#4a1f06]">
+      <div className="flex flex-wrap items-center gap-3"><h2 className="chunk text-5xl text-white">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} /></div>
       {eng.status && <p className="rounded-2xl bg-amber-100 p-3 text-sm" role="alert">{eng.status}</p>}
       {msg && <p className="rounded-2xl bg-white/60 p-3 text-sm" role="status">{msg}</p>}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch', flex: 'none' }}>
-        {chip('all', 'All packs')}{PACKS.filter((p) => !p.lab && !p.secret).map((p) => chip(p.id, p.name, p.img))}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <input className={FIELD + ' max-w-xs'} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search blook or seller" />
-        <select className="rounded-2xl bg-white px-3 py-2" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings">
-          <option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option>
-        </select>
-      </div>
-      <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto pr-1 [grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]">
-        {rows.length === 0 && <p>No listings here yet. List one from the My Blooks page!</p>}
-        {rows.map((l) => {
-          const b = byId(l.blook), p = PACKS.find((x) => x.id === b.pack), mine = l.seller === user.name
-          const why = l.state !== 'open' ? 'Sale in progress' : user.tokens < l.price ? 'Not enough Blook Tokens' : null
-          return (
-            <div key={l.id} className="bzcard rounded-[2rem] border-b-8 border-black/20 bg-white/60 p-3 text-center" style={{ boxShadow: `0 0 0 4px ${RARITY[b.rarity].color}88, 0 10px 0 rgba(0,0,0,.12)` }}>
-              <div className="mx-auto grid h-24 w-24 place-items-center"><Blook id={l.blook} size={72} /></div>
-              <div className="chunk mt-1">{b.name}</div>
-              <div className="text-xs" style={{ color: RARITY[b.rarity].color }}><RLabel k={b.rarity} /></div>
-              <div className="text-sm">by {l.seller}</div>
-              <div className="chunk flex items-center justify-center gap-1 text-xl"><Coins size={24} />{l.price.toLocaleString()}</div>
-              {mine ? <button className="btn mt-2 w-full bg-white/70 text-[#5a2608] disabled:opacity-50" disabled={l.state !== 'open'} onClick={() => setMsg(eng.unlist(l.id) ? 'Listing cancelled. The blook is back in your collection.' : 'Could not cancel that listing.')}>Cancel listing</button>
-                : ask === l.id ? <div className="mt-2 flex gap-2"><button className="btn flex-1 bg-emerald-500 px-2 text-white" onClick={() => { setMsg(eng.buy(l) ? 'Purchase sent. If the seller is offline, the blook arrives when they next open Oranget (your tokens are refunded if it falls through).' : 'Could not buy that one.'); setAsk(null) }}>Yes</button><button className="btn flex-1 bg-white/70 px-2 text-[#5a2608]" onClick={() => setAsk(null)}>No</button></div>
-                : <button className="btn mt-2 w-full bg-[#f7953a] text-white disabled:opacity-50" disabled={!!why} onClick={() => setAsk(l.id)}>{why || 'Buy'}</button>}
-            </div>
-          )
-        })}
-      </div>
-      {((user.escrow || []).length > 0 || (user.buying || []).length > 0) && (
-        <section className="rounded-[2rem] bg-white/35 p-4">
-          {(user.escrow || []).length > 0 && <><h3 className="chunk mb-2 text-xl">Your listings</h3>
-            {user.escrow.map((e) => <div key={e.id} className="flex items-center justify-between gap-2 py-1"><span className="flex items-center gap-2"><Blook id={e.blook} size={40} /><span className="chunk">{byId(e.blook).name}</span> for {e.price.toLocaleString()}</span><button className="btn bg-white/70 px-3 py-1 text-base text-[#5a2608]" onClick={() => setMsg(eng.unlist(e.id) ? 'Listing cancelled. The blook is back in your collection.' : 'A sale is in progress, so it cannot be cancelled right now.')}>Cancel</button></div>)}</>}
-          {(user.buying || []).length > 0 && <><h3 className="chunk mb-2 mt-3 text-xl">Waiting for seller</h3>
-            {user.buying.map((e) => <div key={e.id} className="flex items-center gap-2 py-1"><Blook id={e.blook} size={40} /><span className="chunk">{byId(e.blook).name}</span> for {e.price.toLocaleString()} (refunded automatically if it falls through)</div>)}</>}
-        </section>
+      <div className="flex gap-2">{tab('blooks', 'Blooks')}{tab('listings', 'Listings')}</div>
+      {view === 'blooks' && <>
+        <div className="bzpanel">
+          <div className="bzchests">
+            {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
+              <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={58} /></button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input className={FIELD + ' max-w-xs flex-1'} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search blook or seller" />
+          <select className="rounded-2xl bg-white px-3 py-2" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings">
+            <option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option>
+          </select>
+          <button className="bzt" onClick={() => { setQ(''); setPack('all'); setSort('new') }}>Clear</button>
+        </div>
+        <h3 className="chunk text-center text-3xl text-white">Results:</h3>
+        <div className="bzpanel">
+          {rows.length === 0 && <p className="p-6 text-center text-white/80">No listings here yet. List one from the My Blooks page!</p>}
+          <div className="bzgrid">
+            {rows.map((l) => {
+              const b = byId(l.blook)
+              return (
+                <button key={l.id} className="bztile" style={{ boxShadow: `inset 0 -3px 0 ${RARITY[b.rarity].color}` }} onClick={() => setAsk(l.id)} aria-label={`${b.name} by ${l.seller} for ${l.price}`}>
+                  <Blook id={l.blook} size={72} />
+                  <span className="bzn">{l.seller}</span>
+                  <span className="bzp2"><span>{l.price.toLocaleString()}</span><Coins size={16} /></span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </>}
+      {view === 'listings' && (
+        <div className="bzpanel p-4 text-white">
+          <h3 className="chunk mb-2 text-xl">Your listings</h3>
+          {(user.escrow || []).length === 0 && <p className="mb-3 text-white/70">Nothing listed. List a blook from My Blooks.</p>}
+          {(user.escrow || []).map((e) => <div key={e.id} className="flex items-center justify-between gap-2 py-1"><span className="flex items-center gap-2"><Blook id={e.blook} size={44} /><span className="chunk">{byId(e.blook).name}</span> for {e.price.toLocaleString()} <Coins size={16} /></span><button className="bzt" onClick={() => setMsg(eng.unlist(e.id) ? 'Listing cancelled. The blook is back in your collection.' : 'A sale is in progress, so it cannot be cancelled right now.')}>Cancel</button></div>)}
+          <h3 className="chunk mb-2 mt-4 text-xl">Waiting for seller</h3>
+          {(user.buying || []).length === 0 && <p className="text-white/70">No purchases waiting.</p>}
+          {(user.buying || []).map((e) => <div key={e.id} className="flex items-center gap-2 py-1"><Blook id={e.blook} size={44} /><span className="chunk">{byId(e.blook).name}</span> for {e.price.toLocaleString()} (refunded automatically if it falls through)</div>)}
+        </div>
       )}
-      <p className="text-sm">You can buy even when the seller is offline; the sale finishes when they next open Oranget. Listings last up to 11 hours. Listed blooks are held safely until they sell or you cancel. A 5% tax is taken from each sale.</p>
+      {sel && ReactDOM.createPortal(
+        <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => setAsk(null)}>
+          <div className="bzmodal" onClick={(e) => e.stopPropagation()}>
+            <Blook id={sel.blook} size={110} />
+            <div className="chunk text-2xl">{byId(sel.blook).name}</div>
+            <div className="text-sm" style={{ color: RARITY[byId(sel.blook).rarity].color }}><RLabel k={byId(sel.blook).rarity} /></div>
+            <div>by {sel.seller}</div>
+            <div className="chunk flex items-center justify-center gap-1 text-2xl"><Coins size={24} />{sel.price.toLocaleString()}</div>
+            {sel.seller === user.name
+              ? <button className="btn w-full bg-white/70 text-[#5a2608] disabled:opacity-50" disabled={sel.state !== 'open'} onClick={() => { setMsg(eng.unlist(sel.id) ? 'Listing cancelled. The blook is back in your collection.' : 'Could not cancel that listing.'); setAsk(null) }}>Cancel listing</button>
+              : <button className="btn w-full bg-[#f7953a] text-white disabled:opacity-50" disabled={sel.state !== 'open' || user.tokens < sel.price} onClick={() => { setMsg(eng.buy(sel) ? 'Purchase sent. If the seller is offline, the blook arrives when they next open Oranget (your tokens are refunded if it falls through).' : 'Could not buy that one.'); setAsk(null) }}>{sel.state !== 'open' ? 'Sale in progress' : user.tokens < sel.price ? 'Not enough Blook Tokens' : 'Buy'}</button>}
+            <button className="text-sm underline" onClick={() => setAsk(null)}>Close</button>
+          </div>
+        </div>, document.body)}
+      <p className="text-sm">You can buy even when the seller is offline; the sale finishes when they next open Oranget. Listings last up to 11 hours. A 5% tax is taken from each sale.</p>
     </div>
   )
 }
