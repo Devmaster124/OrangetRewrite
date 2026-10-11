@@ -14,6 +14,7 @@ const LogOut = mk(<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5
 const Coins = ({ size = 24, className = '' }) => (
   <img src={IMG.blooktoken} width={size} height={size} className={className} alt="Blook Tokens" draggable={false} style={{ display: 'inline-block', flex: 'none', objectFit: 'contain', verticalAlign: 'middle', width: size, height: size, maxWidth: 'none', maxHeight: 'none', filter: 'none', transform: 'none' }} />
 )
+const UsersIcon = mk(<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>)
 const Send = mk(<path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />)
 const Check = mk(<path d="M20 6 9 17l-5-5" />)
 const Lock = mk(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)
@@ -1017,7 +1018,7 @@ function WheelButton({ user, update, og }) {
   return <><button className={og ? `btn bg-[#f7953a] text-white ${left === 0 ? 'ready' : ''}` : `pbtn g ${left === 0 ? 'ready' : ''}`} onClick={() => setOpen(true)}>{left === 0 ? (og ? 'Spin the wheel!' : 'Daily Wheel') : `Next spin ${clock}`}</button>{open && <WheelModal user={user} update={update} onClose={() => setOpen(false)} />}</>
 }
 
-function Profile({ user, update, go }) {
+function Profile({ user, update, go, fr, eng }) {
   const [pick, setPick] = useState(false)
   const uniq = [...new Set(user.inv)]
   const avatar = uniq.includes(user.avatar) ? user.avatar : user.inv[0]
@@ -1062,6 +1063,7 @@ function Profile({ user, update, go }) {
           <div className="mt-3"><WheelButton user={user} update={update} og /></div>
         </section>
       </div>
+      {fr && <Friends user={user} fr={fr} eng={eng} go={go} />}
       {pick && ReactDOM.createPortal(
         <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => setPick(false)}>
           <div className="avpick w-full max-w-md overflow-y-auto rounded-[2rem] bg-[#fba852] p-4" style={{ maxHeight: '86dvh', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }} onClick={(e) => e.stopPropagation()}>
@@ -1218,6 +1220,7 @@ function Blooks({ user, update, eng }) {
 }
 
 function ProfileCard({ name, me, snap, onClose, onTrade }) {
+  const [, rr] = useState(0), F = FRIENDS
   const tile = (label, v) => <div className="rounded-2xl bg-white/70 p-2"><div className="text-xs">{label}</div><div className="chunk text-xl">{v}</div></div>
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 p-4" onClick={onClose}>
@@ -1233,6 +1236,7 @@ function ProfileCard({ name, me, snap, onClose, onTrade }) {
         ) : <p className="mt-4">No profile info yet. Profiles appear while a player has Oranget open.</p>}
         <div className="mt-4 flex gap-2">
           {name !== me && <button className="btn bg-white/80 text-[#5a2608]" onClick={onTrade}>Request trade</button>}
+          {name !== me && F && <button className="btn bg-emerald-500 text-white disabled:opacity-60" disabled={F.isFriend(name) || F.isOut(name)} onClick={() => { F.add(name); rr((n) => n + 1) }}>{F.isFriend(name) ? 'Friends ✓' : F.isOut(name) ? 'Request sent' : F.isIn(name) ? 'Accept friend' : 'Add friend'}</button>}
           <button className="btn bg-white/30 text-white" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -1668,7 +1672,7 @@ function Bazaar({ user, eng }) {
         <div className="bzpanel">
           <div className="bzchests">
             {PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
-              <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={58} /></button>
+              <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={62} /><span className="bzcl">{p.name.replace(/ Pack$/, '')}</span></button>
             ))}
           </div>
         </div>
@@ -2178,12 +2182,12 @@ function Leaderboard({ user, eng, go }) {
   all[user.name] = { s: snapOf(user), at: Date.now() }
   const rows = Object.entries(all).filter(([n, v]) => NAME_OK.test(n) && v && v.s).map(([n, v]) => ({ n, s: v.s, on: n === user.name || now - v.at < 130000 })).sort((a, b) => (b.s[by] || 0) - (a.s[by] || 0) || a.n.localeCompare(b.n))
   useEffect(() => { const keep = Object.fromEntries(Object.entries(all).filter(([n]) => n !== user.name).sort((a, b) => b[1].at - a[1].at).slice(0, 150)); try { localStorage.setItem(LB_KEY, JSON.stringify(keep)) } catch {} }, [rows.length])
-  const me = rows.findIndex((r) => r.n === user.name) + 1, top = rows.slice(0, 3), val = (r) => Number(r.s[by] || 0).toLocaleString()
+  const me = rows.findIndex((r) => r.n === user.name) + 1, top = rows.slice(0, 3), top50 = rows.slice(0, 50), val = (r) => Number(r.s[by] || 0).toLocaleString()
   const order = top.length === 3 ? [1, 0, 2] : top.map((_, i) => i)
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-8 sm:p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h2 className="chunk text-4xl sm:text-5xl">Leaderboard</h2><p className="mute mt-1 text-sm">You are #{me} of {rows.length}. Every player who has opened Oranget, ranked live.</p></div>
+        <div><h2 className="chunk text-4xl sm:text-5xl">Leaderboard · Top 50</h2><p className="mute mt-1 text-sm">You are #{me} of {rows.length}. The top 50 players, ranked live.</p></div>
         <div className="seg" role="tablist" aria-label="Rank by">{LB_TABS.map(([k, l]) => <button key={k} role="tab" aria-selected={by === k} onClick={() => setBy(k)}>{l}</button>)}</div>
       </div>
       <div className="pod">{order.map((i) => { const r = top[i]; return (
@@ -2193,7 +2197,7 @@ function Leaderboard({ user, eng, go }) {
           <span className="mute text-sm">{val(r)}</span>
           <span className="plinth display mt-2" style={{ height: [104, 76, 56][i], background: `linear-gradient(180deg,${MEDAL[i]},color-mix(in srgb,${MEDAL[i]} 35%,#1a1229))` }}>{i + 1}</span>
         </button>) })}</div>
-      <div>{rows.slice(3).map((r, i) => (
+      <div>{top50.slice(3).map((r, i) => (
         <button key={r.n} className={`lb-row ${r.n === user.name ? 'me' : ''}`} onClick={() => setWho(r.n)}>
           <span className="lb-rank display">{i + 4}</span><Blook id={r.s.av} size={44} />
           <span className="min-w-0 flex-1 text-left"><span className={`chunk block truncate ${nmCls(r.n)}`}>{r.n}<span className={`odot ${r.on ? 'on' : ''}`} title={r.on ? 'Online' : 'Offline'} /></span>
@@ -2290,6 +2294,87 @@ function FitBox({ children }) { // shrinks a page to fit any screen, so nothing 
   })
   return <div ref={o} className="h-full w-full overflow-y-auto overflow-x-hidden"><div ref={i} style={{ width: 100 / sc + '%', transform: `scale(${sc})`, transformOrigin: '0 0' }}>{children}</div></div>
 }
+// ---------- Friends ----------
+let FRIENDS = null
+function useFriends(user, update) {
+  const [, tick] = useState(0), ref = useRef(user); ref.current = user
+  const run = () => {
+    const u = ref.current, seen = new Set(u.fseen || []); let fr = [...(u.friends || [])], inn = [...(u.freqIn || [])], out = [...(u.freqOut || [])], ch = false
+    const has = (a, n) => a.some((x) => lc(x) === lc(n)), del = (a, n) => a.filter((x) => lc(x) !== lc(n))
+    for (const m of hub.log()) {
+      if (!m.mid || seen.has(m.mid) || !m.to || lc(m.to) !== lc(u.name) || !['freq', 'facc', 'fno', 'frem'].includes(m.t)) continue
+      seen.add(m.mid); ch = true
+      if (m.t === 'freq') { if (has(fr, m.from)) continue; if (has(out, m.from)) { fr.push(m.from); out = del(out, m.from) } else if (!has(inn, m.from)) inn.push(m.from) }
+      else if (m.t === 'facc') { if (!has(fr, m.from)) fr.push(m.from); out = del(out, m.from) }
+      else if (m.t === 'fno') { out = del(out, m.from); inn = del(inn, m.from) }
+      else if (m.t === 'frem') { fr = del(fr, m.from); inn = del(inn, m.from); out = del(out, m.from) }
+    }
+    if (ch) update({ ...u, friends: fr, freqIn: inn, freqOut: out, fseen: [...seen].slice(-150) })
+    tick((n) => n + 1)
+  }
+  useEffect(() => hub.sub(run), [])
+  const me = () => ref.current.name, snd = (t, to) => hub.send({ t, to, from: me(), mid: crypto.randomUUID().replace(/-/g, '').slice(0, 10) })
+  const L = (k) => ref.current[k] || [], has = (k, n) => L(k).some((x) => lc(x) === lc(n)), del = (k, n) => L(k).filter((x) => lc(x) !== lc(n))
+  const api = {
+    friends: L('friends'), inn: L('freqIn'), out: L('freqOut'),
+    isFriend: (n) => has('friends', n), isOut: (n) => has('freqOut', n), isIn: (n) => has('freqIn', n),
+    add: (n) => {
+      n = String(n || '').trim()
+      if (!NAME_OK.test(n)) return 'Type a valid username.'
+      if (lc(n) === lc(me())) return 'You cannot friend yourself.'
+      if (has('friends', n)) return n + ' is already your friend.'
+      if (has('freqIn', n)) { api.accept(n); return 'You are now friends with ' + n + '!' }
+      if (has('freqOut', n)) return 'Request already sent.'
+      snd('freq', n); update({ ...ref.current, freqOut: [...L('freqOut'), n] }); return 'Friend request sent to ' + n + '.'
+    },
+    accept: (n) => { snd('facc', n); update({ ...ref.current, friends: has('friends', n) ? L('friends') : [...L('friends'), n], freqIn: del('freqIn', n) }) },
+    decline: (n) => { snd('fno', n); update({ ...ref.current, freqIn: del('freqIn', n) }) },
+    cancel: (n) => { snd('fno', n); update({ ...ref.current, freqOut: del('freqOut', n) }) },
+    remove: (n) => { snd('frem', n); update({ ...ref.current, friends: del('friends', n) }) },
+  }
+  FRIENDS = api
+  return api
+}
+function Friends({ user, fr, eng, go }) {
+  const [name, setName] = useState(''), [msg, setMsg] = useState(''), [who, setWho] = useState(null), [view, setView] = useState('friends'), now = useNow(5000), pres = hub.pres()
+  const ps = (n) => pres[Object.keys(pres).find((k) => lc(k) === lc(n))]
+  const on = (n) => { const p = ps(n); return !!p && now - p.at < 130000 }
+  const snapOfName = (n) => { const p = ps(n); return p ? p.s : null }
+  const tile = (n, extra) => { const s = snapOfName(n); return (
+    <div key={n} className="frtile">
+      <button className="frmain" onClick={() => setWho(n)}><Blook id={s ? s.av : 'toast'} size={44} /><span className="min-w-0 text-left"><span className={`chunk block truncate ${nmCls(n)}`}>{n}<span className={`odot ${on(n) ? 'on' : ''}`} title={on(n) ? 'Online' : 'Offline'} /></span><span className="block text-xs opacity-80">{s ? `Level ${s.lv}` : 'Offline'}</span></span></button>
+      {extra && <div className="frx">{extra}</div>}
+    </div>) }
+  const sorted = [...fr.friends].sort((a, b) => Number(on(b)) - Number(on(a)) || a.localeCompare(b))
+  return (
+    <section>
+      <div className="flex items-end justify-between gap-2">
+        <button className={`frtab ${view === 'friends' ? 'on' : ''}`} onClick={() => setView('friends')}>Friends</button>
+        <button className={`frtab ${view === 'requests' ? 'on' : ''}`} onClick={() => setView('requests')}>Requests{fr.inn.length > 0 ? ` (${fr.inn.length})` : ''}</button>
+      </div>
+      <div className="frpanel">
+        <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setMsg(fr.add(name)); setName('') }}>
+          <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a friend by username" maxLength={16} aria-label="Friend username" />
+          <button className="btn bg-[#f7953a] text-white">Add</button>
+        </form>
+        {msg && <p className="mb-3 rounded-xl bg-white/20 p-2 text-sm" role="status">{msg}</p>}
+        {view === 'friends' && <div className="frgrid">
+          {sorted.length === 0 && <p className="opacity-80">No friends yet. Add someone above, or tap a player on Ranks or in Chat.</p>}
+          {sorted.map((n) => tile(n, <><button className="frb" disabled={!on(n)} onClick={() => { eng.invite(n); go('trade') }}>Trade</button><button className="frb" onClick={() => { if (confirm('Remove ' + n + '?')) fr.remove(n) }}>Remove</button></>))}
+        </div>}
+        {view === 'requests' && <div>
+          <div className="frgrid">
+            {fr.inn.length === 0 && <p className="opacity-80">No friend requests right now.</p>}
+            {fr.inn.map((n) => tile(n, <><button className="frb ok" onClick={() => fr.accept(n)}>Accept</button><button className="frb" onClick={() => fr.decline(n)}>Decline</button></>))}
+          </div>
+          {fr.out.length > 0 && <><h4 className="chunk mb-2 mt-4 text-lg">Sent</h4><div className="frgrid">{fr.out.map((n) => tile(n, <button className="frb" onClick={() => fr.cancel(n)}>Cancel</button>))}</div></>}
+        </div>}
+      </div>
+      {who && <ProfileCard name={who} me={user.name} snap={snapOfName(who)} onClose={() => setWho(null)} onTrade={() => { eng.invite(who); setWho(null); go('trade') }} />}
+    </section>
+  )
+}
+
 function Dashboard({ user, update, onLogout }) {
   const [tab, setTab] = useState(ROUTE.get()), [loading, setLoading] = useState(false), [settings, setSettings] = useState(() => (location.pathname.split('/').pop() || '').toLowerCase() === 'settings.html'), [pings, setPings] = useState(0)
   const tabRef = useRef(tab); tabRef.current = tab
@@ -2322,6 +2407,7 @@ function Dashboard({ user, update, onLogout }) {
   useEffect(() => { if (localStorage.getItem('oranget_chatseen') == null) localStorage.setItem('oranget_chatseen', String(Date.now())) ; return chat.subscribe((l) => { if (tabRef.current === 'chat') { localStorage.setItem('oranget_chatseen', String(Date.now())); setPings(0) } else { const seen = Number(localStorage.getItem('oranget_chatseen')) || 0; setPings(l.filter((m) => m.ts > seen && m.user !== uref.current.name && pinged(m, uref.current.name)).length) } }, () => {}) }, [])
   useEffect(() => { if (tab === 'chat') { localStorage.setItem('oranget_chatseen', String(Date.now())); setPings(0) } }, [tab])
   const eng = useTradeEngine(user, update)
+  const fr = useFriends(user, update)
   const pending = eng.view.invites.length
   if (CS.banned[lc(user.name)]) return <div className="grid h-[100dvh] place-items-center bg-[#5a2608] p-6 text-center text-white"><div><h1 className="chunk text-5xl">Banned</h1><p className="mt-3">This account was banned from Oranget.</p><button className="btn mt-5 bg-white/20" onClick={onLogout}>Log out</button></div></div>
   return (
@@ -2346,7 +2432,7 @@ function Dashboard({ user, update, onLogout }) {
       <main className={`relative z-10 min-h-0 min-w-0 flex-1 ${tab === 'blooks' || tab === 'leaders' ? 'overflow-y-auto p-5 sm:p-8' : tab === 'chat' || tab === 'market' ? 'overflow-hidden p-0' : 'overflow-hidden p-3 sm:p-5'}`}>
         {loading ? <Loader /> : (
           <Boundary key={tab}><div className="page-in h-full">
-            {tab === 'home' && <FitBox><Profile user={user} update={update} go={go} /></FitBox>}
+            {tab === 'home' && <FitBox><Profile user={user} update={update} go={go} fr={fr} eng={eng} /></FitBox>}
             {tab === 'blooks' && <Blooks user={user} update={update} eng={eng} />}
             {tab === 'market' && <Market user={user} update={update} />}
             {tab === 'bazaar' && <Bazaar user={user} eng={eng} />}
