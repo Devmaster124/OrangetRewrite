@@ -706,7 +706,6 @@ function OceanBg() {
       <i className="oc-wave oc-w1" />
       {jumps.map((v, i) => <i key={'j' + i} className="oc-jump" style={{ left: v.l + '%', animationDuration: v.d + 's', animationDelay: v.de + 's' }}>{v.e}</i>)}
       <i className="oc-wave oc-w2" />
-      {fish.map((v, i) => <i key={i} className="oc-fish" style={{ top: v.t + '%', fontSize: v.s, animationName: v.r ? 'ocswimr' : 'ocswiml', animationDuration: v.d + 's', animationDelay: v.de + 's' }}>{v.e}</i>)}
       <i className="oc-wave oc-w3" />
     </div>
   )
@@ -1873,7 +1872,7 @@ function Bazaar({ user, eng }) {
       <div className="bzhead">
         <div className="bzleft"><h2 className="chunk bztitle">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} />{tab('blooks', 'Blooks')}{tab('listings', 'Listings')}</div>
         {view === 'blooks' && <div className="bzstrip">{PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
-          <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><Chest3D id={p.id} src={IMG[p.img]} size={58} /></button>
+          <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><img src={IMG[p.img]} alt="" draggable={false} style={{ width: '100%', height: 66, objectFit: 'contain' }} /></button>
         ))}</div>}
         {view === 'blooks' && <div className="bzright"><input className="bzsearch" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search blook or seller" /><select className="bzsearch" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings"><option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option></select><button className="bzt" onClick={() => { setQ(''); setPack('all'); setSort('new') }}>Clear</button></div>}
       </div>

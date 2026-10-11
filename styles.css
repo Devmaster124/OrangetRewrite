@@ -659,3 +659,10 @@ html[data-perf="1"] .pk,html[data-perf="1"] .st,html[data-perf="1"] .pm,html[dat
 .bztile{padding:14px 6px 10px}
 .bzmodal{background:var(--s2);color:var(--cream);border-bottom:6px solid var(--s3)}
 .bzp .text-white{color:var(--cream)!important}
+
+/* see-through bazaar + trade in forest/ocean */
+:is([data-theme=forest],[data-theme=ocean]) :is(.bzpanel,.bzstrip,.bzsearch,.bzmodal,.trp,.trchat,.trslots,.trtok,.trsearch){background:rgba(4,20,14,.28)!important;backdrop-filter:blur(2px);border-bottom-color:rgba(255,255,255,.12)}
+:is([data-theme=forest],[data-theme=ocean]) :is(.bzchest,.bztile,.trslots button){background:rgba(255,255,255,.1)!important}
+:is([data-theme=forest],[data-theme=ocean]) :is(.bzchest,.bztile,.trslots button):hover{background:rgba(255,255,255,.2)!important}
+:is([data-theme=forest],[data-theme=ocean]) .bzt{background:rgba(4,20,14,.4)!important}
+:is([data-theme=forest],[data-theme=ocean]) .trgrid button:hover{background:rgba(255,255,255,.18)}
