@@ -1056,13 +1056,13 @@ function packOdds(id) { // mirrors rollBlook exactly, including the fallback whe
 }
 function PackModal({ pack, user, onOpen, onClose }) {
   const [n, setN] = useState(1), rows = packOdds(pack.id)
-  const max = Math.min(10, Math.floor(user.tokens / pack.price)), q = Math.max(1, Math.min(n, max || 1)), cost = q * pack.price
+  const FCo = ({ size }) => pack.fish ? <img src={IMG.fcoin} width={size + 4} height={size + 4} alt="" /> : <Coins size={size} />, max = Math.min(10, Math.floor(user.tokens / pack.price)), q = Math.max(1, Math.min(n, max || 1)), cost = q * pack.price
   useEffect(() => { const f = (e) => e.key === 'Escape' && onClose(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [])
   const groups = [...RKD].reverse().map((k) => ({ k, list: rows.filter((r) => r.b.rarity === k) })).filter((g) => g.list.length)
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-2" onClick={onClose}>
       <div className="pm" style={{ '--a': ACC[pack.id] }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${pack.name} odds`}>
-        <div className="pm-art"><Chest3D id={pack.id} src={IMG[pack.img]} size={innerWidth < 720 ? 96 : 250} idle /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><Coins size={15} />{pack.price} each</div></div></div>
+        <div className="pm-art"><Chest3D id={pack.id} src={IMG[pack.img]} size={innerWidth < 720 ? 96 : 250} idle /><div><div className="display text-2xl">{pack.name}</div><div className="chunk flex items-center gap-1 text-base"><FCo size={15} />{pack.price} each</div></div></div>
         <div className="pm-main">
           <div className="pm-top"><h3 className="display text-xl">Odds per chest</h3><button className="text-sm underline" onClick={onClose}>Close</button></div>
           <div className="pm-odds">{groups.map((g) => { const tot = g.list.reduce((s, r) => s + r.p, 0), c = RARITY[g.k].color; return (
@@ -1074,8 +1074,8 @@ function PackModal({ pack, user, onOpen, onClose }) {
             <div className="flex flex-wrap items-center gap-2"><span className="chunk text-sm">How many?</span>
               {[1, 5, 10].map((k) => <button key={k} disabled={k * pack.price > user.tokens} onClick={() => setN(k)} className={`qty ${q === k ? 'on' : ''}`}>{k}</button>)}
               <button className={`qty ${q === max && ![1, 5, 10].includes(max) ? 'on' : ''}`} disabled={max < 1} onClick={() => setN(max)}>Max {max}</button></div>
-            <button className="btn mt-2 w-full bg-[#f7953a] text-base" disabled={max < 1} onClick={() => onOpen(q)}><span className="inline-flex items-center justify-center gap-2">Open {q} chest{q > 1 ? 's' : ''} for <Coins size={15} />{cost.toLocaleString()}</span></button>
-            {max < 1 && <p className="mute mt-1 text-xs">You need {pack.price} Blook Tokens. Spin the daily wheel on Home for free Blook Tokens.</p>}
+            <button className="btn mt-2 w-full bg-[#f7953a] text-base" disabled={max < 1} onClick={() => onOpen(q)}><span className="inline-flex items-center justify-center gap-2">Open {q} chest{q > 1 ? 's' : ''} for <FCo size={15} />{cost.toLocaleString()}</span></button>
+            {max < 1 && <p className="mute mt-1 text-xs">{pack.fish ? `You need ${pack.price} fish coins. Catch fish in the Fishing world to earn more.` : `You need ${pack.price} Blook Tokens. Spin the daily wheel on Home for free Blook Tokens.`}</p>}
           </div>
         </div>
       </div>
@@ -2098,44 +2098,34 @@ function FishBag({ user, upd, ur }) {
     </div>
   )
 }
+DOCK.forEach((d) => { const pk = PACKS.find((p) => p.id === d.id + 'chest'); if (pk) pk.odds = Object.fromEntries(d.pool) })
 function Dockside({ user, upd, ur }) {
-  const [sel, setSel] = useState(null), [busy, setBusy] = useState(false), [got, setGot] = useState(null)
-  const open = (c) => {
-    const u = ur.current; if ((u.fc || 0) < c.cost || busy) return
-    setBusy(true); setGot(null)
-    setTimeout(() => {
-      const tot = c.pool.reduce((s, p) => s + p[1], 0); let r = Math.random() * tot, id = c.pool[0][0]
-      for (const [k, w] of c.pool) { r -= w; if (r <= 0) { id = k; break } }
-      const cu = ur.current; upd({ ...cu, fc: (cu.fc || 0) - c.cost, inv: [...cu.inv, id] }); setGot(id); setBusy(false)
-    }, 1000)
+  const [opening, setOpening] = useState(null), [picked, setPicked] = useState(null)
+  const fc = user.fc || 0, mk = (d) => ({ ...PACKS.find((p) => p.id === d.id + 'chest'), price: d.cost, fish: true })
+  const open = (p, n = 1) => {
+    const u = ur.current; if ((u.fc || 0) < p.price * n) return
+    const bs = Array.from({ length: n }, () => rollBlook(p.id))
+    upd({ ...u, fc: (u.fc || 0) - p.price * n, inv: [...u.inv, ...bs.map((b) => b.id)] })
+    setPicked(null); setOpening({ bs, p, k: Date.now(), prev: new Set(u.inv) })
   }
-  const c = sel && DOCK.find((x) => x.id === sel), tot = c ? c.pool.reduce((s, p) => s + p[1], 0) : 1
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-6 text-white">
       <div className="mx-auto max-w-4xl">
-        <h2 className="chunk text-4xl">Dockside</h2><p className="text-sm opacity-80">Spend fish coins on special chests. Blooks from these chests go to your normal collection.</p>
+        <h2 className="chunk text-4xl">Dockside</h2><p className="text-sm opacity-80">Spend fish coins on special chests. Tap a chest to see its odds and choose how many to open.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {DOCK.map((d) => (
-            <button key={d.id} className="trp p-4 text-center transition hover:-translate-y-1" onClick={() => { setSel(d.id); setGot(null) }}>
-              <div className={`mx-auto w-fit ${busy && sel === d.id ? 'fz-shake' : ''}`}><div className="fz-c3"><Chest3D id={d.id + 'chest'} size={190} idle /></div></div>
+            <button key={d.id} className="trp p-4 text-center transition hover:-translate-y-1" disabled={!!opening} onClick={() => setPicked(mk(d))}>
+              <div className="mx-auto w-fit"><div className="fz-c3"><Chest3D id={d.id + 'chest'} size={190} idle /></div></div>
               <div className="chunk text-2xl">{d.name}</div>
               <div className="chunk flex items-center justify-center gap-1 text-xl"><img src={IMG.fcoin} width="24" height="24" alt="" />{d.cost}</div>
             </button>
           ))}
         </div>
       </div>
-      {c && ReactDOM.createPortal(
-        <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => !busy && setSel(null)}>
-          <div className="bzmodal !w-[min(30rem,100%)] max-h-[92dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className={busy ? 'fz-shake' : ''}><div className="fz-c3"><Chest3D id={c.id + 'chest'} size={200} idle /></div></div>
-            <div className="chunk text-3xl">{c.name}</div>
-            {got && <div className="rounded-2xl bg-white/15 p-3"><div className="chunk">You got {byId(got).name}!</div><div className="mx-auto w-fit"><Blook id={got} size={90} /></div><div className="text-sm"><RLabel k={byId(got).rarity} /></div></div>}
-            <button className="btn w-full bg-emerald-500 text-white disabled:opacity-50" disabled={busy || (user.fc || 0) < c.cost} onClick={() => open(c)}>{busy ? 'Opening…' : (user.fc || 0) < c.cost ? 'Not enough fish coins' : `Open for ${c.cost} fish coins`}</button>
-            <div className="w-full text-left"><div className="chunk mb-1">Odds</div>
-              <div className="grid grid-cols-2 gap-1 text-sm">{c.pool.map(([id, w]) => <div key={id} className="flex items-center gap-2 rounded-lg bg-black/20 p-1"><Blook id={id} size={32} /><span className="min-w-0 flex-1 truncate">{byId(id).name}</span><b>{(w / tot * 100).toFixed(1)}%</b></div>)}</div></div>
-            <button className="text-sm underline" onClick={() => setSel(null)}>Close</button>
-          </div>
-        </div>, document.body)}
+      {picked && <PackModal pack={picked} user={{ ...user, tokens: fc }} onOpen={(n) => open(picked, n)} onClose={() => setPicked(null)} />}
+      {opening && (opening.bs.length === 1
+        ? <PackOpening key={opening.k} pack={opening.p} blook={opening.bs[0]} canAgain={(ur.current.fc || 0) >= opening.p.price} onAgain={() => open(opening.p, 1)} onClose={() => setOpening(null)} />
+        : <MultiOpening key={opening.k} info={opening} canAgain={(ur.current.fc || 0) >= opening.p.price * opening.bs.length} onAgain={() => open(opening.p, opening.bs.length)} onClose={() => setOpening(null)} />)}
     </div>
   )
 }
