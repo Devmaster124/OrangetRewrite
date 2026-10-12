@@ -1032,6 +1032,7 @@ function PackOpening({ pack, blook, canAgain, onAgain, onClose }) {
 const ACC = { orange: '#ff8a1f', breakfast: '#ffa53d', space: '#7f73ff', spooky: '#b05cff', dragon: '#ff3b52', royalty: '#d63fd0' }
 const lightHex = (h) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * 0.45 + 255 * 0.55).toString(16).padStart(2, '0')).join('')
 NEW_PACKS.forEach((np) => { ACC[np.id] = np.c1; PACK_THEME[np.id] = [np.c1, np.c2, lightHex(np.c1)] })
+PACK_THEME.sharkchest = ['#e8c27a', '#7a4a10', '#8fd8ff']; PACK_THEME.oceanchest = ['#2a9fc4', '#0b4a63', '#7fe3ff']
 ACC.videogame = '#7a5cff'; PACK_THEME.videogame = ['#7a5cff', '#0a0620', '#43e8ff']
 const fmtP = (n) => `${+n.toFixed(n < 0.1 ? 3 : n < 1 ? 2 : 1)}%`
 function packOdds(id) { // mirrors rollBlook exactly, including the fallback when a pack has no blook of a rolled rarity
@@ -1877,7 +1878,7 @@ function Bazaar({ user, eng }) {
       <div className="bzhead">
         <div className="bzleft"><h2 className="chunk bztitle">Bazaar</h2><StatusDot ok={eng.conn === 'ok'} />{tab('blooks', 'Blooks')}{tab('listings', 'Listings')}</div>
         {view === 'blooks' && <div className="bzstrip">{PACKS.filter((p) => !p.lab && !p.secret).map((p) => (
-          <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><img src={IMG[p.img]} alt="" draggable={false} style={{ width: '100%', height: 66, objectFit: 'contain' }} /></button>
+          <button key={p.id} title={p.name} aria-label={p.name} aria-pressed={pack === p.id} onClick={() => setPack(pack === p.id ? 'all' : p.id)} className={`bzchest ${pack === p.id ? 'on' : ''}`}><span className="bzcw"><Chest3D id={p.id} src={IMG[p.img]} size={46} /></span></button>
         ))}</div>}
         {view === 'blooks' && <div className="bzright"><input className="bzsearch" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search blook or seller" /><select className="bzsearch" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort listings"><option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rarity">Rarity</option></select><button className="bzt" onClick={() => { setQ(''); setPack('all'); setSort('new') }}>Clear</button></div>}
       </div>
@@ -1961,8 +1962,8 @@ const FChest = ({ kind, size = 150 }) => kind === 'shark' ? (
     <path d="M118 116l4-10 4 10-10-6h12z" fill="#ff7a59" stroke="#a03c20" strokeWidth="2" /><path d="M30 120q4-14 8 0t8 0" fill="none" stroke="#57d68d" strokeWidth="4" strokeLinecap="round" /></svg>
 )
 function ReelGame({ rar, onDone }) {
-  const ri = Math.max(0, FRAR.indexOf(rar)), zh = Math.max(0.13, 0.32 - ri * 0.022), sp = 0.3 + ri * 0.07
-  const st = useRef({ zc: 0.5, zv: sp, y: 0.2, v: 0, p: 0.3, over: false }), [, tick] = useState(0)
+  const ri = Math.max(0, FRAR.indexOf(rar)), zh = Math.max(0.24, 0.44 - ri * 0.02), sp = 0.16 + ri * 0.035
+  const st = useRef({ zc: 0.5, zv: sp, y: 0.2, v: 0, p: 0.4, over: false }), [, tick] = useState(0)
   useEffect(() => {
     let raf, last = performance.now()
     const loop = (t) => {
@@ -1970,19 +1971,19 @@ function ReelGame({ rar, onDone }) {
       if (!s.over) {
         if (Math.random() < dt * 0.9) s.zv = (Math.random() < 0.5 ? -1 : 1) * sp * (0.5 + Math.random())
         s.zc += s.zv * dt; if (s.zc > 1 - zh / 2) { s.zc = 1 - zh / 2; s.zv = -Math.abs(s.zv) } if (s.zc < zh / 2) { s.zc = zh / 2; s.zv = Math.abs(s.zv) }
-        s.v += 1.15 * dt; s.y += s.v * dt; if (s.y > 1) { s.y = 1; s.v = 0 } if (s.y < 0) { s.y = 0; s.v = 0 }
-        s.p += (Math.abs(s.y - s.zc) < zh / 2 ? 0.26 : -0.2) * dt
+        s.v += 0.8 * dt; s.y += s.v * dt; if (s.y > 1) { s.y = 1; s.v = 0 } if (s.y < 0) { s.y = 0; s.v = 0 }
+        s.p += (Math.abs(s.y - s.zc) < zh / 2 ? 0.36 : -0.1) * dt
         if (s.p >= 1) { s.over = true; onDone(true) } else if (s.p <= 0) { s.over = true; onDone(false) }
       }
       tick((n) => n + 1); raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
-    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); st.current.v = -0.6 } }
+    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); st.current.v = -0.5 } }
     addEventListener('keydown', key); return () => { cancelAnimationFrame(raf); removeEventListener('keydown', key) }
   }, [])
   const s = st.current, inz = Math.abs(s.y - s.zc) < zh / 2
   return (
-    <div className="fz-reel-wrap" onPointerDown={(e) => { e.stopPropagation(); st.current.v = -0.6 }}>
+    <div className="fz-reel-wrap" onPointerDown={(e) => { e.stopPropagation(); st.current.v = -0.5 }}>
       <div className="fz-prog"><div style={{ width: Math.max(0, Math.min(1, s.p)) * 100 + '%', background: inz ? '#3ddc6a' : '#ff6b4a' }} /></div>
       <div className="fz-reel"><div className="fz-zone" style={{ top: (s.zc - zh / 2) * 100 + '%', height: zh * 100 + '%' }} /><div className="fz-hook" style={{ top: 'calc(' + s.y * 100 + '% - 7px)' }} /></div>
       <div className="fz-say">Click to keep the line in the green!</div>
@@ -1991,10 +1992,10 @@ function ReelGame({ rar, onDone }) {
 }
 function FishCast({ user, upd, ur }) {
   const now = useTick(1000), [phase, setPhase] = useState('idle'), [fish, setFish] = useState(null), [res, setRes] = useState(null), tm = useRef()
-  const left = Math.max(0, (user.fs || 0) - now), active = left > 0
+  const [mins, setMins] = useState(10), cost = mins * 5, left = Math.max(0, (user.fs || 0) - now), active = left > 0
   const avatar = user.avatar && user.inv.includes(user.avatar) ? user.avatar : user.inv[0] || 'toast'
   useEffect(() => () => clearTimeout(tm.current), [])
-  const start = () => { const u = ur.current; if (u.tokens < SESSION_COST) return; upd({ ...u, tokens: u.tokens - SESSION_COST, fs: Date.now() + SESSION_MS }) }
+  const start = () => { const u = ur.current; if (u.tokens < cost) return; upd({ ...u, tokens: u.tokens - cost, fs: Date.now() + mins * 60000 }) }
   const cast = () => {
     if (!active || phase !== 'idle') return
     setFish(fishRoll()); setPhase('sink')
@@ -2020,8 +2021,9 @@ function FishCast({ user, upd, ur }) {
       {!active && !res && (
         <div className="fz-panel" onPointerDown={(e) => e.stopPropagation()}>
           <div className="chunk text-2xl">Fishing session</div>
-          <p className="text-sm">Pay {SESSION_COST} Blook Tokens to fish for {SESSION_MS / 60000} minutes. Catch blooks, sell them in the Fish tab for fish coins, and spend those in the Dockside.</p>
-          <button className="btn bg-emerald-500 text-white disabled:opacity-50" disabled={user.tokens < SESSION_COST} onClick={start}>{user.tokens < SESSION_COST ? 'Not enough Blook Tokens' : `Start (${SESSION_COST} tokens)`}</button>
+          <p className="text-sm">How long do you want to fish? Longer sessions cost more Blook Tokens (5 per minute).</p>
+          <div className="flex flex-wrap justify-center gap-2">{[5, 10, 20, 30].map((m) => <button key={m} onClick={() => setMins(m)} className={`bzt !px-3 !py-1 ${mins === m ? 'on' : ''}`}>{m} min</button>)}</div>
+          <button className="btn bg-emerald-500 text-white disabled:opacity-50" disabled={user.tokens < cost} onClick={start}>{user.tokens < cost ? 'Not enough Blook Tokens' : `Start ${mins} min session (${cost} tokens)`}</button>
         </div>
       )}
       {res && (
@@ -2078,7 +2080,7 @@ function Dockside({ user, upd, ur }) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {DOCK.map((d) => (
             <button key={d.id} className="trp p-4 text-center transition hover:-translate-y-1" onClick={() => { setSel(d.id); setGot(null) }}>
-              <div className={`mx-auto w-fit ${busy && sel === d.id ? 'fz-shake' : ''}`}><FChest kind={d.id} size={170} /></div>
+              <div className={`mx-auto w-fit ${busy && sel === d.id ? 'fz-shake' : ''}`}><div className="fz-c3"><Chest3D id={d.id === 'shark' ? 'sharkchest' : 'oceanchest'} src={d.id === 'shark' ? IMG.sh_hammer : IMG.oc_jelly} size={140} idle /></div></div>
               <div className="chunk text-2xl">{d.name}</div>
               <div className="chunk flex items-center justify-center gap-1 text-xl"><img src={IMG.fcoin} width="24" height="24" alt="" />{d.cost}</div>
             </button>
@@ -2088,7 +2090,7 @@ function Dockside({ user, upd, ur }) {
       {c && ReactDOM.createPortal(
         <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => !busy && setSel(null)}>
           <div className="bzmodal !w-[min(30rem,100%)] max-h-[92dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className={busy ? 'fz-shake' : ''}><FChest kind={c.id} size={130} /></div>
+            <div className={busy ? 'fz-shake' : ''}><div className="fz-c3"><Chest3D id={c.id === 'shark' ? 'sharkchest' : 'oceanchest'} src={c.id === 'shark' ? IMG.sh_hammer : IMG.oc_jelly} size={120} idle /></div></div>
             <div className="chunk text-3xl">{c.name}</div>
             {got && <div className="rounded-2xl bg-white/15 p-3"><div className="chunk">You got {byId(got).name}!</div><div className="mx-auto w-fit"><Blook id={got} size={90} /></div><div className="text-sm"><RLabel k={byId(got).rarity} /></div></div>}
             <button className="btn w-full bg-emerald-500 text-white disabled:opacity-50" disabled={busy || (user.fc || 0) < c.cost} onClick={() => open(c)}>{busy ? 'Opening…' : (user.fc || 0) < c.cost ? 'Not enough fish coins' : `Open for ${c.cost} fish coins`}</button>
@@ -2115,7 +2117,7 @@ function FishChat({ user }) {
   )
 }
 function FishingWorld({ user, update, onExit }) {
-  const [tab, setTab] = useState('cast'), ur = useRef(user); ur.current = user
+  const [tab, setTab] = useState('fish'), ur = useRef(user); ur.current = user
   useEffect(() => { const prev = document.documentElement.dataset.theme; document.documentElement.dataset.theme = 'ocean'; return () => { document.documentElement.dataset.theme = prev } }, [])
   const upd = (u) => update(u)
   const T = [['cast', 'Fishing'], ['fish', 'Fish'], ['dock', 'Dockside']]
@@ -2140,7 +2142,7 @@ function FishPortal({ onEnter }) {
   return (
     <>
       <button className="tradebox wl-box wl-fish" onClick={enter} aria-label="Enter the fishing world">
-        <div className="portal"><i className="pt-sky" /><i className="pt-sun" /><i className="pt-dock" /><i className="pt-wave" /><i className="pt-wave pt-w2" /><i className="pt-swirl" /></div>
+        <div className="portal"><i className="pt-sky" /><i className="pt-sun" /><i className="pt-cl pt-c1" /><i className="pt-cl pt-c2" /><i className="pt-leg" /><i className="pt-dock" /><span className="pt-av"><Blook id="toast" size={40} /></span><i className="pt-rod" /><i className="pt-wave" /><i className="pt-wave pt-w2" /><i className="pt-swirl" /></div>
         <div className="chunk wl-w">Fishing</div><div className="text-sm opacity-80">Click the portal to enter</div>
       </button>
       {go && ReactDOM.createPortal(<div className="portal-go"><div className="chunk text-4xl text-white">Transporting to the docks…</div></div>, document.body)}
