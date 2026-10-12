@@ -666,3 +666,44 @@ html[data-perf="1"] .pk,html[data-perf="1"] .st,html[data-perf="1"] .pm,html[dat
 :is([data-theme=forest],[data-theme=ocean]) :is(.bzchest,.bztile,.trslots button):hover{background:rgba(255,255,255,.2)!important}
 :is([data-theme=forest],[data-theme=ocean]) .bzt{background:rgba(4,20,14,.4)!important}
 :is([data-theme=forest],[data-theme=ocean]) .trgrid button:hover{background:rgba(255,255,255,.18)}
+/* ===== fishing world ===== */
+.fz{position:relative;height:100%;overflow:hidden;background:linear-gradient(180deg,#8fdcff,#6ecff6 62%,#59c4f2);cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.fz i{position:absolute;display:block}
+.fz .oc-c1{top:8%}.fz .oc-c2{top:20%}
+.fz-sea{left:0;right:0;bottom:0;height:24%;background:linear-gradient(180deg,#2a86e8,#1763c8)}
+.fz-dock{left:0;bottom:22%;width:38%;height:8%;background:#e07a35;border-bottom:6px solid #c05f20;z-index:2}
+.fz-leg{bottom:14%;width:5%;height:9%;background:#c1481f;border-radius:0 0 40% 0;z-index:1}
+.fz .oc-w1{top:auto;bottom:21%}.fz .oc-w2{top:auto;bottom:14%}.fz .oc-w3{top:auto;bottom:6%}
+.fz-av{position:absolute;left:26%;bottom:29%;z-index:3}
+.fz-rod{position:absolute;left:33%;bottom:31%;width:min(24vw,250px);height:6px;border-radius:4px;background:linear-gradient(90deg,#e0a030 0 24%,#d8d8d8 24%);transform-origin:0 50%;transform:rotate(-38deg);z-index:4}
+.fz-line{position:absolute;right:0;top:3px;width:2px;background:#f4faff;transform-origin:top;transform:rotate(38deg);transition:height .7s ease-in}
+.fz-bob{position:absolute;left:-5px;bottom:-9px;width:12px;height:12px;border-radius:50%;background:#ff4d3d;border:2px solid #fff}
+.fz-bob.bite{animation:fzbob .25s infinite alternate}
+@keyframes fzbob{to{transform:translateY(8px)}}
+.fz-hud{position:absolute;top:12px;left:12px;z-index:6}
+.fz-say{position:absolute;left:50%;top:14%;transform:translateX(-50%);z-index:6;font-family:'Titan One',system-ui,sans-serif;font-size:clamp(1.1rem,3vw,1.8rem);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35);text-align:center;pointer-events:none;width:90%}
+.fz-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;width:min(22rem,92%);display:grid;gap:.6rem;text-align:center;padding:1.2rem;border-radius:18px;background:rgba(4,32,46,.82);color:#e6fbff;cursor:default;backdrop-filter:blur(3px)}
+.fz-reel-wrap{position:absolute;inset:0;z-index:5;cursor:pointer}
+.fz-reel{position:absolute;right:10%;top:12%;bottom:26%;width:46px;border-radius:12px;background:rgba(0,0,0,.4);border:3px solid #fff}
+.fz-zone{position:absolute;left:0;right:0;background:#3ddc6a;border-radius:8px;opacity:.92}
+.fz-hook{position:absolute;left:-8px;right:-8px;height:14px;background:#fff;border:3px solid #234;border-radius:8px}
+.fz-prog{position:absolute;left:50%;top:22%;transform:translateX(-50%);width:min(60%,22rem);height:16px;border-radius:10px;background:rgba(0,0,0,.4);border:3px solid #fff;overflow:hidden}
+.fz-prog div{height:100%;transition:background .1s}
+.fz-chat{position:absolute;right:10px;bottom:10px;width:min(19rem,calc(100% - 20px));z-index:8;border-radius:12px;background:rgba(4,32,46,.62);backdrop-filter:blur(3px);color:#fff;font-size:.9rem;cursor:default}
+.fz-chath{display:flex;justify-content:space-between;width:100%;padding:.4rem .7rem}
+.fz-chatl{max-height:10rem;overflow-y:auto;padding:0 .7rem .4rem}
+.fz-shake{animation:fzshake .25s infinite}
+@keyframes fzshake{25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+.wl-fish{cursor:pointer}
+.portal{position:relative;width:min(100%,13rem);aspect-ratio:3/4;border-radius:50%;overflow:hidden;box-shadow:0 0 0 5px #7fe3ff,0 0 34px #19b5e6,inset 0 0 30px rgba(0,60,120,.5)}
+.portal i{position:absolute;display:block}
+.pt-sky{inset:0;background:linear-gradient(180deg,#8fdcff,#6ecff6 58%)}
+.pt-sun{top:12%;right:18%;width:22%;aspect-ratio:1;border-radius:50%;background:#ffe46b}
+.pt-dock{left:0;bottom:38%;width:46%;height:7%;background:#e07a35}
+.pt-wave{left:0;right:0;bottom:0;height:40%;background:linear-gradient(180deg,#2a86e8,#1763c8);animation:ptw 3s ease-in-out infinite alternate}
+.pt-w2{height:30%;background:#0f86c0;animation-duration:2.2s}
+@keyframes ptw{to{transform:translateY(4px)}}
+.pt-swirl{inset:-20%;background:conic-gradient(from 0deg,rgba(255,255,255,.28),transparent 25%,rgba(255,255,255,.22) 50%,transparent 75%,rgba(255,255,255,.28));animation:ptspin 6s linear infinite;mix-blend-mode:screen}
+@keyframes ptspin{to{transform:rotate(360deg)}}
+.portal-go{position:fixed;inset:0;z-index:90;display:grid;place-items:center;background:radial-gradient(circle,#19b5e6,#04202e);animation:ptgo 1.7s ease-in forwards}
+@keyframes ptgo{from{opacity:0;clip-path:circle(8% at 50% 50%)}to{opacity:1;clip-path:circle(80% at 50% 50%)}}
