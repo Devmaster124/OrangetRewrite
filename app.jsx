@@ -877,6 +877,13 @@ const CHSPR = {
   snow: svgU(46, 46, `<g stroke='#bfeaff' stroke-width='3.5' stroke-linecap='round' fill='none'><path d='M23 4 V42 M6.5 13.5 L39.5 32.5 M6.5 32.5 L39.5 13.5'/><path d='M17 8 L23 13 L29 8 M17 38 L23 33 L29 38 M4 20 L11 20 L10 13 M42 26 L35 26 L36 33 M4 26 L11 26 L10 33 M42 20 L35 20 L36 13'/></g><circle cx='23' cy='23' r='4' fill='#fff' stroke='#6cc4f0' stroke-width='2'/>`),
   bell: svgU(40, 46, `<g fill='#2f9a3a' stroke='#1b5a22' stroke-width='2.5'><path d='M3 12 C10 4 18 8 20 12 C14 18 6 18 3 12Z'/><path d='M37 12 C30 4 22 8 20 12 C26 18 34 18 37 12Z'/></g><circle cx='20' cy='12' r='4' fill='#e11d48' stroke='#7a0a20' stroke-width='2'/><path d='M20 16 C10 16 8 28 6 36 H34 C32 28 30 16 20 16Z' fill='#ffd24a' stroke='#7a4d08' stroke-width='3' stroke-linejoin='round'/><circle cx='20' cy='40' r='4' fill='#d9951a' stroke='#7a4d08' stroke-width='2'/><path d='M14 24 C13 28 12 31 11 34' stroke='#fff' stroke-opacity='.6' stroke-width='3' stroke-linecap='round' fill='none'/>`),
   clasp: svgU(40, 46, `<rect x='6' y='6' width='28' height='34' rx='5' fill='#c8d0dc' stroke='#2e3440' stroke-width='3'/><rect x='11' y='12' width='18' height='12' rx='3' fill='#6b7482' stroke='#2e3440' stroke-width='2'/><rect x='16' y='26' width='8' height='9' rx='2' fill='#d42a2a' stroke='#2e3440' stroke-width='2'/><path d='M9 9 H31' stroke='#fff' stroke-opacity='.6' stroke-width='2.5'/>`),
+  // ===== Shark / Ocean chest extras =====
+  fin: svgU(100, 96, `<defs>${LG('fn', '#9fb8cc', '#3f5d78')}</defs><path d='M6 90 C22 84 40 56 46 6 C62 36 82 60 96 90 C70 84 36 90 6 90Z' fill='url(#fn)' stroke='#14283a' stroke-width='4' stroke-linejoin='round'/><path d='M46 6 C50 20 54 30 60 40 C52 36 48 24 46 6Z' fill='#e8f2fa' opacity='.55'/><path d='M14 90 C34 86 66 86 90 90' stroke='#e8f2fa' stroke-width='4' fill='none' stroke-linecap='round' opacity='.85'/>`),
+  finsm: svgU(60, 60, `<defs>${LG('fs', '#9fb8cc', '#3f5d78')}</defs><path d='M4 56 C16 48 24 28 28 4 C38 24 50 40 56 56 C38 52 20 56 4 56Z' fill='url(#fs)' stroke='#14283a' stroke-width='3.5' stroke-linejoin='round'/>`),
+  seashell: svgU(100, 90, `<defs>${LG('sh', '#fff2e0', '#f2a8b8')}</defs><path d='M50 84 C20 80 4 52 8 34 C16 14 34 6 50 6 C66 6 84 14 92 34 C96 52 80 80 50 84Z' fill='url(#sh)' stroke='#9a3a5a' stroke-width='4' stroke-linejoin='round'/><path d='M50 84 L50 8 M50 84 L26 12 M50 84 L14 28 M50 84 L8 48 M50 84 L74 12 M50 84 L86 28 M50 84 L92 48' stroke='#c0587a' stroke-width='3' stroke-linecap='round' opacity='.75'/><path d='M36 80 H64 L60 90 H40Z' fill='#e8a0b4' stroke='#9a3a5a' stroke-width='3' stroke-linejoin='round'/><ellipse cx='34' cy='24' rx='12' ry='5' fill='#fff' opacity='.6' transform='rotate(-30 34 24)'/>`),
+  starfish: svgU(80, 80, `<defs>${RG('sf', '#ffb27a', '#e8452a')}</defs><path d='M40 4 L49 28 L76 30 L55 46 L63 72 L40 57 L17 72 L25 46 L4 30 L31 28Z' fill='url(#sf)' stroke='#7a1a0a' stroke-width='4' stroke-linejoin='round'/><g fill='#ffe2c0' opacity='.9'><circle cx='40' cy='22' r='2.4'/><circle cx='40' cy='36' r='2.4'/><circle cx='28' cy='34' r='2'/><circle cx='52' cy='34' r='2'/><circle cx='33' cy='50' r='2'/><circle cx='47' cy='50' r='2'/></g>`),
+  sharktooth: svgU(40, 46, `<defs>${LG('st', '#ffffff', '#cfdbe6')}</defs><path d='M3 14 Q20 2 37 14 L33 22 H7Z' fill='#7a1020' stroke='#2a0610' stroke-width='3' stroke-linejoin='round'/><g fill='url(#st)' stroke='#1c2f40' stroke-width='2.5' stroke-linejoin='round'><path d='M7 16 L13 32 L19 16Z'/><path d='M21 16 L27 32 L33 16Z'/><path d='M14 18 L20 42 L26 18Z'/></g>`),
+  shelllock: svgU(40, 46, `<path d='M20 42 C8 40 3 28 5 20 C8 11 14 7 20 7 C26 7 32 11 35 20 C37 28 32 40 20 42Z' fill='#ffe3a0' stroke='#8a5a0a' stroke-width='3' stroke-linejoin='round'/><path d='M20 42 V9 M20 42 L10 12 M20 42 L6 24 M20 42 L30 12 M20 42 L34 24' stroke='#c98a1a' stroke-width='2' stroke-linecap='round'/><defs>${RG('pe', '#ffffff', '#a8d8ff')}</defs><circle cx='20' cy='26' r='6' fill='url(#pe)' stroke='#4a7aa8' stroke-width='2'/>`),
 }
 
 // ---------- per-pack chest themes: colours, surface pattern, lid decorations and front lock ----------
@@ -903,6 +910,10 @@ const CHEST_THEME = {
   outback:    { wd: '#c7592a', tr: '#f2b66d', pl: '#5a2008', pat: 'dots', lock: 'paw', lw: 38, lh: 44, lid: [] },
   videogame:  { wd: '#2b2370', tr: '#43e8ff', pl: '#0a0620', pat: 'pixel', lock: 'orb', lw: 40, lh: 46, studs: 1, live: 1, lid: [] },
   lunch:      { wd: '#f2c744', tr: '#d42a2a', pl: '#8a4a10', pat: 'ridges', lock: 'clasp', lw: 38, lh: 46, studs: 1, lid: [] },
+  sharkchest: { wd: '#5f7f9a', tr: '#eef5fa', pl: '#16293c', pat: 'waves', lock: 'sharktooth', lw: 40, lh: 46, studs: 1, lid: [
+    { s: 'fin', w: 100, h: 96, x: 0, z: 74 }, { s: 'finsm', w: 54, h: 54, x: -76, z: 38 }, { s: 'finsm', w: 54, h: 54, x: 76, z: 38, mir: 1 }] },
+  oceanchest: { wd: '#1b93bd', tr: '#ffd86b', pl: '#06364f', pat: 'waves', lock: 'shelllock', lw: 40, lh: 46, studs: 1, lid: [
+    { s: 'seashell', w: 92, h: 84, x: 0, z: 72 }, { s: 'starfish', w: 58, h: 58, x: -78, z: 40, rz: -14 }, { s: 'coral', w: 74, h: 58, x: 76, z: 40 }] },
 }
 
 const CHW = 200, CHD = 140, CHH = 90
@@ -2106,7 +2117,7 @@ function Dockside({ user, upd, ur }) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {DOCK.map((d) => (
             <button key={d.id} className="trp p-4 text-center transition hover:-translate-y-1" onClick={() => { setSel(d.id); setGot(null) }}>
-              <div className={`mx-auto w-fit ${busy && sel === d.id ? 'fz-shake' : ''}`}><div className="fz-c3">{d.id === 'shark' ? <SharkChest /> : <OceanChest />}</div></div>
+              <div className={`mx-auto w-fit ${busy && sel === d.id ? 'fz-shake' : ''}`}><div className="fz-c3"><Chest3D id={d.id + 'chest'} size={190} idle /></div></div>
               <div className="chunk text-2xl">{d.name}</div>
               <div className="chunk flex items-center justify-center gap-1 text-xl"><img src={IMG.fcoin} width="24" height="24" alt="" />{d.cost}</div>
             </button>
@@ -2116,7 +2127,7 @@ function Dockside({ user, upd, ur }) {
       {c && ReactDOM.createPortal(
         <div className="fixed left-0 top-0 z-[60] grid w-screen place-items-center bg-black/60 p-3" style={{ height: '100dvh' }} onClick={() => !busy && setSel(null)}>
           <div className="bzmodal !w-[min(30rem,100%)] max-h-[92dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className={busy ? 'fz-shake' : ''}><div className="fz-c3">{c.id === 'shark' ? <SharkChest size={150} /> : <OceanChest />}</div></div>
+            <div className={busy ? 'fz-shake' : ''}><div className="fz-c3"><Chest3D id={c.id + 'chest'} size={200} idle /></div></div>
             <div className="chunk text-3xl">{c.name}</div>
             {got && <div className="rounded-2xl bg-white/15 p-3"><div className="chunk">You got {byId(got).name}!</div><div className="mx-auto w-fit"><Blook id={got} size={90} /></div><div className="text-sm"><RLabel k={byId(got).rarity} /></div></div>}
             <button className="btn w-full bg-emerald-500 text-white disabled:opacity-50" disabled={busy || (user.fc || 0) < c.cost} onClick={() => open(c)}>{busy ? 'Opening…' : (user.fc || 0) < c.cost ? 'Not enough fish coins' : `Open for ${c.cost} fish coins`}</button>
