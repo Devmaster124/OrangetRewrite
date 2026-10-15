@@ -120,6 +120,25 @@ NEW_PACKS.forEach((np) => {
   PACKS.splice(at < 0 ? PACKS.length : at, 0, { id: np.id, name: np.name, price: np.price, img: np.id + 'pack', bg: `from-[${np.c1}] to-[${np.c2}]`, odds })
 })
 const PTS = { common: 1, uncommon: 3, rare: 8, epic: 20, legendary: 50, chroma: 80, mystical: 120, zero: 300, owner: 5000, og: 400  }
+
+// ---------- Card Chest: 9 cards (1 to 9) in each of the 4 suits, drawn in code ----------
+const CARD_SUITS = [['h', 'Hearts', '#d62839', 'M50 90 C10 60 2 38 15 22 C28 8 45 14 50 30 C55 14 72 8 85 22 C98 38 90 60 50 90Z'], ['d', 'Diamonds', '#d62839', 'M50 4 L88 50 L50 96 L12 50Z'], ['s', 'Spades', '#111', 'M50 6 C50 6 6 40 10 62 C13 78 36 82 46 66 C45 80 40 90 32 94 L68 94 C60 90 55 80 54 66 C64 82 87 78 90 62 C94 40 50 6 50 6Z'], ['c', 'Clubs', '#111', 'M50 8 a20 20 0 1 0 0.1 0Z M28 42 a20 20 0 1 0 0.1 0Z M72 42 a20 20 0 1 0 0.1 0Z M44 60 L40 94 L60 94 L56 60Z']]
+const CARD_PIPS = { 1: [[90, 85]], 2: [[90, 40], [90, 130]], 3: [[90, 40], [90, 85], [90, 130]], 4: [[62, 40], [118, 40], [62, 130], [118, 130]], 5: [[62, 40], [118, 40], [62, 130], [118, 130], [90, 85]], 6: [[62, 40], [118, 40], [62, 85], [118, 85], [62, 130], [118, 130]], 7: [[62, 40], [118, 40], [62, 85], [118, 85], [62, 130], [118, 130], [90, 62]], 8: [[62, 40], [118, 40], [62, 85], [118, 85], [62, 130], [118, 130], [90, 62], [90, 108]], 9: [[62, 40], [118, 40], [62, 70], [118, 70], [62, 100], [118, 100], [62, 130], [118, 130], [90, 85]] }
+const CARD_RK = { 9: 'common', 8: 'common', 7: 'uncommon', 6: 'uncommon', 5: 'rare', 4: 'rare', 3: 'epic', 2: 'epic', 1: 'legendary' }
+const CARD_W = { 9: 14, 8: 14, 7: 11, 6: 11, 5: 8, 4: 8, 3: 4, 2: 4, 1: 1.5 }
+const CARD_ODDS = {}
+CARD_SUITS.forEach(([k, nm, col, d]) => {
+  for (let r = 1; r <= 9; r++) {
+    const pip = (x, y, z, rot) => `<g transform='translate(${x} ${y})${rot ? ' rotate(180)' : ''} scale(${z / 100}) translate(-50 -50)' fill='${col}'><path d='${d}'/></g>`
+    const big = r === 1 ? 64 : 30
+    const body = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 200'><rect x='10' y='22' width='160' height='170' rx='20' fill='#b7bcc4'/><rect x='10' y='8' width='160' height='170' rx='20' fill='#fff' stroke='#e2e5ea' stroke-width='2'/>${CARD_PIPS[r].map(([x, y]) => pip(x, y, big, y > 85)).join('')}<text x='30' y='46' font-family='Arial Black,Arial,sans-serif' font-weight='900' font-size='34' text-anchor='middle' fill='#111'>${r}</text>${pip(30, 62, 20, 0)}<g transform='rotate(180 150 135)'><text x='150' y='154' font-family='Arial Black,Arial,sans-serif' font-weight='900' font-size='34' text-anchor='middle' fill='#111'>${r}</text>${pip(150, 170, 20, 0)}</g></svg>`
+    const id = 'cd_' + k + r
+    IMG[id] = 'data:image/svg+xml;utf8,' + encodeURIComponent(body)
+    BLOOKS.push({ id, name: `${r === 1 ? 'Ace' : r} of ${nm}`, rarity: CARD_RK[r], pack: 'cardchest' })
+    CARD_ODDS[id] = CARD_W[r]
+  }
+})
+PACKS.push({ id: 'cardchest', name: 'Card Chest', price: 200, cur: 'chips', img: 'cd_s1', bg: 'from-[#e8334a] to-[#12060a]', secret: true, odds: CARD_ODDS })
 const SELL = { common: 5, uncommon: 10, rare: 20, epic: 50, legendary: 150, chroma: 250, mystical: 400, zero: 1000, og: 2500 , owner: 0 }
 const RK = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mystical', 'zero', 'og'] // fusion ladder (saved fusions depend on this order)
 const RKD = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'chroma', 'mystical', 'zero', 'og', 'owner'] // display order, Chroma sits between Legendary and Mystical
@@ -511,9 +530,10 @@ async function changeName(user, curName, newName, pass) {
     try { const rs = await FB.db.doc('aliases/' + nl).get(); if (rs.exists && rs.data().uid !== c.uid) throw new Error('That username is taken.') } catch (x) { if (x && x.message === 'That username is taken.') throw x }
     try { await c.updateEmail(emailOf(newName)) } catch (x) { if (x && x.code === 'auth/operation-not-allowed') throw new Error('Name changes are blocked in Firebase: turn off Email enumeration protection (Authentication, Settings, User actions).'); throw fbErr(x) }
   }
+  try { await c.getIdToken(true) } catch {}
   const nu = { ...user, name: newName, orig, saved: Date.now() }
   ALIASES[nl] = orig; ALIASES[orig.toLowerCase()] = orig
-  try { const b = FB.db.batch(); b.set(FB.db.doc('aliases/' + nl), { orig, uid: c.uid, at: FB.ts() }); b.set(FB.db.doc('aliases/' + orig.toLowerCase()), { orig, uid: c.uid, at: FB.ts() }); await b.commit() } catch (x) { console.warn('alias save failed', x) }
+  try { const b = FB.db.batch(); b.set(FB.db.doc('aliases/' + nl), { orig, uid: c.uid, at: FB.ts() }); if (!user.orig) b.set(FB.db.doc('aliases/' + orig.toLowerCase()), { orig, uid: c.uid, at: FB.ts() }); await b.commit() } catch (x) { console.warn('alias save failed', x) }
   latest = nu; await pushCloud(); lsFlush(); cmdSubs.forEach((f) => f())
   return nu
 }
@@ -671,7 +691,7 @@ const ro = (n) => ALIASES[String(n || '').toLowerCase()] || n
 const lc = (n) => String(ro(n) || '').toLowerCase()
 const isRb = (n) => RB.has(lc(n)) || !!CS.rainbow[lc(n)]
 const isBr = (n) => BR.has(lc(n)) || !!CS.blackred[lc(n)]
-const isArtist = (n) => AR.has(lc(n)) || lc(n) === 'tytytyt' || !!CS.artist[lc(n)]
+const isArtist = (n) => AR.has(lc(n)) || !!CS.artist[lc(n)]
 const BW = new Set(['jeff76']) // black and white animated names
 const JM = new Set(['jeff76']) // can mute players (needs the mute key: /key4 yourkey)
 const PUB4 = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"-gjthSzIZuXUtNt4N14D7O66wkzob9R-gv-TK1DdUzc","y":"hhfSx4BGDIGyreBpNXl6LxP5Xm4dCdhrTze3KOiBZbQ","crv":"P-256"}, MKY = 'oranget_mkey'
@@ -1010,6 +1030,7 @@ const chAbs = (w, h, tf, extra) => ({ width: w, height: h, marginLeft: -w / 2, m
 CHSPR.fin = svgU(110, 100, `<path d='M6 96 Q40 60 62 4 Q70 52 104 96 Z' fill='#6f8aa3' stroke='#22313f' stroke-width='4' stroke-linejoin='round'/><path d='M62 12 Q64 44 88 84' fill='none' stroke='#a9c0d2' stroke-width='3' stroke-linecap='round'/>`)
 CHSPR.starfish = svgU(90, 86, `<path d='M45 6 L55 33 L84 34 L61 52 L69 80 L45 64 L21 80 L29 52 L6 34 L35 33 Z' fill='#ff8a5c' stroke='#8a2f12' stroke-width='4' stroke-linejoin='round'/><circle cx='45' cy='42' r='5' fill='#ffd0b8'/>`)
 CHEST_THEME.casinochest = { wd: '#0e6b3c', tr: '#ffd34d', pl: '#2a0a0a', pat: 'checker', lock: 'orb', lw: 40, lh: 46, lid: [{ s: 'crown', w: 96, h: 74, x: 0, z: 60 }] }
+CHEST_THEME.cardchest = { wd: '#7a1226', tr: '#f4ecd0', pl: '#0a0a0a', pat: 'checker', lock: 'orb', lw: 40, lh: 46, lid: [{ s: 'crown', w: 96, h: 74, x: 0, z: 60 }] }
 CHEST_THEME.sharkchest = { wd: '#587a96', tr: '#e9f3fa', pl: '#243645', pat: 'scales', lock: 'clasp', lw: 44, lh: 50, lid: [{ s: 'fin', w: 96, h: 88, x: 0, z: 60 }] }
 CHEST_THEME.oceanchest = { wd: '#1b86b8', tr: '#ffd95e', pl: '#08365a', pat: 'waves', lock: 'pearl', lw: 40, lh: 46, lid: [{ s: 'starfish', w: 74, h: 70, x: 0, z: 60 }] }
 function Chest3D({ id, src, size = 160, lid = 0, glow = 0, idle = false, shake = 0, amp = 1, beam = false }) {
@@ -1136,7 +1157,7 @@ function PackOpening({ pack, blook, canAgain, onAgain, onClose }) {
 const ACC = { orange: '#ff8a1f', breakfast: '#ffa53d', space: '#7f73ff', spooky: '#b05cff', dragon: '#ff3b52', royalty: '#d63fd0' }
 const lightHex = (h) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * 0.45 + 255 * 0.55).toString(16).padStart(2, '0')).join('')
 NEW_PACKS.forEach((np) => { ACC[np.id] = np.c1; PACK_THEME[np.id] = [np.c1, np.c2, lightHex(np.c1)] })
-ACC.casinochest = '#ffd34d'; PACK_THEME.casinochest = ['#0e6b3c', '#2a0a0a', '#ffd34d']; PACK_THEME.sharkchest = ['#e8c27a', '#7a4a10', '#8fd8ff']; PACK_THEME.oceanchest = ['#2a9fc4', '#0b4a63', '#7fe3ff']
+ACC.cardchest = '#e8334a'; PACK_THEME.cardchest = ['#7a1226', '#0a0a0a', '#e8334a']; ACC.casinochest = '#ffd34d'; PACK_THEME.casinochest = ['#0e6b3c', '#2a0a0a', '#ffd34d']; PACK_THEME.sharkchest = ['#e8c27a', '#7a4a10', '#8fd8ff']; PACK_THEME.oceanchest = ['#2a9fc4', '#0b4a63', '#7fe3ff']
 ACC.videogame = '#7a5cff'; PACK_THEME.videogame = ['#7a5cff', '#0a0620', '#43e8ff']
 const fmtP = (n) => `${+n.toFixed(n < 0.1 ? 3 : n < 1 ? 2 : 1)}%`
 function packOdds(id) { // mirrors rollBlook exactly, including the fallback when a pack has no blook of a rolled rarity
@@ -1802,6 +1823,18 @@ function useTradeEngine(user, update) {
     if (nu !== u) update(nu)
     sold.forEach((d) => FB.db.doc('bazaar/' + d.id).delete().catch(() => {}))
   }, [kS])
+  useEffect(() => { // safety net: a blook held in escrow whose Bazaar listing no longer exists (failed or lost listing) goes back to its owner
+    if (!FB) return; let dead = false
+    const t = setTimeout(async () => {
+      const u = latest.current, old = (u.escrow || []).filter((e) => e.fs && Date.now() - (e.at || 0) > 120000); if (!old.length) return
+      const gone = []
+      for (const e of old) { try { const d = await FB.db.doc('bazaar/' + e.id).get(); if (!d.exists) gone.push(e) } catch { return } }
+      if (dead || !gone.length) return
+      const c = latest.current, ids = new Set(gone.map((e) => e.id)), back = (c.escrow || []).filter((e) => ids.has(e.id))
+      if (back.length) update({ ...c, escrow: c.escrow.filter((e) => !ids.has(e.id)), inv: [...c.inv, ...back.map((e) => e.blook)] })
+    }, 4000)
+    return () => { dead = true; clearTimeout(t) }
+  }, [user.name])
   const sendm = (m) => hub.send({ ...m, from: latest.current.name })
   useEffect(() => { // remember boss progress on this device
     const u = latest.current, g = u.guild
@@ -2071,7 +2104,7 @@ const SESSION_COST = 50, SESSION_MS = 10 * 60000
 const FRAR = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'chroma', 'mystical', 'zero', 'og']
 const FW = { common: 66, uncommon: 14, rare: 5, epic: 2, legendary: 0.7, chroma: 0.25, mystical: 0.1, zero: 0.03, og: 0.001 }
 const FV = { common: 10, uncommon: 25, rare: 60, epic: 150, legendary: 400, chroma: 800, mystical: 1400, zero: 3000, og: 6000 }
-const NOFISH = new Set(['owner', 'sharkchest', 'oceanchest', 'casinochest', 'secret'])
+const NOFISH = new Set(['owner', 'sharkchest', 'oceanchest', 'casinochest', 'cardchest', 'secret'])
 let FPOOL = null
 function fishRoll() {
   if (!FPOOL) { FPOOL = {}; BLOOKS.forEach((b) => { if (FV[b.rarity] && !NOFISH.has(b.pack) && !isLab(b.id)) (FPOOL[b.rarity] ||= []).push(b.id) }) }
@@ -2308,7 +2341,7 @@ function FishPortal({ onEnter }) {
 
 // ================= Oranget Casino =================
 const CASINO_CHEST = { id: 'casino', name: 'Casino Chest', cost: 300, pool: [['ca_redchip', 60], ['ca_blackchip', 32], ['ca_dice', 7], ['ca_slot', 0.8], ['ca_sketch', 0.12]] }
-const isCasino = (id) => { const b = byId(id); return !!b && b.pack === 'casinochest' }
+const isCasino = (id) => { const b = byId(id); return !!b && (b.pack === 'casinochest' || b.pack === 'cardchest') }
 const SLOT_SYMS = [['🍒', 30, 8], ['🍋', 25, 12], ['🍊', 20, 20], ['🔔', 12, 40], ['💎', 8, 80], ['7️⃣', 5, 200]]
 const ROUL_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36])
 const DFACE = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
@@ -2386,12 +2419,12 @@ function CasinoGames({ user, upd, ur }) {
   )
 }
 function CasinoExchange({ user, upd, ur }) {
-  const [picked, setPicked] = useState(null), [opening, setOpening] = useState(null), chips = user.chips || 0, CP = PACKS.find((p) => p.id === 'casinochest')
+  const [picked, setPicked] = useState(null), [opening, setOpening] = useState(null), chips = user.chips || 0, CPS = PACKS.filter((p) => p.cur === 'chips')
   const day = new Date().toDateString(), used = user.cbuy && user.cbuy.d === day ? user.cbuy.n : 0, left = Math.max(0, 300 - used)
   const buy = (n) => { const u = ur.current, k = Math.min(n === 'all' ? 300 : n, left, u.tokens); if (k < 1) return; const un = u.cbuy && u.cbuy.d === day ? u.cbuy.n : 0; upd({ ...u, tokens: u.tokens - k, chips: (u.chips || 0) + k, cbuy: { d: day, n: un + k } }) }
   const open = (n) => {
-    const u = ur.current; if ((u.chips || 0) < CP.price * n) return
-    const bs = Array.from({ length: n }, () => rollBlook('casinochest'))
+    const u = ur.current, CP = picked || (opening && opening.p); if (!CP || (u.chips || 0) < CP.price * n) return
+    const bs = Array.from({ length: n }, () => rollBlook(CP.id))
     upd({ ...u, chips: u.chips - CP.price * n, packs: (u.packs || 0) + n, inv: [...u.inv, ...bs.map((b) => b.id)] })
     setPicked(null); setOpening({ bs, p: CP, k: Date.now(), prev: new Set(u.inv) })
   }
@@ -2404,15 +2437,17 @@ function CasinoExchange({ user, upd, ur }) {
         <div className="mt-2 text-sm opacity-80">You have <Coins size={18} /> {user.tokens.toLocaleString()} and <Chips n={chips} size={20} /></div></div>
       <p className="mute mt-4 text-sm">Tap the chest to see its odds and choose how many to open.</p>
       <div className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),200px))]">
-        <button onClick={() => setPicked(CP)} disabled={!!opening} className="pk" style={{ '--a': ACC.casinochest }} aria-label={`${CP.name}, ${CP.price} chips. See odds`}>
-          <div className="art"><Chest3D id="casinochest" src={IMG.ca_slot} size={innerWidth < 640 ? 110 : 140} idle /></div>
+        {CPS.map((CP) => (
+        <button key={CP.id} onClick={() => setPicked(CP)} disabled={!!opening} className="pk" style={{ '--a': ACC[CP.id] }} aria-label={`${CP.name}, ${CP.price} chips. See odds`}>
+          <div className="art"><Chest3D id={CP.id} src={IMG[CP.img]} size={innerWidth < 640 ? 110 : 140} idle /></div>
           <div className="flex flex-col gap-1 p-3 sm:p-4"><div><div className="display text-base leading-tight sm:text-lg">{CP.name}</div><div className="mute text-xs">See odds · open up to 10</div></div><div className="chunk flex items-center gap-1 text-lg"><img src={IMG.chip} width="20" height="20" alt="" />{CP.price}</div></div>
         </button>
+        ))}
       </div>
       {picked && <PackModal pack={picked} user={user} onOpen={open} onClose={() => setPicked(null)} />}
       {opening && (opening.bs.length === 1
-        ? <PackOpening key={opening.k} pack={opening.p} blook={opening.bs[0]} canAgain={(user.chips || 0) >= CP.price} onAgain={() => open(1)} onClose={() => setOpening(null)} />
-        : <MultiOpening key={opening.k} info={opening} canAgain={(user.chips || 0) >= CP.price * opening.bs.length} onAgain={() => open(opening.bs.length)} onClose={() => setOpening(null)} />)}
+        ? <PackOpening key={opening.k} pack={opening.p} blook={opening.bs[0]} canAgain={(user.chips || 0) >= opening.p.price} onAgain={() => open(1)} onClose={() => setOpening(null)} />
+        : <MultiOpening key={opening.k} info={opening} canAgain={(user.chips || 0) >= opening.p.price * opening.bs.length} onAgain={() => open(opening.bs.length)} onClose={() => setOpening(null)} />)}
     </div>
   )
 }
@@ -2456,7 +2491,7 @@ function CasinoBuyIn({ user, upd, onEnter, onExit }) {
   )
 }
 function CasinoChipsTab({ user, upd, ur, go }) {
-  const list = BLOOKS.filter((b) => b.pack === 'casinochest'), have = (id) => user.inv.filter((x) => x === id).length, owned = list.filter((b) => have(b.id) > 0).length
+  const list = BLOOKS.filter((b) => b.pack === 'casinochest' || b.pack === 'cardchest'), have = (id) => user.inv.filter((x) => x === id).length, owned = list.filter((b) => have(b.id) > 0).length
   const dev = isOw(user.name) // DEVMASTER only: click a casino blook you don't have yet to own it, same as the Blooks collection page
   const own = (id) => { if (!dev) return; const u = ur ? ur.current : user, nu = { ...u, inv: [...u.inv, id] }; if (ur) ur.current = nu; upd(nu) }
   return (
@@ -2663,7 +2698,7 @@ function BotMatch({ user, upd, ur, game, bet, onDone }) {
   useEffect(() => { const u = ur.current; upd({ ...u, chips: Math.max(0, (u.chips || 0) - bet) }) }, []) // chips taken once, up front
   useEffect(() => { // the bot "thinks" for a moment, then plays a move of its own — never reads the player's hidden cards
     if (st.done) return
-    const key = JSON.stringify(st.cur || [st.turn, st.n]); if (thinking.current[key]) return
+    const key = [st.r, st.turn, st.n, JSON.stringify(st.cur || null)].join('|'); if (thinking.current[key]) return
     let mv = null
     if (game === 'bj') { if (st.turn === 1) mv = bjVal(st.P[1]) < 17 ? st.n + ':hit' : st.n + ':stand' }
     else if (st.cur && st.cur[1] === null) {
@@ -2674,8 +2709,9 @@ function BotMatch({ user, upd, ur, game, bet, onDone }) {
     }
     if (!mv) return
     thinking.current[key] = true
-    const t = setTimeout(() => setLog((l) => [...l, { t: 'ca', from: 'Bot', id: bm.id, text: mv, at: Date.now() }]), 650 + Math.random() * 850)
-    return () => clearTimeout(t)
+    let fired = false
+    const t = setTimeout(() => { fired = true; setLog((l) => [...l, { t: 'ca', from: 'Bot', id: bm.id, text: mv, at: Date.now() }]) }, 650 + Math.random() * 850)
+    return () => { clearTimeout(t); if (!fired) delete thinking.current[key] }
   }, [st.done, st.turn, st.n, st.r, JSON.stringify(st.cur)])
   useEffect(() => { // pay out once, right when the match finishes
     if (!st.done || paid.current || st.endAt === Infinity || now < st.endAt) return
