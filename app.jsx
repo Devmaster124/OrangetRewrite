@@ -3405,21 +3405,23 @@ function DuelsBg({ off }) {
     </div>
   )
 }
-function useDuelRep(user, upd, ur) {
+const LVM = [0.6, 1, 1.6], LVN = ['Easy', 'Normal', 'Hard']
+function useDuelRep(user, upd, ur, game, lv) {
   return (win, tok = 0) => {
-    const u = ur.current, d = { tr: 0, w: 0, l: 0, st: 0, best: 0, ...(u.duel || {}) }
-    const gain = win ? 25 + Math.min(5, d.st) * 3 : -15
-    const nd = { ...d, tr: Math.max(0, d.tr + gain), w: d.w + (win ? 1 : 0), l: d.l + (win ? 0 : 1), st: win ? d.st + 1 : 0 }
+    const u = ur.current, d = { tr: 0, w: 0, l: 0, st: 0, best: 0, g: {}, h: [], cl: [], ...(u.duel || {}) }, m = LVM[lv]
+    const gain = win ? Math.round((25 + Math.min(5, d.st) * 3) * m) : -Math.round(15 * (lv === 0 ? 0.5 : lv === 2 ? 1.2 : 1)), t2 = win ? Math.round(tok * m) : 0
+    const gg = d.g[game] || { w: 0, l: 0 }
+    const nd = { ...d, tr: Math.max(0, d.tr + gain), w: d.w + (win ? 1 : 0), l: d.l + (win ? 0 : 1), st: win ? d.st + 1 : 0, g: { ...d.g, [game]: { w: gg.w + (win ? 1 : 0), l: gg.l + (win ? 0 : 1) } }, h: [{ g: game, w: win, t: gain, lv, at: Date.now() }, ...(d.h || [])].slice(0, 8) }
     nd.best = Math.max(d.best || 0, nd.st)
-    upd({ ...u, duel: nd, tokens: u.tokens + (win ? tok : 0) })
-    return gain
+    upd({ ...u, duel: nd, tokens: u.tokens + t2 })
+    return { gain, tok: t2 }
   }
 }
-function DuelEnd({ win, tok, gain, onAgain, onBack }) {
+function DuelEnd({ win, tok, gain, tie, onAgain, onBack }) {
   return (
     <div className="du-end" role="dialog">
-      <div className={`du-endcard ${win ? 'win' : 'lose'}`}>
-        <div className="chunk text-5xl">{win ? 'VICTORY!' : 'DEFEAT'}</div>
+      <div className={`du-endcard ${win ? 'win' : tie ? 'tie' : 'lose'}`}>
+        <div className="chunk text-5xl">{win ? 'VICTORY!' : tie ? 'DRAW' : 'DEFEAT'}</div>
         <div className="chunk mt-2 text-xl">{gain > 0 ? '+' : ''}{gain} trophies{win && tok ? ` · +${tok} tokens` : ''}</div>
         <div className="mt-4 flex justify-center gap-2"><button className="btn bg-[#ff3d81] text-white" onClick={onAgain}>Rematch</button><button className="btn bg-white/20 text-white" onClick={onBack}>Back to games</button></div>
       </div>
@@ -3428,11 +3430,11 @@ function DuelEnd({ win, tok, gain, onAgain, onBack }) {
 }
 // ---- Blook Battle: your own blooks fight in a 3D arena ----
 const bstat = (id) => { const b = byId(id) || BLOOKS[0], ri = Math.max(0, RKD.indexOf(b.rarity)); return { id: b.id, name: b.name, ri, max: 90 + ri * 16, atk: 11 + ri * 2.5 } }
-function BlookBattle({ user, rep, onBack }) {
+function BlookBattle({ user, rep, lv, onBack }) {
   const mine = useMemo(() => [...new Set(user.inv)].filter((id) => byId(id)).sort((a, b) => RKD.indexOf(byId(b).rarity) - RKD.indexOf(byId(a).rarity)).slice(0, 80), [])
   const [sel, setSel] = useState(null), [f, setF] = useState(null), [res, setRes] = useState(null), [fl, setFl] = useState(0)
   const start = (id) => {
-    const p = bstat(id), pool = BLOOKS.filter((b) => b.rarity !== 'owner' && RKD.indexOf(b.rarity) >= Math.max(0, p.ri - 1) && RKD.indexOf(b.rarity) <= p.ri && !b.id.startsWith('cd_')), bb = pool.length ? pool[rint(0, pool.length - 1)] : BLOOKS[0], b = bstat(bb.id)
+    const p = bstat(id), pool = BLOOKS.filter((b) => b.rarity !== 'owner' && RKD.indexOf(b.rarity) >= Math.max(0, p.ri - 1) && RKD.indexOf(b.rarity) <= p.ri && !b.id.startsWith('cd_')), bb = pool.length ? pool[rint(0, pool.length - 1)] : BLOOKS[0], b = bstat(bb.id); b.atk *= [0.8, 1, 1.2][lv]
     setRes(null); setF({ P: { ...p, hp: p.max, ch: 0, g: false }, B: { ...b, hp: b.max, ch: 0, g: false }, turn: 'p', log: 'Your move!', hit: null, dmg: null, k: 0 })
   }
   const strike = (A, D, kind) => { // returns [A', D', text, dmg]
@@ -3459,7 +3461,7 @@ function BlookBattle({ user, rep, onBack }) {
   }, [f && f.turn, f && f.k])
   useEffect(() => {
     if (!f || f.turn !== 'end' || res) return
-    const win = f.B.hp <= 0, tok = win ? 20 + f.B.ri * 5 : 0, t = setTimeout(() => setRes({ win, tok, gain: rep(win, tok) }), 900)
+    const win = f.B.hp <= 0, tok = win ? 20 + f.B.ri * 5 : 0, t = setTimeout(() => setRes({ win, ...rep(win, tok) }), 900)
     return () => clearTimeout(t)
   }, [f && f.turn])
   if (!f) return (
@@ -3503,19 +3505,19 @@ const Cube = ({ v, spin, pick, onClick, dim }) => {
     </button>
   )
 }
-function DiceDuel({ rep, onBack }) {
+function DiceDuel({ rep, lv, onBack }) {
   const [pd, setPd] = useState([1, 2]), [bd, setBd] = useState([3, 4]), [ps, setPs] = useState([0, 0]), [sc, setSc] = useState([0, 0]), [ph, setPh] = useState('idle'), [msg, setMsg] = useState('Roll to begin. First to 3 round wins.'), [res, setRes] = useState(null), [used, setUsed] = useState(false), [bs, setBs] = useState([0, 0])
   const r6 = () => rint(1, 6), tm = useRef([]); useEffect(() => () => tm.current.forEach(clearTimeout), [])
   const later = (f, ms) => tm.current.push(setTimeout(f, ms))
   const roll = () => { if (ph !== 'idle') return; setPd([r6(), r6()]); setBd([r6(), r6()]); setPs((s) => [s[0] + 1, s[1] + 1]); setBs((s) => [s[0] + 1, s[1] + 1]); setUsed(false); setPh('rolling'); setMsg('Rolling…'); later(() => { setPh('pick'); setMsg('Tap one of your dice to reroll it (once), or keep.') }, 1300) }
   const finish = (a, b) => {
     setPh('resolving'); let bb = [...b]
-    if (bb[0] + bb[1] < 8) { const i = bb[0] <= bb[1] ? 0 : 1; bb[i] = r6(); setBd(bb); setBs((s) => s.map((x, k) => (k === i ? x + 1 : x))) }
+    if (bb[0] + bb[1] < [6, 8, 9][lv]) { const i = bb[0] <= bb[1] ? 0 : 1; bb[i] = r6(); setBd(bb); setBs((s) => s.map((x, k) => (k === i ? x + 1 : x))) }
     later(() => {
       const p = a[0] + a[1], q = bb[0] + bb[1]; let n = sc
       if (p > q) { n = [sc[0] + 1, sc[1]]; setMsg(`You win the round, ${p} to ${q}!`) } else if (q > p) { n = [sc[0], sc[1] + 1]; setMsg(`Bot wins the round, ${q} to ${p}.`) } else setMsg(`Tie at ${p}, roll again.`)
       setSc(n)
-      if (n[0] >= 3 || n[1] >= 3) { const win = n[0] >= 3; later(() => setRes({ win, tok: win ? 25 : 0, gain: rep(win, win ? 25 : 0) }), 900); setPh('end') } else later(() => setPh('idle'), 1100)
+      if (n[0] >= 3 || n[1] >= 3) { const win = n[0] >= 3; later(() => setRes({ win, ...rep(win, 25) }), 900); setPh('end') } else later(() => setPh('idle'), 1100)
     }, 1300)
   }
   const reroll = (i) => { if (ph !== 'pick' || used) return; const a = [...pd]; a[i] = r6(); setPd(a); setPs((s) => s.map((x, k) => (k === i ? x + 1 : x))); setUsed(true); setPh('wait'); later(() => finish(a, bd), 1200) }
@@ -3534,20 +3536,20 @@ function DiceDuel({ rep, onBack }) {
   )
 }
 // ---- Quick Draw: wait for DRAW!, then fire first ----
-function QuickDraw({ user, rep, onBack }) {
+function QuickDraw({ user, rep, lv, onBack }) {
   const [ph, setPh] = useState('idle'), [sc, setSc] = useState([0, 0]), [msg, setMsg] = useState('Best of 5. Click when you see DRAW. Too early and you lose the round.'), [res, setRes] = useState(null), t0 = useRef(0), tms = useRef([]), botMs = useRef(500)
   const tr = (user.duel && user.duel.tr) || 0, av = user.avatar && byId(user.avatar) ? user.avatar : user.inv[0], bot = byId('robot') ? 'robot' : BLOOKS[1].id
   const clr = () => { tms.current.forEach(clearTimeout); tms.current = [] }
   useEffect(() => clr, [])
   const end = (win, text, cur) => {
     clr(); const n = win ? [cur[0] + 1, cur[1]] : [cur[0], cur[1] + 1]; setSc(n); setMsg(text); setPh('result')
-    if (n[0] >= 3 || n[1] >= 3) { const w = n[0] >= 3; tms.current.push(setTimeout(() => { setPh('end'); setRes({ win: w, tok: w ? 25 : 0, gain: rep(w, w ? 25 : 0) }) }, 1200)) }
+    if (n[0] >= 3 || n[1] >= 3) { const w = n[0] >= 3; tms.current.push(setTimeout(() => { setPh('end'); setRes({ win: w, ...rep(w, 25) }) }, 1200)) }
   }
   const go = () => {
     if (ph !== 'idle' && ph !== 'result') return
     setPh('wait'); setMsg('Steady…')
     tms.current.push(setTimeout(() => {
-      t0.current = performance.now(); botMs.current = Math.max(240, Math.min(640, 520 - tr / 8 + rint(-70, 130))); setPh('draw'); setMsg('DRAW!')
+      t0.current = performance.now(); botMs.current = Math.max(240, Math.min(640, 520 - tr / 8 + [110, 0, -90][lv] + rint(-70, 130))); setPh('draw'); setMsg('DRAW!')
       tms.current.push(setTimeout(() => end(false, 'The bot was faster!', sc), botMs.current))
     }, rint(1200, 3600)))
   }
@@ -3572,39 +3574,200 @@ function QuickDraw({ user, rep, onBack }) {
     </div>
   )
 }
-function DuelRanks({ user }) {
-  const d = { tr: 0, w: 0, l: 0, st: 0, best: 0, ...(user.duel || {}) }, t = tierOf(d.tr), nx = DUEL_TIERS.find((x) => x[1] > d.tr)
+// ---- Clash: rock paper scissors with 3D flip cards ----
+const RPS = [['r', '✊', 'Rock'], ['p', '✋', 'Paper'], ['s', '✌️', 'Scissors']]
+const rpsWin = (a, b) => (a === 'r' && b === 's') || (a === 's' && b === 'p') || (a === 'p' && b === 'r')
+function Clash({ rep, lv, onBack }) {
+  const [sc, setSc] = useState([0, 0]), [pm, setPm] = useState(null), [bm, setBm] = useState(null), [rev, setRev] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState('Pick your move. First to 3 wins.'), [res, setRes] = useState(null), hist = useRef([]), tm = useRef([])
+  useEffect(() => () => tm.current.forEach(clearTimeout), [])
+  const play = (m) => {
+    if (busy) return; setBusy(true); setRev(false); setPm(m)
+    let b = RPS[rint(0, 2)][0]; const h = hist.current
+    if (h.length >= 2 && Math.random() < [0.15, 0.35, 0.6][lv]) { const cnt = { r: 0, p: 0, s: 0 }; h.forEach((x) => cnt[x]++); const fav = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0]; b = fav === 'r' ? 'p' : fav === 'p' ? 's' : 'r' }
+    hist.current = [...h, m]; setBm(b)
+    tm.current.push(setTimeout(() => {
+      setRev(true); const n = [...sc]
+      if (rpsWin(m, b)) { n[0]++; setMsg('You win the round!') } else if (rpsWin(b, m)) { n[1]++; setMsg('Bot wins the round.') } else setMsg('Draw. Go again.')
+      setSc(n)
+      if (n[0] >= 3 || n[1] >= 3) { const w = n[0] >= 3; tm.current.push(setTimeout(() => setRes({ win: w, ...rep(w, 25) }), 1100)) } else tm.current.push(setTimeout(() => { setBusy(false); setPm(null); setBm(null); setRev(false) }, 1300))
+    }, 700))
+  }
+  const face = (m) => { const x = RPS.find((r) => r[0] === m); return x ? x[1] : '❔' }
   return (
-    <div className="du-pane"><h3 className="chunk text-3xl">Ranks</h3>
-      <div className="du-rank" style={{ '--tc': t[2] }}><div className="du-medal chunk">{t[0][0]}</div><div><div className="chunk text-3xl" style={{ color: t[2] }}>{t[0]}</div><div className="chunk text-xl">🏆 {d.tr} trophies</div>
-        {nx ? <><div className="du-hp mt-2"><i style={{ width: Math.min(100, (100 * (d.tr - t[1])) / (nx[1] - t[1])) + '%', background: t[2] }} /><span>{nx[1] - d.tr} to {nx[0]}</span></div></> : <div className="text-sm">Top rank reached!</div>}</div></div>
-      <div className="du-stats"><div><b>{d.w}</b>Wins</div><div><b>{d.l}</b>Losses</div><div><b>{d.st}</b>Streak</div><div><b>{d.best || 0}</b>Best streak</div></div>
-      <div className="du-tiers">{DUEL_TIERS.map(([n, at, c]) => <div key={n} className={d.tr >= at ? 'on' : ''} style={{ '--tc': c }}><b className="chunk">{n}</b><span>{at}+</span></div>)}</div>
-      <p className="mute mt-3 text-sm">Win duels to earn trophies and Blook Tokens. Losing costs a few trophies. Win streaks give bonus trophies.</p></div>
+    <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Clash</h3>
+      <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
+      <div className="du-stage">
+        <div className="cl-slot"><div className={`cl-card ${rev ? 'rev' : ''} ${busy && !rev ? 'shake' : ''}`}><div className="cl-f cl-back">?</div><div className="cl-f cl-front">{face(bm)}</div></div><span className="chunk">Bot</span></div>
+        <div className="chunk text-3xl opacity-80">VS</div>
+        <div className="cl-slot"><div className={`cl-card ${rev ? 'rev' : ''} ${busy && !rev ? 'shake' : ''}`}><div className="cl-f cl-back">?</div><div className="cl-f cl-front">{face(pm)}</div></div><span className="chunk">You</span></div>
+      </div>
+      <div className="du-log">{msg}</div>
+      <div className="du-acts">{RPS.map(([k, e, n]) => <button key={k} disabled={busy} onClick={() => play(k)}>{e} {n}</button>)}</div>
+      {res && <DuelEnd {...res} onAgain={() => { setRes(null); setSc([0, 0]); setBusy(false); setPm(null); setBm(null); setRev(false); hist.current = []; setMsg('Pick your move. First to 3 wins.') }} onBack={onBack} />}
+    </div>
+  )
+}
+// ---- Memory Match: flip cards, take turns with the bot ----
+function MemoryMatch({ rep, lv, onBack }) {
+  const mk = () => { const pool = BLOOKS.filter((b) => b.rarity !== 'owner' && !b.id.startsWith('cd_')), ids = []; while (ids.length < 8) { const b = pool[rint(0, pool.length - 1)]; if (!ids.includes(b.id)) ids.push(b.id) } return [...ids, ...ids].sort(() => Math.random() - 0.5).map((id) => ({ id, f: false, m: false })) }
+  const [st, setSt] = useState(() => ({ cards: mk(), sel: [], turn: 'p', sc: [0, 0], busy: false, done: false })), [res, setRes] = useState(null), R = useRef(st), seen = useRef(new Set()), tm = useRef([]); R.current = st
+  useEffect(() => () => tm.current.forEach(clearTimeout), [])
+  const flip = (i, who) => {
+    const s = R.current; if (s.busy || s.done || s.cards[i].f || s.cards[i].m || s.sel.length >= 2) return
+    seen.current.add(i); const cards = s.cards.map((c, k) => (k === i ? { ...c, f: true } : c)), sel = [...s.sel, i]
+    if (sel.length < 2) { setSt({ ...s, cards, sel }); return }
+    setSt({ ...s, cards, sel, busy: true })
+    tm.current.push(setTimeout(() => {
+      const c = R.current, [a, b] = sel, ok = c.cards[a].id === c.cards[b].id, sc = [...c.sc]
+      const cs = c.cards.map((x, k) => (k === a || k === b ? { ...x, f: ok, m: ok } : x))
+      if (ok) sc[who === 'p' ? 0 : 1]++
+      const done = cs.every((x) => x.m)
+      setSt({ cards: cs, sel: [], turn: ok ? who : who === 'p' ? 'b' : 'p', sc, busy: false, done })
+      if (done) tm.current.push(setTimeout(() => { const w = sc[0] > sc[1]; if (sc[0] === sc[1]) setRes({ win: false, gain: 0, tok: 0, tie: true }); else setRes({ win: w, ...rep(w, 25) }) }, 900))
+    }, 900))
+  }
+  useEffect(() => {
+    if (st.turn !== 'b' || st.busy || st.done || st.sel.length >= 2) return
+    const t = setTimeout(() => {
+      const s = R.current, mem = [0.35, 0.65, 0.9][lv], un = s.cards.map((c, i) => i).filter((i) => !s.cards[i].m && !s.cards[i].f)
+      const known = (id, not) => [...seen.current].filter((i) => !s.cards[i].m && s.cards[i].id === id && i !== not)
+      let pick
+      if (s.sel.length === 0) {
+        const byid = {}; [...seen.current].filter((i) => !s.cards[i].m).forEach((i) => { (byid[s.cards[i].id] = byid[s.cards[i].id] || []).push(i) })
+        const pair = Object.values(byid).find((v) => v.length >= 2)
+        pick = pair && Math.random() < mem ? pair[0] : (un.filter((i) => !seen.current.has(i))[0] ?? un[0])
+        const fresh = un.filter((i) => !seen.current.has(i)); if (!(pair && Math.random() < mem) && fresh.length) pick = fresh[rint(0, fresh.length - 1)]
+      } else {
+        const k = known(s.cards[s.sel[0]].id, s.sel[0]), fresh = un.filter((i) => i !== s.sel[0] && !seen.current.has(i)), rest = un.filter((i) => i !== s.sel[0])
+        pick = k.length && Math.random() < mem ? k[0] : fresh.length ? fresh[rint(0, fresh.length - 1)] : rest[rint(0, rest.length - 1)]
+      }
+      if (pick !== undefined) flip(pick, 'b')
+    }, 750)
+    return () => clearTimeout(t)
+  }, [st.turn, st.sel.length, st.busy, st.done])
+  return (
+    <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Memory Match</h3>
+      <div className="du-score"><span className={st.turn === 'p' ? 'tn' : ''}>You <b>{st.sc[0]}</b></span><span className={st.turn === 'b' ? 'tn' : ''}>Bot <b>{st.sc[1]}</b></span></div>
+      <div className="mm-grid">{st.cards.map((c, i) => <button key={i} className={`mm-c ${c.f || c.m ? 'up' : ''} ${c.m ? 'ok' : ''}`} onClick={() => st.turn === 'p' && flip(i, 'p')} aria-label={c.f || c.m ? byId(c.id).name : 'Hidden card'}><div className="mm-in"><div className="mm-bk">?</div><div className="mm-fr"><Blook id={c.id} size={54} /></div></div></button>)}</div>
+      <div className="du-log">{st.turn === 'p' ? 'Your turn: flip two cards.' : 'Bot is thinking…'}</div>
+      {res && <DuelEnd {...res} onAgain={() => { setRes(null); seen.current = new Set(); setSt({ cards: mk(), sel: [], turn: 'p', sc: [0, 0], busy: false, done: false }) }} onBack={onBack} />}
+    </div>
+  )
+}
+// ---- Sharpshooter: pop the targets before time runs out ----
+function Sharpshooter({ rep, lv, onBack }) {
+  const T = 20, [phase, setPhase] = useState('idle'), [t, setT] = useState(T), [score, setScore] = useState(0), [tg, setTg] = useState([]), [res, setRes] = useState(null), botF = useRef(0), id = useRef(0), sc = useRef(0)
+  const start = () => { botF.current = [11, 16, 22][lv] + rint(-2, 2); sc.current = 0; setScore(0); setTg([]); setT(T); setPhase('go') }
+  useEffect(() => {
+    if (phase !== 'go') return
+    const t0 = performance.now(), life = [1500, 1150, 850][lv]
+    const iv = setInterval(() => {
+      const el = (performance.now() - t0) / 1000, left = Math.max(0, T - el); setT(left); setTg((a) => a.filter((x) => performance.now() - x.at < life))
+      if (left <= 0) { clearInterval(iv); clearInterval(sp); setPhase('end'); const bs = botF.current, w = sc.current > bs; setRes({ win: w, bs, ...rep(w, 25) }) }
+    }, 100)
+    const sp = setInterval(() => setTg((a) => [...a.slice(-4), { id: ++id.current, x: rint(6, 86), y: rint(8, 78), at: performance.now(), s: rint(46, 70) }]), [700, 600, 480][lv])
+    return () => { clearInterval(iv); clearInterval(sp) }
+  }, [phase])
+  const hit = (e, x) => { e.stopPropagation(); sc.current++; setScore(sc.current); setTg((a) => a.filter((y) => y.id !== x.id)) }
+  const bot = Math.round(botF.current * Math.min(1, (T - t) / T))
+  return (
+    <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Sharpshooter</h3>
+      <div className="du-score"><span>You <b>{score}</b></span><span className="chunk">⏱ {t.toFixed(1)}s</span><span>Bot <b>{phase === 'idle' ? 0 : bot}</b></span></div>
+      <div className="ss-range">
+        {phase === 'idle' && <div className="ss-start"><p className="chunk text-xl">Pop more targets than the bot in {T} seconds.</p><button className="btn bg-[#ff3d81] text-white" onClick={start}>🎯 Start</button></div>}
+        {tg.map((x) => <button key={x.id} className="ss-t" style={{ left: x.x + '%', top: x.y + '%', width: x.s, height: x.s }} onPointerDown={(e) => hit(e, x)} aria-label="Target" />)}
+      </div>
+      {res && <DuelEnd {...res} onAgain={() => { setRes(null); setPhase('idle') }} onBack={onBack} />}
+    </div>
+  )
+}
+// ---- Connect Four against a minimax bot ----
+const C4W = []; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) { for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) { const w = []; for (let k = 0; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr > 5 || cc < 0 || cc > 6) break; w.push(rr * 7 + cc) } if (w.length === 4) C4W.push(w) } }
+const c4win = (b, p) => C4W.some((w) => w.every((i) => b[i] === p))
+const c4drop = (b, c, p) => { for (let r = 5; r >= 0; r--) if (!b[r * 7 + c]) { const n = b.slice(); n[r * 7 + c] = p; return [n, r] } return null }
+const c4eval = (b) => { let s = 0; for (const w of C4W) { const v = w.map((i) => b[i]), a = v.filter((x) => x === 2).length, h = v.filter((x) => x === 1).length; if (a && h) continue; s += a === 3 ? 6 : a === 2 ? 2 : a === 1 ? 0.3 : 0; s -= h === 3 ? 7 : h === 2 ? 2 : h === 1 ? 0.3 : 0 } for (let r = 0; r < 6; r++) if (b[r * 7 + 3] === 2) s += 1.5; return s }
+function c4search(b, d, al, be, mx) {
+  if (c4win(b, 2)) return [1e6 + d, null]; if (c4win(b, 1)) return [-1e6 - d, null]
+  const cols = [3, 2, 4, 1, 5, 0, 6].filter((c) => !b[c]); if (!cols.length) return [0, null]; if (d === 0) return [c4eval(b), null]
+  let best = mx ? -Infinity : Infinity, bc = cols[0]
+  for (const c of cols) { const [nb] = c4drop(b, c, mx ? 2 : 1), [v] = c4search(nb, d - 1, al, be, !mx); if (mx ? v > best : v < best) { best = v; bc = c } if (mx) al = Math.max(al, best); else be = Math.min(be, best); if (al >= be) break }
+  return [best, bc]
+}
+function ConnectFour({ rep, lv, onBack }) {
+  const [b, setB] = useState(() => Array(42).fill(0)), [turn, setTurn] = useState(1), [last, setLast] = useState(null), [res, setRes] = useState(null), [msg, setMsg] = useState('Your move: pick a column.'), [hov, setHov] = useState(-1), done = useRef(false)
+  const place = (c, p) => {
+    const r = c4drop(b, c, p); if (!r) return; const [nb, row] = r; setB(nb); setLast({ i: row * 7 + c, row, k: Date.now() })
+    if (c4win(nb, p)) { done.current = true; const w = p === 1; setMsg(w ? 'Four in a row!' : 'The bot connected four.'); setTimeout(() => setRes({ win: w, ...rep(w, 30) }), 1000); return }
+    if (nb.every(Boolean)) { done.current = true; setMsg('Draw! Resetting…'); setTimeout(() => { setB(Array(42).fill(0)); setTurn(1); setLast(null); done.current = false; setMsg('Your move: pick a column.') }, 1500); return }
+    setTurn(p === 1 ? 2 : 1); setMsg(p === 1 ? 'Bot is thinking…' : 'Your move: pick a column.')
+  }
+  useEffect(() => {
+    if (turn !== 2 || done.current) return
+    const t = setTimeout(() => { let c = [1, 3, 5][lv] ; const [, bc] = c4search(b, c, -Infinity, Infinity, true); const open = [0, 1, 2, 3, 4, 5, 6].filter((x) => !b[x]); place(lv === 0 && Math.random() < 0.3 ? open[rint(0, open.length - 1)] : bc, 2) }, 650)
+    return () => clearTimeout(t)
+  }, [turn])
+  return (
+    <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Connect Four</h3>
+      <div className="c4-wrap"><div className="c4-board" onPointerLeave={() => setHov(-1)}>
+        {Array.from({ length: 7 }, (_, c) => <div key={c} className={`c4-col ${hov === c && turn === 1 ? 'hov' : ''}`} onPointerEnter={() => setHov(c)} onClick={() => turn === 1 && !done.current && place(c, 1)}>
+          {Array.from({ length: 6 }, (_, r) => { const v = b[r * 7 + c]; return <div key={r} className="c4-cell">{v ? <i className={`c4-d p${v} ${last && last.i === r * 7 + c ? 'drop' : ''}`} style={{ '--fall': (r + 1) * -62 + 'px' }} /> : null}</div> })}
+        </div>)}
+      </div></div>
+      <div className="du-log">{msg}</div>
+      {res && <DuelEnd {...res} onAgain={() => { setRes(null); done.current = false; setB(Array(42).fill(0)); setTurn(1); setLast(null); setMsg('Your move: pick a column.') }} onBack={onBack} />}
+    </div>
+  )
+}
+const TIER_RW = { Silver: 50, Gold: 150, Platinum: 300, Diamond: 600, Champion: 1500 }
+const GAMES = [['battle', '⚔️', 'Blook Battle', 'Your blooks fight in a 3D arena. Attack, guard, charge an Ultimate.', '#ff3d81'], ['dice', '🎲', 'Dice Duel', 'Real 3D dice. Reroll one, beat the bot. First to 3.', '#22c55e'], ['draw', '🤠', 'Quick Draw', 'Wait for DRAW, then fire first. Pure reflexes.', '#ff8a2b'], ['clash', '✊', 'Clash', 'Rock paper scissors with flip cards. The bot learns your habits.', '#a855f7'], ['memory', '🧠', 'Memory Match', 'Flip blook cards and take turns with the bot. Most pairs wins.', '#38bdf8'], ['shoot', '🎯', 'Sharpshooter', 'Pop more targets than the bot in 20 seconds.', '#facc15'], ['c4', '🔴', 'Connect Four', 'Drop discs and beat a thinking bot to four in a row.', '#ef4444']]
+function DuelRanks({ user, upd, ur }) {
+  const d = { tr: 0, w: 0, l: 0, st: 0, best: 0, g: {}, h: [], cl: [], ...(user.duel || {}) }, t = tierOf(d.tr), nx = DUEL_TIERS.find((x) => x[1] > d.tr), tot = d.w + d.l, wr = tot ? Math.round((100 * d.w) / tot) : 0
+  const claim = (n) => { const u = ur.current, dd = { cl: [], ...(u.duel || {}) }; if ((dd.cl || []).includes(n)) return; upd({ ...u, tokens: u.tokens + TIER_RW[n], duel: { ...dd, cl: [...(dd.cl || []), n] } }); toast(`Claimed ${TIER_RW[n]} Blook Tokens!`) }
+  return (
+    <div className="du-pane rk">
+      <div className="rk-hero" style={{ '--tc': t[2] }}>
+        <div className="rk-coinw"><div className="rk-coin"><span className="chunk">{t[0][0]}</span></div><i className="rk-glow" /></div>
+        <div className="rk-info"><div className="rk-lab">CURRENT RANK</div><div className="chunk rk-name">{t[0]}</div><div className="chunk rk-tr">🏆 {d.tr.toLocaleString()} trophies</div>
+          {nx ? <div className="du-hp rk-bar"><i style={{ width: Math.min(100, (100 * (d.tr - t[1])) / (nx[1] - t[1])) + '%', background: `linear-gradient(90deg,${t[2]},#fff)` }} /><span>{nx[1] - d.tr} to {nx[0]}</span></div> : <div className="chunk mt-2">Top rank reached!</div>}</div>
+      </div>
+      <div className="du-stats">{[['⚔️', d.w, 'Wins'], ['💀', d.l, 'Losses'], ['📈', wr + '%', 'Win rate'], ['🔥', d.st, 'Streak'], ['⭐', d.best || 0, 'Best streak']].map(([e, v, l]) => <div key={l}><em>{e}</em><b>{v}</b>{l}</div>)}</div>
+      <h3 className="chunk rk-h">Rank rewards</h3>
+      <div className="rk-ladder">{DUEL_TIERS.map(([n, at, c], i) => { const reached = d.tr >= at, got = (d.cl || []).includes(n); return (
+        <div key={n} className={`rk-step ${reached ? 'on' : ''}`} style={{ '--tc': c }}><div className="rk-dot chunk">{n[0]}</div><div className="rk-sb"><b className="chunk">{n}</b><span>{at}+ trophies</span></div>
+          {TIER_RW[n] ? (got ? <span className="rk-got">✓ Claimed</span> : <button className="rk-claim" disabled={!reached} onClick={() => claim(n)}>{reached ? `Claim ${TIER_RW[n]}` : `🔒 ${TIER_RW[n]}`}</button>) : <span className="rk-got">Starter</span>}</div>) })}</div>
+      <h3 className="chunk rk-h">Game records</h3>
+      <div className="rk-games">{GAMES.map(([k, e, n, , col]) => { const r = d.g[k] || { w: 0, l: 0 }, p = r.w + r.l ? (100 * r.w) / (r.w + r.l) : 0; return <div key={k} style={{ '--gc': col }}><span className="rk-ge">{e}</span><div className="min-w-0 flex-1"><div className="flex justify-between"><b className="chunk">{n}</b><span>{r.w}W · {r.l}L</span></div><div className="du-hp"><i style={{ width: p + '%', background: col }} /></div></div></div> })}</div>
+      <h3 className="chunk rk-h">Recent matches</h3>
+      <div className="rk-hist">{(d.h || []).length === 0 && <p className="mute">No matches yet. Play a duel to get on the board!</p>}{(d.h || []).map((m, i) => { const g = GAMES.find((x) => x[0] === m.g); return <div key={i} className={m.w ? 'w' : 'l'}><span>{g ? g[1] : '⚔️'} {g ? g[2] : m.g}</span><span className="mute">{LVN[m.lv] || ''}</span><b className="chunk">{m.w ? 'WIN' : 'LOSS'} {m.t > 0 ? '+' : ''}{m.t}</b></div> })}</div>
+    </div>
   )
 }
 function DuelsWorld({ user, update, onExit }) {
-  const [tab, setTab] = useState('play'), [game, setGame] = useState(null), [leaving, setLeaving] = useState(false), ur = useRef(user); ur.current = user
+  const [tab, setTab] = useState('play'), [game, setGame] = useState(null), [lv, setLv] = useState(1), [leaving, setLeaving] = useState(false), ur = useRef(user); ur.current = user
   useEffect(() => { const prev = document.documentElement.dataset.theme; document.documentElement.dataset.theme = 'duels'; return () => { document.documentElement.dataset.theme = prev } }, [])
-  const upd = (u) => { ur.current = u; update(u) }, rep = useDuelRep(user, upd, ur)
+  const upd = (u) => { ur.current = u; update(u) }, rep = useDuelRep(user, upd, ur, game, lv)
   const leave = () => { if (leaving) return; setLeaving(true); setTimeout(onExit, 1500) }
-  const d = user.duel || {}, t = tierOf(d.tr || 0)
-  const G = [['battle', '⚔️', 'Blook Battle', 'Your own blooks fight in a 3D arena. Attack, guard and charge an Ultimate.'], ['dice', '🎲', 'Dice Duel', 'Real 3D dice. Reroll one die, then beat the bot. First to 3.'], ['draw', '🤠', 'Quick Draw', 'Wait for DRAW, then fire first. Pure reflexes. Best of 5.']]
-  const back = () => setGame(null)
+  const d = user.duel || {}, t = tierOf(d.tr || 0), back = () => setGame(null), P = { rep, lv, onBack: back }
+  const unclaimed = DUEL_TIERS.filter(([n, at]) => TIER_RW[n] && (d.tr || 0) >= at && !(d.cl || []).includes(n)).length
   return (
     <div className="app-bg relative flex h-[100dvh] flex-col overflow-hidden"><DuelsBg off={!!user.perf} />
       <header className="topbar sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 sm:px-6">
         <div className="logo">Oranget<span className="ml-2 text-base opacity-80">Duels</span></div>
-        <nav className="order-3 flex w-full gap-1 sm:order-none sm:w-auto sm:flex-1">{[['play', 'Duels'], ['rank', 'Ranks']].map(([k, l]) => <button key={k} onClick={() => { setTab(k); setGame(null) }} aria-current={tab === k} className="tab flex shrink-0 items-center gap-2 text-base">{l}</button>)}</nav>
+        <nav className="order-3 flex w-full gap-1 sm:order-none sm:w-auto sm:flex-1">{[['play', 'Duels'], ['rank', 'Ranks']].map(([k, l]) => <button key={k} onClick={() => { setTab(k); setGame(null) }} aria-current={tab === k} className="tab flex shrink-0 items-center gap-2 text-base">{l}{k === 'rank' && unclaimed > 0 ? <span className="rk-ping">{unclaimed}</span> : null}</button>)}</nav>
         <div className="ml-auto flex items-center gap-2"><span className="chip"><Coins size={24} />{user.tokens.toLocaleString()}</span><span className="chip" style={{ color: t[2] }}>🏆 {d.tr || 0}</span><button className="btn bg-white/25 text-white" onClick={leave}>Leave</button></div>
       </header>
       <main className="relative z-10 min-h-0 min-w-0 flex-1 overflow-y-auto">
-        {tab === 'rank' && <DuelRanks user={user} />}
-        {tab === 'play' && !game && <div className="du-pane"><h2 className="chunk text-4xl">Choose your duel</h2><p className="text-sm opacity-80">Beat the bot to climb the ranks. More games and live player duels are coming.</p>
-          <div className="du-games">{G.map(([k, e, n, ds]) => <button key={k} className="du-gc" onClick={() => setGame(k)}><span className="du-ge">{e}</span><span className="chunk text-2xl">{n}</span><span className="text-sm opacity-80">{ds}</span><span className="du-play chunk">PLAY</span></button>)}</div></div>}
-        {tab === 'play' && game === 'battle' && <BlookBattle user={user} rep={rep} onBack={back} />}
-        {tab === 'play' && game === 'dice' && <DiceDuel rep={rep} onBack={back} />}
-        {tab === 'play' && game === 'draw' && <QuickDraw user={user} rep={rep} onBack={back} />}
+        {tab === 'rank' && <DuelRanks user={user} upd={upd} ur={ur} />}
+        {tab === 'play' && !game && <div className="du-pane"><h2 className="chunk text-4xl">Choose your duel</h2>
+          <div className="du-lv" role="radiogroup" aria-label="Difficulty">{LVN.map((n, i) => <button key={n} role="radio" aria-checked={lv === i} className={lv === i ? 'on' : ''} onClick={() => setLv(i)}>{n}<small>x{LVM[i]} rewards</small></button>)}</div>
+          <div className="du-games">{GAMES.map(([k, e, n, ds, col]) => <button key={k} className="du-gc" style={{ '--gc': col }} onClick={() => setGame(k)}><span className="du-ge">{e}</span><span className="chunk text-2xl">{n}</span><span className="text-sm opacity-80">{ds}</span><span className="du-play chunk">PLAY</span></button>)}</div></div>}
+        {tab === 'play' && game === 'battle' && <BlookBattle user={user} {...P} />}
+        {tab === 'play' && game === 'dice' && <DiceDuel {...P} />}
+        {tab === 'play' && game === 'draw' && <QuickDraw user={user} {...P} />}
+        {tab === 'play' && game === 'clash' && <Clash {...P} />}
+        {tab === 'play' && game === 'memory' && <MemoryMatch {...P} />}
+        {tab === 'play' && game === 'shoot' && <Sharpshooter {...P} />}
+        {tab === 'play' && game === 'c4' && <ConnectFour {...P} />}
       </main>
       {leaving && ReactDOM.createPortal(<div className="portal-go duels-go"><div className="chunk text-4xl text-white">Going back to Oranget…</div></div>, document.body)}
     </div>
