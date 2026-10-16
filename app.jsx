@@ -436,10 +436,22 @@ const USERS = 'oranget_users'
 const getUsers = () => read(USERS, {})
 const loadLocal = (name) => { const e = getUsers()[name.toLowerCase()]; if (!e) return null; try { return JSON.parse(e.rec) } catch { return null } }
 let latest = null, cloudT
+const SYNC = { base: null, name: null, onMerge: null }
+const invCount = (a) => { const m = {}; (a || []).forEach((x) => { m[x] = (m[x] || 0) + 1 }); return m }
 const pushCloud = async () => {
-  const u = latest, c = FB && FB.auth.currentUser
+  let u = latest; const c = FB && FB.auth.currentUser
   if (!u || !c) return
-  try { await FB.db.doc('users/' + c.uid).set({ name: u.name, nameLower: u.name.toLowerCase(), blob: JSON.stringify(strip(u)), saved: u.saved, at: FB.ts() }, { merge: true }) } catch (e) { console.warn('cloud save failed', e) }
+  try {
+    // If another device/tab saved since we loaded, merge instead of overwriting (this is what was wiping blooks)
+    const snap = await FB.db.doc('users/' + c.uid).get(), d = snap.exists ? snap.data() : null
+    if (d && d.blob && SYNC.base && (d.saved || 0) > SYNC.base.saved) {
+      const cu = JSON.parse(d.blob), b = invCount(SYNC.base.inv), mine = invCount(u.inv), cl = invCount(cu.inv), keys = new Set([...Object.keys(b), ...Object.keys(mine), ...Object.keys(cl)]), inv = []
+      keys.forEach((k) => { const n = Math.max(0, (cl[k] || 0) + (mine[k] || 0) - (b[k] || 0)); for (let i = 0; i < n; i++) inv.push(k) })
+      u = { ...u, inv, tokens: Math.max(0, (cu.tokens || 0) + ((u.tokens || 0) - SYNC.base.tokens)) }; latest = u
+      SYNC.onMerge && SYNC.onMerge(u)
+    }
+  } catch (e) { console.warn('cloud merge check failed', e) }
+  try { await FB.db.doc('users/' + c.uid).set({ name: u.name, nameLower: u.name.toLowerCase(), blob: JSON.stringify(strip(u)), saved: u.saved, at: FB.ts() }, { merge: true }); SYNC.base = { saved: u.saved, inv: [...(u.inv || [])], tokens: u.tokens || 0 } } catch (e) { console.warn('cloud save failed', e) }
 }
 let lsT = 0
 const lsFlush = () => { clearTimeout(lsT); lsT = 0; const c = FB && FB.auth.currentUser; if (c && latest) { try { localStorage.setItem(cacheKey(c.uid), JSON.stringify(strip(latest))) } catch {} } }
@@ -3762,12 +3774,12 @@ function DuelsWorld({ user, update, onExit }) {
           <div className="du-lv" role="radiogroup" aria-label="Difficulty">{LVN.map((n, i) => <button key={n} role="radio" aria-checked={lv === i} className={lv === i ? 'on' : ''} onClick={() => setLv(i)}>{n}<small>x{LVM[i]} rewards</small></button>)}</div>
           <div className="du-games">{GAMES.map(([k, e, n, ds, col]) => <button key={k} className="du-gc" style={{ '--gc': col }} onClick={() => setGame(k)}><span className="du-ge">{e}</span><span className="chunk text-2xl">{n}</span><span className="text-sm opacity-80">{ds}</span><span className="du-play chunk">PLAY</span></button>)}</div></div>}
         {tab === 'play' && game === 'battle' && <BlookBattle user={user} {...P} />}
-        {tab === 'play' && game === 'dice' && <DiceDuel {...P} />}
+        {tab === 'play' && game === 'dice' && <DiceDuel user={user} {...P} />}
         {tab === 'play' && game === 'draw' && <QuickDraw user={user} {...P} />}
-        {tab === 'play' && game === 'clash' && <Clash {...P} />}
-        {tab === 'play' && game === 'memory' && <MemoryMatch {...P} />}
-        {tab === 'play' && game === 'shoot' && <Sharpshooter {...P} />}
-        {tab === 'play' && game === 'c4' && <ConnectFour {...P} />}
+        {tab === 'play' && game === 'clash' && <Clash user={user} {...P} />}
+        {tab === 'play' && game === 'memory' && <MemoryMatch user={user} {...P} />}
+        {tab === 'play' && game === 'shoot' && <Sharpshooter user={user} {...P} />}
+        {tab === 'play' && game === 'c4' && <ConnectFour user={user} {...P} />}
       </main>
       {leaving && ReactDOM.createPortal(<div className="portal-go duels-go"><div className="chunk text-4xl text-white">Going back to Oranget…</div></div>, document.body)}
     </div>
@@ -3908,6 +3920,7 @@ function App() {
   const [user, setUser] = useState(null), [ready, setReady] = useState(false)
   useEffect(() => { Promise.race([restoreSession(), new Promise((r) => setTimeout(() => r(null), 12000))]).catch(() => null).then((u) => { setUser(u); setReady(true) }) }, []) // valid signed token skips the landing page
   const update = (u) => { saveUser(u); setUser(u) }
+  useEffect(() => { SYNC.onMerge = (u) => setUser(u); if (user && SYNC.name !== user.name) { SYNC.name = user.name; SYNC.base = { saved: user.saved || 0, inv: [...(user.inv || [])], tokens: user.tokens || 0 } } }, [user && user.name])
   const [, bumpImg] = useState(0)
   useEffect(() => { const f = () => bumpImg((n) => n + 1); thumbSubs.add(f); return () => thumbSubs.delete(f) }, [])
   useEffect(() => { document.documentElement.dataset.theme = (user && user.theme) || read('oranget_theme', 'orange') }, [user && user.theme])
@@ -3979,34 +3992,144 @@ function d3Load() {
 function Stage3D({ build, height = '22rem', onReady, onPointer, onMove, onLeave, children }) {
   const el = useRef(null), [err, setErr] = useState(false)
   useEffect(() => {
-    let dead = false, raf = 0, R = null, off = null
+    let dead = false, raf = 0, R = null, off = null, io = null, vis = true
     d3Load().then(() => {
       if (dead || !el.current) return
       const THREE = window.THREE, w = el.current.clientWidth || 600, h = el.current.clientHeight || 350
-      R = new THREE.WebGLRenderer({ antialias: true }); R.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1)); R.setSize(w, h)
-      R.outputEncoding = THREE.sRGBEncoding; R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap
+      R = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); R.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); R.setSize(w, h)
+      R.outputEncoding = THREE.sRGBEncoding
       el.current.appendChild(R.domElement)
       const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(45, w / h, 0.1, 120)
       const ctx = { THREE, scene, cam, R, el: el.current, tick: [], clock: new THREE.Clock(), shake: 0, t: 0 }
       const api = build(ctx)
       const loop = () => {
         raf = requestAnimationFrame(loop)
-        const dt = Math.min(0.05, ctx.clock.getDelta()); ctx.t += dt
-        ctx.tick.slice().forEach((f) => f(dt, ctx.t))
+        const dt = Math.min(0.05, ctx.clock.getDelta())
+        if (!vis || document.hidden) return
+        ctx.t += dt
+        for (let i = ctx.tick.length - 1; i >= 0; i--) { const f = ctx.tick[i]; if (f) f(dt, ctx.t) }
         R.render(scene, cam)
       }
       loop()
+      try { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting }); io.observe(el.current) } catch (e) {}
       const rs = () => { if (!el.current) return; const w2 = el.current.clientWidth, h2 = el.current.clientHeight; if (!w2 || !h2) return; R.setSize(w2, h2); cam.aspect = w2 / h2; cam.updateProjectionMatrix() }
       window.addEventListener('resize', rs); off = () => window.removeEventListener('resize', rs)
       rs()
       onReady && onReady(api)
     }).catch(() => setErr(true))
-    return () => { dead = true; cancelAnimationFrame(raf); off && off(); if (R) { R.dispose(); R.domElement.remove() } }
+    return () => { dead = true; cancelAnimationFrame(raf); off && off(); io && io.disconnect(); if (R) { R.dispose(); try { R.forceContextLoss() } catch (e) {} R.domElement.remove() } }
   }, [])
   return <div ref={el} className="d3-stage" style={{ height }} onPointerDown={onPointer} onPointerMove={onMove} onPointerLeave={onLeave}>{err && <div className="d3-err">3D could not load. Check your connection and reload.</div>}{children}</div>
 }
 
 // ---------- tiny helpers ----------
+
+// ---------- Blook -> 3D engine: every blook (zeros, fused, animated, owner) becomes a real voxel model ----------
+const d3cache = { cv: new Map(), model: new Map(), flat: new Map() }
+let d3box = null
+const d3src = (k) => { try { return (typeof IMG !== 'undefined' && IMG[k]) || imgSrc(k, 256) || null } catch (e) { return null } }
+const d3loadImg = (src) => new Promise((ok) => { if (!src) return ok(null); const im = new Image(); if (!/^data:/.test(src)) im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src })
+function d3fx(cv, o) { // CSS-style hue / saturate / brightness / invert done on the pixels (Safari canvas has no filter)
+  const g = cv.getContext('2d'), im = g.getImageData(0, 0, cv.width, cv.height), d = im.data
+  const hr = ((o.hue || 0) * Math.PI) / 180, c = Math.cos(hr), s = Math.sin(hr), sa = o.sat == null ? 1 : o.sat, br = o.bri == null ? 1 : o.bri
+  const H = [0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928, 0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.14, 0.072 - c * 0.072 - s * 0.283, 0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072]
+  const S = [0.213 + 0.787 * sa, 0.715 - 0.715 * sa, 0.072 - 0.072 * sa, 0.213 - 0.213 * sa, 0.715 + 0.285 * sa, 0.072 - 0.072 * sa, 0.213 - 0.213 * sa, 0.715 - 0.715 * sa, 0.072 + 0.928 * sa]
+  const cl = (v) => (v < 0 ? 0 : v > 255 ? 255 : v)
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue
+    let r = d[i], gg = d[i + 1], b = d[i + 2]
+    if (o.inv) { r = 255 - r; gg = 255 - gg; b = 255 - b }
+    let R = H[0] * r + H[1] * gg + H[2] * b, G = H[3] * r + H[4] * gg + H[5] * b, B = H[6] * r + H[7] * gg + H[8] * b
+    r = S[0] * R + S[1] * G + S[2] * B; gg = S[3] * R + S[4] * G + S[5] * B; b = S[6] * R + S[7] * G + S[8] * B
+    d[i] = cl(r * br); d[i + 1] = cl(gg * br); d[i + 2] = cl(b * br)
+  }
+  g.putImageData(im, 0, 0)
+}
+function d3zeroTint(cv) { // Zeros: left half burns, right half freezes, so they never look like the original
+  const g = cv.getContext('2d'), S = cv.width, im = g.getImageData(0, 0, S, S), d = im.data
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = (y * S + x) * 4; if (!d[i + 3]) continue
+    const t = x / S, f = Math.max(0, 1 - t * 1.7) * 0.7, c = Math.max(0, t * 1.7 - 0.7) * 0.7, k = 1 - f - c
+    d[i] = Math.min(255, d[i] * k + 255 * f + 90 * c + 18); d[i + 1] = Math.min(255, d[i + 1] * k + 110 * f + 235 * c); d[i + 2] = Math.min(255, d[i + 2] * k + 25 * f + 255 * c + 18)
+  }
+  g.putImageData(im, 0, 0)
+}
+function d3blookCanvas(id) {
+  if (d3cache.cv.has(id)) return d3cache.cv.get(id)
+  const p = (async () => {
+    const b = byId(id) || BLOOKS[0], S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d')
+    let keys
+    if (b.id === 'ca_slot') keys = ['ca_slot']; else if (b.rarity === 'owner') keys = ['vgyoshi']; else if (b.anim) keys = ['blackdragon']; else if (b.parts) keys = [b.parts[0], b.parts[1]]; else keys = [b.inv || b.img || b.id]
+    let ims = await Promise.all(keys.map((k) => d3loadImg(d3src(k))))
+    if (!ims[0]) { const alts = [b.id, b.img, b.spr, b.inv].filter(Boolean); for (const k of alts) { const im = await d3loadImg(d3src(k)); if (im) { ims = [im]; break } } }
+    if (!ims[0]) { // last resort: a coloured tile with the blook's letter, so nothing is ever invisible
+      const col = (typeof RARITY !== 'undefined' && RARITY[b.rarity] && RARITY[b.rarity].color) || '#ff7a2f'
+      g.fillStyle = col; g.beginPath(); g.roundRect ? g.roundRect(20, 20, 120, 120, 26) : g.rect(20, 20, 120, 120); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 80px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((b.name || '?')[0].toUpperCase(), 80, 86); return cv
+    }
+    const put = (im) => { const r = Math.min(S / im.naturalWidth, S / im.naturalHeight), w = im.naturalWidth * r, h = im.naturalHeight * r; g.drawImage(im, (S - w) / 2, (S - h) / 2, w, h) }
+    if (ims.length === 2 && ims[1]) { g.save(); g.beginPath(); g.rect(0, 0, S / 2, S); g.clip(); put(ims[0]); g.restore(); g.save(); g.beginPath(); g.rect(S / 2, 0, S / 2, S); g.clip(); put(ims[1]); g.restore() } else put(ims[0])
+    try {
+      if (b.rarity === 'zero' && b.inv) d3fx(cv, b.hue != null ? b : { inv: true, hue: 180 })
+      else if (b.hue != null) d3fx(cv, b)
+      if (b.rarity === 'zero') d3zeroTint(cv)
+    } catch (e) {}
+    return cv
+  })()
+  d3cache.cv.set(id, p); return p
+}
+function d3flatTex(THREE, id) { // flat texture that always shows the right blook
+  const c = document.createElement('canvas'); c.width = c.height = 160; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding
+  d3blookCanvas(id).then((src) => { c.getContext('2d').drawImage(src, 0, 0); t.needsUpdate = true }); return t
+}
+function d3model(id, G) {
+  const k = id + ':' + G; if (d3cache.model.has(k)) return d3cache.model.get(k)
+  const p = d3blookCanvas(id).then((cv) => {
+    const S = cv.width, d = cv.getContext('2d').getImageData(0, 0, S, S).data; let x0 = S, y0 = S, x1 = -1, y1 = -1
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+    if (x1 < 0) { x0 = 0; y0 = 0; x1 = S - 1; y1 = S - 1 }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = G / Math.max(bw, bh), gw = Math.max(2, Math.round(bw * sc)), gh = Math.max(2, Math.round(bh * sc))
+    const sm = document.createElement('canvas'); sm.width = gw; sm.height = gh; const g = sm.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cv, x0, y0, bw, bh, 0, 0, gw, gh)
+    const px = g.getImageData(0, 0, gw, gh).data, on = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh && px[(y * gw + x) * 4 + 3] > 110, cells = []
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) if (on(x, y)) { const i = (y * gw + x) * 4; cells.push([x, y, px[i], px[i + 1], px[i + 2], !(on(x - 1, y) && on(x + 1, y) && on(x, y - 1) && on(x, y + 1))]) }
+    return { gw, gh, cells }
+  })
+  d3cache.model.set(k, p); return p
+}
+function d3voxel(THREE, model, mat, height) {
+  const D = 4, { gw, gh, cells } = model, cs = height / Math.max(gw, gh); let n = 0
+  cells.forEach((c) => { n += 2 + (c[5] ? D - 2 : 0) })
+  if (!d3box) d3box = new THREE.BoxGeometry(1, 1, 1)
+  const im = new THREE.InstancedMesh(d3box, mat, n), m = new THREE.Matrix4(), col = new THREE.Color(); let i = 0
+  const add = (c, l, shade) => { m.makeScale(cs, cs, cs); m.setPosition((c[0] - gw / 2 + 0.5) * cs, (gh / 2 - c[1] - 0.5) * cs, (D * 0.45 - l) * cs); im.setMatrixAt(i, m); col.setRGB((c[2] / 255) * shade, (c[3] / 255) * shade, (c[4] / 255) * shade).convertSRGBToLinear(); im.setColorAt(i, col); i++ }
+  cells.forEach((c) => { add(c, 0, 1); if (c[5]) for (let l = 1; l < D - 1; l++) add(c, l, 0.8 - l * 0.08); add(c, D - 1, 0.5) })
+  im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.frustumCulled = false
+  return im
+}
+function d3aura(ctx, parent, H, mat) { // fire on one side, ice on the other: for every Zero
+  const { THREE } = ctx, n = 48, A = []
+  ;[[0xff7a2f, -1], [0x7fe9ff, 1]].forEach(([c, side]) => {
+    const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), ph = [], ox = []
+    for (let i = 0; i < n; i++) { ph.push(Math.random()); ox.push(Math.random()) }
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3))
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: c, size: 0.22, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts); A.push({ pts, p, ph, ox, side, g })
+  })
+  const f = (dt, t) => { if (mat) mat.emissive.setRGB(0.22 + 0.12 * Math.sin(t * 3), 0.1, 0.22 + 0.12 * Math.cos(t * 3)); A.forEach((a) => { for (let i = 0; i < n; i++) { const k = (a.ph[i] + t * 0.35) % 1; a.p[i * 3] = a.side * (0.3 + a.ox[i] * H * 0.38) + Math.sin(t * 3 + i) * 0.08; a.p[i * 3 + 1] = -H / 2 + k * H * 1.2; a.p[i * 3 + 2] = Math.sin(i * 1.7) * 0.4 + 0.3 } a.g.attributes.position.needsUpdate = true }) }
+  ctx.tick.push(f)
+  return { off() { if (mat) mat.emissive.setHex(0x161616); const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1); A.forEach((a) => { parent.remove(a.pts); a.g.dispose(); a.pts.material.dispose() }) } }
+}
+function d3bodySetter(ctx, body, mat, H, G) {
+  let cur = 0, vox = null, aura = null
+  return (id) => {
+    const my = ++cur
+    d3model(id, G).then((m) => {
+      if (my !== cur) return
+      if (vox) { body.remove(vox); vox.dispose && vox.dispose() }
+      vox = d3voxel(ctx.THREE, m, mat, H); body.add(vox)
+      if (aura) { aura.off(); aura = null }
+      const b = byId(id); if (b && b.rarity === 'zero') aura = d3aura(ctx, body, H, mat)
+    })
+  }
+}
 const d3tw = (ctx, dur, fn, done) => {
   let t = 0
   const f = (dt) => { t += dt; const k = Math.min(1, t / dur); fn(k, dt); if (k >= 1) { const i = ctx.tick.indexOf(f); if (i >= 0) ctx.tick.splice(i, 1); done && done() } }
@@ -4039,21 +4162,41 @@ function d3stars(ctx, n = 260, spread = 40, ymin = 2) {
   const s = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.8 })); ctx.scene.add(s)
   ctx.tick.push((dt) => { s.rotation.y += dt * 0.01 })
 }
+const d3me = (u) => (u && u.avatar && byId(u.avatar) ? u.avatar : (u && u.inv && u.inv.find((x) => byId(x))) || 'toast')
+const d3rand = () => { const p = BLOOKS.filter((b) => b.rarity !== 'owner' && !String(b.id).startsWith('cd_')); return p[rint(0, p.length - 1)].id }
+function d3actor(ctx, x, y, z, ry, H = 2.6, G = 30) { // a 3D blook that plays the game: bobs, throws, pumps, cheers, slumps
+  const { THREE } = ctx, g = new THREE.Group(); g.position.set(x, y, z)
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x161616 })
+  const body = new THREE.Group(); body.position.y = H / 2; body.rotation.y = ry; g.add(body)
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(H * 0.4, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; g.add(sh)
+  ctx.scene.add(g)
+  const A = { g, body, mat, busy: 0, down: false, pump: 0, set: d3bodySetter(ctx, body, mat, H, G) }
+  ctx.tick.push((dt, t) => {
+    if (A.busy) return
+    if (A.down) { body.position.y = H / 2 - 0.15; body.rotation.z += (0.5 - body.rotation.z) * Math.min(1, dt * 6); return }
+    body.position.y = H / 2 + Math.sin(t * 2.2 + x) * 0.07 + (A.pump ? Math.abs(Math.sin(t * 8)) * A.pump : 0)
+    body.rotation.z += (0 - body.rotation.z) * Math.min(1, dt * 8); body.rotation.y = ry + Math.sin(t * 0.8 + x) * 0.12
+  })
+  const run = (dur, fn) => { A.busy++; d3tw(ctx, dur, fn, () => { A.busy-- }) }
+  A.hop = () => run(0.45, (k) => { body.position.y = H / 2 + Math.sin(k * Math.PI) * 0.9 })
+  A.lean = (dir) => run(0.4, (k) => { body.rotation.z = -dir * Math.sin(k * Math.PI) * 0.4; body.position.y = H / 2 + Math.sin(k * Math.PI) * 0.3 })
+  A.cheer = () => { A.down = false; run(1.0, (k) => { body.position.y = H / 2 + Math.abs(Math.sin(k * Math.PI * 2)) * 0.9; body.rotation.y = ry + k * Math.PI * 2; body.rotation.z = 0 }) }
+  return A
+}
 function d3fighter(ctx, x, flip, baseColor = 0x2a2f6b) {
   const { THREE } = ctx, g = new THREE.Group(); g.position.set(x, 0, 0)
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.45, 0.28, 40), new THREE.MeshStandardMaterial({ color: baseColor, metalness: 0.6, roughness: 0.3, emissive: baseColor, emissiveIntensity: 0.35 }))
-  base.position.y = 0.14; base.castShadow = base.receiveShadow = true; g.add(base)
-  const mat = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.04, side: THREE.DoubleSide })
-  const body = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), mat); body.position.y = 1.65; g.add(body)
-  if (flip) body.scale.x = -1
-  const sh = new THREE.Mesh(new THREE.CircleGeometry(1.2, 28), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }))
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.45, 0.28, 32), new THREE.MeshStandardMaterial({ color: baseColor, metalness: 0.6, roughness: 0.3, emissive: baseColor, emissiveIntensity: 0.35 }))
+  base.position.y = 0.14; g.add(base)
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x161616, transparent: true })
+  const body = new THREE.Group(), ry = flip ? -0.5 : 0.5; body.position.y = 1.7; body.rotation.y = ry; g.add(body)
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(1.2, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }))
   sh.rotation.x = -Math.PI / 2; sh.position.y = 0.3; g.add(sh)
   const glow = new THREE.PointLight(0xffffff, 0, 9); glow.position.set(0, 2, 1.5); g.add(glow)
-  const shield = new THREE.Mesh(new THREE.SphereGeometry(1.9, 28, 18), new THREE.MeshBasicMaterial({ color: 0x4fd8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }))
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(1.9, 20, 14), new THREE.MeshBasicMaterial({ color: 0x4fd8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }))
   shield.position.y = 1.6; g.add(shield)
   ctx.scene.add(g)
-  const F = { g, body, mat, glow, shield, x, y: 1.65, busy: false, set(id) { mat.map = d3tex(THREE, id); body.visible = !!mat.map; mat.needsUpdate = true } }
-  ctx.tick.push((dt, t) => { if (!F.busy) { body.position.y = F.y + Math.sin(t * 2 + x) * 0.08; body.rotation.y = Math.sin(t * 0.9 + x) * 0.14 } })
+  const F = { g, body, mat, glow, shield, x, y: 1.7, busy: false, set: d3bodySetter(ctx, body, mat, 2.7, 36) }
+  ctx.tick.push((dt, t) => { if (!F.busy) { body.position.y = F.y + Math.sin(t * 2 + x) * 0.08; body.rotation.y = ry + Math.sin(t * 0.9 + x) * 0.18 } })
   return F
 }
 
@@ -4093,7 +4236,7 @@ function d3Arena(ctx) {
     d3tw(ctx, 0.45, (k) => { d.g.position.x = x0 + dir * Math.sin(k * Math.PI) * 0.8; d.glow.intensity = 3 * (1 - k); d.mat.color.lerpColors(new THREE.Color(0xff5555), new THREE.Color(0xffffff), k) }, () => { d.busy = false; d.glow.intensity = 0 })
   }
   return {
-    set(p, b) { F.P.set(p); F.B.set(b); ['P', 'B'].forEach((s) => { const d = F[s]; d.g.rotation.z = 0; d.g.position.set(d.x, 0, 0); d.body.position.y = d.y; d.mat.opacity = 1; d.mat.transparent = true; d.busy = false; d.shield.material.opacity = 0 }) },
+    set(p, b) { F.P.set(p); F.B.set(b); ['P', 'B'].forEach((s) => { const d = F[s]; d.g.rotation.z = 0; d.g.position.set(d.x, 0, 0); d.body.position.y = d.y; d.mat.opacity = 1; d.mat.color.set(0xffffff); d.busy = false; d.shield.material.opacity = 0 }) },
     act(side, kind) {
       const a = F[side], d = F[side === 'P' ? 'B' : 'P'], dir = side === 'P' ? 1 : -1, reach = Math.abs(d.x - a.x) - 2.7, col = side === 'P' ? 0x38e8ff : 0xff3d81
       if (kind === 'guard') { a.shield.material.opacity = 0.35; d3wave(ctx, new THREE.Vector3(a.x, 0, 0), 0x4fd8ff, 2.5); d3tw(ctx, 1.1, (k) => { a.shield.scale.setScalar(1 + Math.sin(k * Math.PI * 4) * 0.04); a.shield.material.opacity = 0.35 * (1 - k * k) }, () => { a.shield.material.opacity = 0 }); return }
@@ -4188,7 +4331,8 @@ function d3DiceTable(ctx) {
   ;[[0, -4.5, 13.8, 0.7], [0, 4.5, 13.8, 0.7], [-6.9, 0, 0.7, 9.2], [6.9, 0, 0.7, 9.2]].forEach(([x, z, w, d]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.7, d), wood); m.position.set(x, 0, z); m.castShadow = m.receiveShadow = true; scene.add(m) })
   const line = new THREE.Mesh(new THREE.PlaneGeometry(11, 0.05), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.5 })); line.rotation.x = -Math.PI / 2; line.position.y = 0.01; scene.add(line)
   d3stars(ctx, 120, 20, 4)
-  cam.position.set(0, 8.6, 7.2); cam.lookAt(0, 0, 0.3)
+  cam.position.set(0, 9.5, 8.2); cam.lookAt(0, 0, 0.3)
+  const act = [d3actor(ctx, -6.2, 0.35, -3.9, 0.9, 2.6), d3actor(ctx, 6.2, 0.35, 3.9, -0.9, 2.6)]
   const mk = (v) => {
     const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d')
     g.fillStyle = '#fbf6ea'; g.fillRect(0, 0, 128, 128); g.strokeStyle = '#d9cfb8'; g.lineWidth = 6; g.strokeRect(3, 3, 122, 122)
@@ -4210,10 +4354,13 @@ function d3DiceTable(ctx) {
     cam.position.x = Math.sin(t * 0.25) * 0.6; cam.lookAt(0, 0, 0.3)
   })
   return {
+    who(b, p) { act[0].set(b); act[1].set(p) },
+    react(w) { if (w === 'P') { act[1].cheer(); act[0].down = true } else if (w === 'B') { act[0].cheer(); act[1].down = true } },
+    calm() { act.forEach((a) => { a.down = false }) },
     show(bv, pv) { [...bv, ...pv].forEach((v, i) => { dice[i].m.quaternion.copy(finalQ(v, i * 0.7 + 0.3)); dice[i].m.position.y = SZ / 2 }) },
     toss(i, v) {
-      const d = dice[i], side = i < 2 ? -1 : 1, from = new THREE.Vector3(d.x + (Math.random() - 0.5) * 3 + (i % 2 ? 4 : -4), 6.5, side * 8.5), axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(), fq = finalQ(v, Math.random() * 6.28), spins = Math.PI * 2 * (3 + Math.random() * 2), spq = new THREE.Quaternion()
-      d.busy = true
+      const d = dice[i], side = i < 2 ? -1 : 1, ac = act[i < 2 ? 0 : 1], from = new THREE.Vector3(ac.g.position.x, 3.2, ac.g.position.z), axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(), fq = finalQ(v, Math.random() * 6.28), spins = Math.PI * 2 * (3 + Math.random() * 2), spq = new THREE.Quaternion()
+      d.busy = true; ac.lean(i < 2 ? 1 : -1)
       d3tw(ctx, 1.15 + (i % 2) * 0.1, (k) => {
         const e = 1 - Math.pow(1 - k, 3)
         d.m.position.x = from.x + (d.x - from.x) * e; d.m.position.z = from.z + (d.z - from.z) * e
@@ -4230,7 +4377,8 @@ function d3DiceTable(ctx) {
   }
 }
 
-function DiceDuel({ rep, lv, onBack }) {
+function DiceDuel({ user, rep, lv, onBack }) {
+  const av = d3me(user), botB = useMemo(() => d3rand(), [])
   const [pd, setPd] = useState([1, 2]), [bd, setBd] = useState([3, 4]), [sc, setSc] = useState([0, 0]), [ph, setPh] = useState('idle'), [msg, setMsg] = useState('Roll to begin. First to 3 round wins.'), [res, setRes] = useState(null), [used, setUsed] = useState(false)
   const A = useRef(null), tm = useRef([]), r6 = () => rint(1, 6)
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
@@ -4238,7 +4386,7 @@ function DiceDuel({ rep, lv, onBack }) {
   const roll = () => {
     if (ph !== 'idle') return
     const b = [r6(), r6()], p = [r6(), r6()]
-    setPd(p); setBd(b); setUsed(false); setPh('rolling'); setMsg('Rolling…')
+    A.current && A.current.calm(); setPd(p); setBd(b); setUsed(false); setPh('rolling'); setMsg('Rolling…')
     if (A.current) { A.current.toss(0, b[0]); A.current.toss(1, b[1]); A.current.toss(2, p[0]); A.current.toss(3, p[1]) }
     later(() => { setPh('pick'); setMsg('Click one of your dice to reroll it (once), or keep.'); A.current && A.current.hl(true) }, 1500)
   }
@@ -4248,7 +4396,7 @@ function DiceDuel({ rep, lv, onBack }) {
     later(() => {
       const p = a[0] + a[1], q = bb[0] + bb[1]; let n = sc
       if (p > q) { n = [sc[0] + 1, sc[1]]; setMsg(`You win the round, ${p} to ${q}!`) } else if (q > p) { n = [sc[0], sc[1] + 1]; setMsg(`Bot wins the round, ${q} to ${p}.`) } else setMsg(`Tie at ${p}, roll again.`)
-      setSc(n)
+      A.current && A.current.react(p > q ? 'P' : q > p ? 'B' : null); setSc(n)
       if (n[0] >= 3 || n[1] >= 3) { const win = n[0] >= 3; later(() => setRes({ win, ...rep(win, 25) }), 900); setPh('end') } else later(() => setPh('idle'), 1100)
     }, 1500)
   }
@@ -4259,7 +4407,7 @@ function DiceDuel({ rep, lv, onBack }) {
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Dice Duel</h3>
       <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
       <div className="d3-wrap">
-        <Stage3D build={d3DiceTable} height="22rem" onPointer={click} onReady={(a) => { A.current = a; a.show(bd, pd) }} />
+        <Stage3D build={d3DiceTable} height="22rem" onPointer={click} onReady={(a) => { A.current = a; a.show(bd, pd); a.who(botB, av) }} />
         <div className="d3-top"><span>Bot · {ph === 'rolling' ? '?' : bd[0] + bd[1]}</span><span>You · {ph === 'rolling' ? '?' : pd[0] + pd[1]}</span></div>
       </div>
       <div className="du-log">{msg}</div>
@@ -4374,7 +4522,8 @@ function d3Clash(ctx) {
     return { g, m, back, l, x, tgt: 0, shake: false, dim: 0 }
   }
   const C = { B: mk(-3.2), P: mk(3.2) }
-  cam.position.set(0, 5.2, 10.5)
+  const act = { B: d3actor(ctx, -6.4, 0.1, -0.2, 0.55, 3.2), P: d3actor(ctx, 6.4, 0.1, -0.2, -0.55, 3.2) }
+  cam.position.set(0, 5.4, 11.8)
   ctx.tick.push((dt, t) => {
     cam.lookAt(0, 2.2, 0); cam.position.x = Math.sin(t * 0.3) * 0.7
     ;['B', 'P'].forEach((s) => {
@@ -4386,19 +4535,22 @@ function d3Clash(ctx) {
     })
   })
   return {
+    who(b, p) { act.B.set(b); act.P.set(p) },
     face(side, m) { const c = C[side]; c.back.map = FACE[m] || FACE['?']; c.back.needsUpdate = true },
-    shake(on) { C.B.shake = C.P.shake = on },
+    shake(on) { C.B.shake = C.P.shake = on; act.B.pump = act.P.pump = on ? 0.5 : 0 },
     reveal(w) {
       C.B.tgt = C.P.tgt = Math.PI
       setTimeout(() => {
+        if (w) { act[w].cheer(); act[w === 'P' ? 'B' : 'P'].down = true }
         ;['B', 'P'].forEach((s) => { const c = C[s]; c.dim = w && w !== s ? 1 : 0; if (w === s) { c.l.intensity = 4; d3burst(ctx, new THREE.Vector3(c.x, 2.8, 1), 0xffd34d, 60, 5); d3wave(ctx, new THREE.Vector3(c.x, 0, 0), 0xffd34d, 4) } })
         if (!w) { ctx.shake = 0.6; d3burst(ctx, new THREE.Vector3(0, 2.5, 1), 0xffffff, 30, 3) } else ctx.shake = 1
       }, 380)
     },
-    hide() { C.B.tgt = C.P.tgt = 0; ;['B', 'P'].forEach((s) => { C[s].dim = 0; C[s].l.intensity = 0 }) },
+    hide() { C.B.tgt = C.P.tgt = 0; act.B.down = act.P.down = false; ;['B', 'P'].forEach((s) => { C[s].dim = 0; C[s].l.intensity = 0 }) },
   }
 }
-function Clash({ rep, lv, onBack }) {
+function Clash({ user, rep, lv, onBack }) {
+  const av = d3me(user), botB = useMemo(() => d3rand(), [])
   const [sc, setSc] = useState([0, 0]), [busy, setBusy] = useState(false), [msg, setMsg] = useState('Pick your move. First to 3 wins.'), [res, setRes] = useState(null), hist = useRef([]), tm = useRef([]), A = useRef(null)
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
   const play = (m) => {
@@ -4417,7 +4569,7 @@ function Clash({ rep, lv, onBack }) {
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Clash</h3>
       <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
-      <div className="d3-wrap"><Stage3D build={d3Clash} height="22rem" onReady={(a) => { A.current = a }} />
+      <div className="d3-wrap"><Stage3D build={d3Clash} height="22rem" onReady={(a) => { A.current = a; a.who(botB, av) }} />
         <div className="d3-top"><span>Bot</span><span>You</span></div></div>
       <div className="du-log">{msg}</div>
       <div className="du-acts">{RPS.map(([k, e, n]) => <button key={k} disabled={busy} onClick={() => play(k)}>{e} {n}</button>)}</div>
@@ -4442,9 +4594,10 @@ function d3Memory(ctx) {
     const bgp = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.1), new THREE.MeshBasicMaterial({ color: 0x1b2266 })); bgp.position.z = -0.055; bgp.rotation.y = Math.PI; inn.add(bgp)
     cards.push({ piv, inn, box, fm, fr, tgt: 0, m: false, y0: piv.position.y })
   }
-  cam.position.set(0, 0, 15.5)
+  const act = { P: d3actor(ctx, -3.8, -7.0, 1.5, 0.35, 1.9, 24), B: d3actor(ctx, 3.8, -7.0, 1.5, -0.35, 1.9, 24) }
+  cam.position.set(0, 0.6, 18.5)
   ctx.tick.push((dt, t) => {
-    cam.lookAt(0, 0, 0); cam.position.x = Math.sin(t * 0.3) * 0.5
+    cam.lookAt(0, -0.4, 0); cam.position.x = Math.sin(t * 0.3) * 0.5
     cards.forEach((c, i) => {
       c.inn.rotation.y += (c.tgt - c.inn.rotation.y) * Math.min(1, dt * 10)
       c.inn.position.z = Math.sin(Math.min(1, Math.abs(c.tgt - c.inn.rotation.y) / Math.PI) * Math.PI) * 1.2
@@ -4453,27 +4606,34 @@ function d3Memory(ctx) {
     })
   })
   return {
-    setIds(ids) { ids.forEach((id, i) => { const t = d3tex(THREE, id); cards[i].fm.map = t; cards[i].fr.visible = !!t; cards[i].fm.needsUpdate = true }) },
+    who(p, b) { act.P.set(p); act.B.set(b) },
+    turn(s) { act.P.pump = s === 'P' ? 0.25 : 0; act.B.pump = s === 'B' ? 0.25 : 0 },
+    hopFor(s) { act[s].hop() },
+    cheerFor(s) { act[s].cheer() },
+    setIds(ids) { ids.forEach((id, i) => { cards[i].fm.map = d3flatTex(THREE, id); cards[i].fr.visible = true; cards[i].fm.needsUpdate = true }) },
     sync(cs) { cs.forEach((c, i) => { const k = cards[i], up = c.f || c.m; if (c.m && !k.m) { const p = k.piv.position; d3burst(ctx, new THREE.Vector3(p.x, p.y, 1), 0x7dffb0, 24, 3) } k.tgt = up ? Math.PI : 0; k.m = c.m }) },
     pick(e) { const h = d3ray(ctx, e).intersectObjects(cards.map((c) => c.box))[0]; return h ? cards.findIndex((c) => c.box === h.object) : -1 },
   }
 }
-function MemoryMatch({ rep, lv, onBack }) {
+function MemoryMatch({ user, rep, lv, onBack }) {
+  const av = d3me(user), botB = useMemo(() => d3rand(), [])
   const mk = () => { const pool = BLOOKS.filter((b) => b.rarity !== 'owner' && !b.id.startsWith('cd_')), ids = []; while (ids.length < 8) { const b = pool[rint(0, pool.length - 1)]; if (!ids.includes(b.id)) ids.push(b.id) } return [...ids, ...ids].sort(() => Math.random() - 0.5).map((id) => ({ id, f: false, m: false })) }
   const [st, setSt] = useState(() => ({ cards: mk(), sel: [], turn: 'p', sc: [0, 0], busy: false, done: false })), [res, setRes] = useState(null), [api, setApi] = useState(null), R = useRef(st), seen = useRef(new Set()), tm = useRef([]); R.current = st
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
   const key = st.cards.map((c) => c.id).join(',')
   useEffect(() => { if (api) api.setIds(st.cards.map((c) => c.id)) }, [api, key])
   useEffect(() => { if (api) api.sync(st.cards) }, [api, st.cards])
+  useEffect(() => { if (api) api.who(av, botB) }, [api])
+  useEffect(() => { if (api) api.turn(st.turn === 'p' ? 'P' : 'B') }, [api, st.turn])
   const flip = (i, who) => {
     const s = R.current; if (s.busy || s.done || s.cards[i].f || s.cards[i].m || s.sel.length >= 2) return
-    seen.current.add(i); const cards = s.cards.map((c, k) => (k === i ? { ...c, f: true } : c)), sel = [...s.sel, i]
+    seen.current.add(i); api && api.hopFor(who === 'p' ? 'P' : 'B'); const cards = s.cards.map((c, k) => (k === i ? { ...c, f: true } : c)), sel = [...s.sel, i]
     if (sel.length < 2) { setSt({ ...s, cards, sel }); return }
     setSt({ ...s, cards, sel, busy: true })
     tm.current.push(setTimeout(() => {
       const c = R.current, [a, b] = sel, ok = c.cards[a].id === c.cards[b].id, sc = [...c.sc]
       const cs = c.cards.map((x, k) => (k === a || k === b ? { ...x, f: ok, m: ok } : x))
-      if (ok) sc[who === 'p' ? 0 : 1]++
+      if (ok) { sc[who === 'p' ? 0 : 1]++; api && api.cheerFor(who === 'p' ? 'P' : 'B') }
       const done = cs.every((x) => x.m)
       setSt({ cards: cs, sel: [], turn: ok ? who : who === 'p' ? 'b' : 'p', sc, busy: false, done })
       if (done) tm.current.push(setTimeout(() => { const w = sc[0] > sc[1]; if (sc[0] === sc[1]) setRes({ win: false, gain: 0, tok: 0, tie: true }); else setRes({ win: w, ...rep(w, 25) }) }, 900))
@@ -4526,11 +4686,29 @@ function d3Range(ctx) {
     cam.lookAt(0, 0, 0); neon.forEach((n, i) => { n.material.color.offsetHSL(0, 0, 0) ; n.position.x = Math.sin(t * 0.5 + i) * 0.6 })
     const now = performance.now()
     T.forEach((o) => {
-      const age = (now - o.at) / 1000, life = o.life / 1000, pop = Math.min(1, age / 0.18), back = 1 + 2.2 * Math.pow(pop - 1, 3) + 1.2 * Math.pow(pop - 1, 2), fade = age > life * 0.78 ? Math.max(0, 1 - (age - life * 0.78) / (life * 0.22)) : 1
+      const age = (now - o.at) / 1000, life = o.life / 1000, pop = Math.min(1, age / 0.18), back = 1 + 2.2 * Math.pow(pop - 1, 3) + 1.2 * Math.pow(pop - 1, 2), fade = o.claimed ? 1 : age > life * 0.78 ? Math.max(0, 1 - (age - life * 0.78) / (life * 0.22)) : 1
       o.g.scale.setScalar(Math.max(0.01, back * fade)); o.g.rotation.y = Math.sin(t * 2.4 + o.id) * 0.3; o.g.position.y = o.y + Math.sin(t * 2 + o.id) * 0.12
     })
   })
+  const mkTh = (dir) => { const g = new THREE.Group(), b = new THREE.Group(), mt = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x161616 }); b.position.y = 1.2; b.rotation.y = dir * 0.6; g.add(b); scene.add(g); return { g, b, dir, th: 0, set: d3bodySetter(ctx, b, mt, 2.4, 32) } }
+  const TH = [mkTh(1), mkTh(-1)]
+  ctx.tick.push((dt, t) => TH.forEach((h) => { h.g.position.set(-h.dir * Math.min(cam.aspect, 2.2) * 4.14 * 0.82, -3.0, 2.2); if (!h.th) { h.b.position.y = 1.2 + Math.sin(t * 2.2 + h.dir) * 0.07; h.b.rotation.z = 0 } }))
+  const mkDart = () => { const g = new THREE.Group(), mt = new THREE.MeshLambertMaterial({ color: 0xe8e8f4 }), sh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), mt); sh.rotation.x = Math.PI / 2; g.add(sh); const tip = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0xffd34d })); tip.rotation.x = Math.PI / 2; tip.position.z = 0.55; g.add(tip); const fm = new THREE.MeshLambertMaterial({ color: 0xff3d81, side: THREE.DoubleSide }); const f1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.22), fm), f2 = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.4, 0.22), fm); f1.position.z = f2.position.z = -0.4; g.add(f1); g.add(f2); return g }
+  const fling = (o, h) => {
+    o.claimed = true
+    const start = new THREE.Vector3(h.g.position.x + h.dir * 0.9, h.g.position.y + 1.7, h.g.position.z), end = o.g.position.clone(); end.z += 0.14
+    const dart = mkDart(); dart.position.copy(start); scene.add(dart); dart.lookAt(end); h.th++
+    d3tw(ctx, 0.25, (k) => { h.b.rotation.z = -h.dir * Math.sin(k * Math.PI) * 0.45; h.b.position.y = 1.2 + Math.sin(k * Math.PI) * 0.35 }, () => { h.th-- })
+    d3tw(ctx, 0.3, (k) => { dart.position.lerpVectors(start, end, k); dart.position.y += Math.sin(k * Math.PI) * 0.7 }, () => {
+      dart.position.copy(end); o.g.attach(dart); d3burst(ctx, o.g.position.clone(), 0xffd34d, 30, 4); d3wave(ctx, new THREE.Vector3(o.g.position.x, -4.3, o.g.position.z), 0xff3d81, 2); ctx.shake = 0.5
+      setTimeout(() => { scene.remove(o.g); T.delete(o.id) }, 380)
+    })
+  }
   return {
+    setAvatar(id) { TH[0].set(id) },
+    setBot(id) { TH[1].set(id) },
+    throwAt(id) { const o = T.get(id); if (!o || o.claimed) return false; fling(o, TH[0]); return true },
+    botThrow() { const c = [...T.values()].filter((o) => !o.claimed); if (c.length) fling(c[rint(0, c.length - 1)], TH[1]) },
     sync(list, life) {
       const ids = new Set(list.map((x) => x.id)), hw = 4.14 * Math.min(cam.aspect, 2.2) * 0.88, hh = 4.14 * 0.82
       list.forEach((x) => { if (T.has(x.id)) return
@@ -4538,14 +4716,13 @@ function d3Range(ctx) {
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 6, 6), side); pole.position.y = -3.4; g.add(pole)
         const px = ((x.x - 46) / 46) * hw, py = ((40 - x.y) / 40) * hh * 0.9; g.position.set(px, py, -(x.id % 3) * 1.1); scene.add(g)
         T.set(x.id, { g, id: x.id, at: x.at, life, y: py, r, col: 0xffd34d }) })
-      T.forEach((o, id) => { if (!ids.has(id)) { scene.remove(o.g); T.delete(id) } })
+      T.forEach((o, id) => { if (!ids.has(id) && !o.claimed) { scene.remove(o.g); T.delete(id) } })
     },
-    pop(id) { const o = T.get(id); if (!o) return; d3burst(ctx, o.g.position.clone(), 0xffd34d, 36, 4.5); d3wave(ctx, new THREE.Vector3(o.g.position.x, -4.3, o.g.position.z), 0xff3d81, 2) },
-    pick(e) { const rc = d3ray(ctx, e); let best = null, bd = 1e9; T.forEach((o) => { const h = rc.intersectObject(o.g, true)[0]; if (h && h.distance < bd) { bd = h.distance; best = o.id } }); return best },
+    pick(e) { const rc = d3ray(ctx, e); let best = null, bd = 1e9; T.forEach((o) => { if (o.claimed) return; const h = rc.intersectObject(o.g, true)[0]; if (h && h.distance < bd) { bd = h.distance; best = o.id } }); return best },
     clear() { T.forEach((o) => scene.remove(o.g)); T.clear() },
   }
 }
-function Sharpshooter({ rep, lv, onBack }) {
+function Sharpshooter({ user, rep, lv, onBack }) {
   const T = 20, life = [1500, 1150, 850][lv], [phase, setPhase] = useState('idle'), [t, setT] = useState(T), [score, setScore] = useState(0), [tg, setTg] = useState([]), [res, setRes] = useState(null), [api, setApi] = useState(null), botF = useRef(0), id = useRef(0), sc = useRef(0), tgr = useRef([]); tgr.current = tg
   const start = () => { botF.current = [11, 16, 22][lv] + rint(-2, 2); sc.current = 0; setScore(0); setTg([]); setT(T); setPhase('go') }
   useEffect(() => { if (api) api.sync(tg, life) }, [api, tg])
@@ -4559,8 +4736,14 @@ function Sharpshooter({ rep, lv, onBack }) {
     const sp = setInterval(() => setTg((a) => [...a.slice(-4), { id: ++id.current, x: rint(6, 86), y: rint(8, 78), at: performance.now(), s: rint(46, 70) }]), [700, 600, 480][lv])
     return () => { clearInterval(iv); clearInterval(sp) }
   }, [phase])
-  const shoot = (e) => { if (phase !== 'go' || !api) return; const i = api.pick(e); if (i == null) return; api.pop(i); sc.current++; setScore(sc.current); setTg((a) => a.filter((y) => y.id !== i)) }
+  const av = user && user.avatar && byId(user.avatar) ? user.avatar : (user && user.inv && user.inv[0]) || 'toast'
+  useEffect(() => { if (api) api.setAvatar(av) }, [api])
+  const botB = useMemo(() => d3rand(), [])
+  useEffect(() => { if (api) api.setBot(botB) }, [api])
+  const shoot = (e) => { if (phase !== 'go' || !api) return; const i = api.pick(e); if (i == null || !api.throwAt(i)) return; sc.current++; setScore(sc.current); setTg((a) => a.filter((y) => y.id !== i)) }
   const bot = Math.round(botF.current * Math.min(1, (T - t) / T))
+  const lastBot = useRef(0)
+  useEffect(() => { if (api && phase === 'go' && bot > lastBot.current) api.botThrow(); lastBot.current = phase === 'go' ? bot : 0 }, [bot, phase])
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Sharpshooter</h3>
       <div className="du-score"><span>You <b>{score}</b></span><span className="chunk">⏱ {t.toFixed(1)}s</span><span>Bot <b>{phase === 'idle' ? 0 : bot}</b></span></div>
@@ -4586,22 +4769,25 @@ function d3C4(ctx) {
   ;[-1, 1].forEach((sx) => { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 1.6), new THREE.MeshStandardMaterial({ color: 0x1a2cae })); leg.position.set(sx * (W / 2 + 0.1), -H / 2 - 0.35, 0); scene.add(leg) })
   const disc = (p, op = 1) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 36), new THREE.MeshStandardMaterial({ color: p === 1 ? 0xff3d81 : 0x38e8ff, emissive: p === 1 ? 0xff3d81 : 0x38e8ff, emissiveIntensity: 0.35, roughness: 0.3, transparent: op < 1, opacity: op })); m.rotation.x = Math.PI / 2; m.castShadow = true; return m }
   let ghost = null, discs = []
-  cam.position.set(0, 1, 14.5)
+  const act = [d3actor(ctx, -6.9, -4.1, 0.6, 0.6, 3.3), d3actor(ctx, 6.9, -4.1, 0.6, -0.6, 3.3)]
+  cam.position.set(0, 1, 15.5)
   ctx.tick.push((dt, t) => { cam.lookAt(0, 0.3, 0); cam.position.x = Math.sin(t * 0.3) * 1.2; if (ghost) ghost.position.y = H / 2 + 1.1 + Math.sin(t * 4) * 0.08 })
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
   return {
     col(e) { const pt = new THREE.Vector3(); if (!d3ray(ctx, e).ray.intersectPlane(plane, pt)) return -1; const c = Math.floor(pt.x / S + 3.5); return c < 0 || c > 6 ? -1 : c },
     hover(c, p) { if (ghost) { scene.remove(ghost); ghost = null } if (c >= 0 && p) { ghost = disc(p, 0.5); ghost.position.set((c - 3) * S, H / 2 + 1.1, 0); scene.add(ghost) } },
     drop(c, r, p) {
-      const d = disc(p); d.position.set((c - 3) * S, H / 2 + 1.2, 0); scene.add(d); discs.push(d)
-      const ty = (2.5 - r) * S, y0 = d.position.y
-      d3tw(ctx, 0.25 + Math.sqrt((y0 - ty) / 9) * 0.45, (k) => { d.position.y = y0 + (ty - y0) * k * k }, () => { d3tw(ctx, 0.22, (k) => { d.position.y = ty + Math.sin(k * Math.PI) * 0.22 }, () => { d.position.y = ty; d3burst(ctx, new THREE.Vector3(d.position.x, ty - 0.3, 0.4), p === 1 ? 0xff3d81 : 0x38e8ff, 12, 2) }) })
+      const a = act[p - 1], d = disc(p), cx = (c - 3) * S, sx = a.g.position.x, sy = -1.2; d.position.set(sx, sy, 0.6); scene.add(d); discs.push(d); a.lean(p === 1 ? 1 : -1)
+      const ty = (2.5 - r) * S, y0 = H / 2 + 1.2
+      d3tw(ctx, 0.35, (k) => { d.position.x = sx + (cx - sx) * k; d.position.y = sy + (y0 - sy) * k + Math.sin(k * Math.PI) * 1.2; d.position.z = 0.6 * (1 - k) }, () => d3tw(ctx, 0.25 + Math.sqrt((y0 - ty) / 9) * 0.45, (k) => { d.position.y = y0 + (ty - y0) * k * k }, () => { d3tw(ctx, 0.22, (k) => { d.position.y = ty + Math.sin(k * Math.PI) * 0.22 }, () => { d.position.y = ty; d3burst(ctx, new THREE.Vector3(d.position.x, ty - 0.3, 0.4), p === 1 ? 0xff3d81 : 0x38e8ff, 12, 2) }) }))
     },
-    win(p) { ctx.shake = 1.4; d3burst(ctx, new THREE.Vector3(0, 0, 1), p === 1 ? 0xff3d81 : 0x38e8ff, 120, 8); d3burst(ctx, new THREE.Vector3(0, 2, 1), 0xffd34d, 80, 7) },
-    clear() { discs.forEach((d) => scene.remove(d)); discs = [] },
+    who(a, b) { act[0].set(a); act[1].set(b) },
+    win(p) { act[p - 1].cheer(); act[2 - p].down = true; ctx.shake = 1.4; d3burst(ctx, new THREE.Vector3(0, 0, 1), p === 1 ? 0xff3d81 : 0x38e8ff, 120, 8); d3burst(ctx, new THREE.Vector3(0, 2, 1), 0xffd34d, 80, 7) },
+    clear() { discs.forEach((d) => scene.remove(d)); discs = []; act.forEach((a) => { a.down = false }) },
   }
 }
-function ConnectFour({ rep, lv, onBack }) {
+function ConnectFour({ user, rep, lv, onBack }) {
+  const av = d3me(user), botB = useMemo(() => d3rand(), [])
   const [b, setB] = useState(() => Array(42).fill(0)), [turn, setTurn] = useState(1), [res, setRes] = useState(null), [msg, setMsg] = useState('Your move: pick a column.'), [hov, setHov] = useState(-1), [api, setApi] = useState(null), done = useRef(false)
   const place = (c, p) => {
     const r = c4drop(b, c, p); if (!r) return; const [nb, row] = r; setB(nb); api && api.drop(c, row, p)
@@ -4618,7 +4804,7 @@ function ConnectFour({ rep, lv, onBack }) {
   const click = (e) => { if (!api || turn !== 1 || done.current) return; const c = api.col(e); if (c >= 0 && !b[c]) { setHov(-1); place(c, 1) } }
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Connect Four</h3>
-      <div className="d3-wrap" style={{ cursor: turn === 1 ? 'pointer' : 'wait' }}><Stage3D build={d3C4} height="30rem" onReady={setApi} onPointer={click} onMove={(e) => api && setHov(api.col(e))} onLeave={() => setHov(-1)} /></div>
+      <div className="d3-wrap" style={{ cursor: turn === 1 ? 'pointer' : 'wait' }}><Stage3D build={d3C4} height="30rem" onReady={(a) => { a.who(av, botB); setApi(a) }} onPointer={click} onMove={(e) => api && setHov(api.col(e))} onLeave={() => setHov(-1)} /></div>
       <div className="du-log">{msg}</div>
       {res && <DuelEnd {...res} onAgain={() => { setRes(null); done.current = false; setB(Array(42).fill(0)); setTurn(1); api && api.clear(); setMsg('Your move: pick a column.') }} onBack={onBack} />}
     </div>
