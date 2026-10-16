@@ -4068,11 +4068,8 @@ function d3blookCanvas(id) {
     }
     const put = (im) => { const r = Math.min(S / im.naturalWidth, S / im.naturalHeight), w = im.naturalWidth * r, h = im.naturalHeight * r; g.drawImage(im, (S - w) / 2, (S - h) / 2, w, h) }
     if (ims.length === 2 && ims[1]) { g.save(); g.beginPath(); g.rect(0, 0, S / 2, S); g.clip(); put(ims[0]); g.restore(); g.save(); g.beginPath(); g.rect(S / 2, 0, S / 2, S); g.clip(); put(ims[1]); g.restore() } else put(ims[0])
-    try {
-      if (b.rarity === 'zero' && b.inv) d3fx(cv, b.hue != null ? b : { inv: true, hue: 180 })
-      else if (b.hue != null) d3fx(cv, b)
-      if (b.rarity === 'zero') d3zeroTint(cv)
-    } catch (e) {}
+    try { if (b.rarity === 'zero' && b.inv) d3fx(cv, b.hue != null ? b : { inv: true, hue: 180 }); else if (b.hue != null) d3fx(cv, b) } catch (e) { console.warn('blook fx', e) }
+    if (b.rarity === 'zero') { try { d3zeroTint(cv) } catch (e) { console.warn('zero tint', e) } }
     return cv
   })()
   d3cache.cv.set(id, p); return p
@@ -4117,16 +4114,118 @@ function d3aura(ctx, parent, H, mat) { // fire on one side, ice on the other: fo
   ctx.tick.push(f)
   return { off() { if (mat) mat.emissive.setHex(0x161616); const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1); A.forEach((a) => { parent.remove(a.pts); a.g.dispose(); a.pts.material.dispose() }) } }
 }
+d3cache.puff = new Map()
+function d3puff(THREE, cv, H, zero, id) { // smooth, rounded 3D body in the exact shape of the blook, art on the front
+  const key = id + (zero ? ':z' : ''); if (d3cache.puff.has(key)) return d3cache.puff.get(key)
+  const S = cv.width; let x0 = 0, y0 = 0, x1 = S - 1, y1 = S - 1
+  try {
+    const d = cv.getContext('2d').getImageData(0, 0, S, S).data; x0 = S; y0 = S; x1 = -1; y1 = -1
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+    if (x1 < 0) { x0 = 0; y0 = 0; x1 = S - 1; y1 = S - 1 }
+  } catch (e) {}
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = 72 / Math.max(bw, bh), Gx = Math.max(10, Math.round(bw * sc)), Gy = Math.max(10, Math.round(bh * sc))
+  const cc = document.createElement('canvas'); cc.width = bw; cc.height = bh; cc.getContext('2d').drawImage(cv, x0, y0, bw, bh, 0, 0, bw, bh)
+  const tex = new THREE.CanvasTexture(cc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4
+  const sm = document.createElement('canvas'); sm.width = Gx; sm.height = Gy; const sg = sm.getContext('2d'); sg.drawImage(cc, 0, 0, Gx, Gy)
+  let px = null; try { px = sg.getImageData(0, 0, Gx, Gy).data } catch (e) {}
+  const ins = new Uint8Array(Gx * Gy), dist = new Float32Array(Gx * Gy)
+  for (let k = 0; k < Gx * Gy; k++) ins[k] = px ? (px[k * 4 + 3] > 110 ? 1 : 0) : 1
+  for (let j = 0; j < Gy; j++) for (let i = 0; i < Gx; i++) { const k = j * Gx + i; dist[k] = ins[k] ? (i === 0 || j === 0 || i === Gx - 1 || j === Gy - 1 ? 1 : 1e9) : 0 }
+  const at = (i, j) => (i < 0 || j < 0 || i >= Gx || j >= Gy ? 0 : dist[j * Gx + i])
+  for (let j = 0; j < Gy; j++) for (let i = 0; i < Gx; i++) { const k = j * Gx + i; if (!ins[k]) continue; dist[k] = Math.min(dist[k], at(i - 1, j) + 1, at(i, j - 1) + 1, at(i - 1, j - 1) + 1.414, at(i + 1, j - 1) + 1.414) }
+  for (let j = Gy - 1; j >= 0; j--) for (let i = Gx - 1; i >= 0; i--) { const k = j * Gx + i; if (!ins[k]) continue; dist[k] = Math.min(dist[k], at(i + 1, j) + 1, at(i, j + 1) + 1, at(i + 1, j + 1) + 1.414, at(i - 1, j + 1) + 1.414) }
+  const scale = H / Math.max(bw, bh), W = bw * scale, Hh = bh * scale, T = H * 0.2, R = Math.max(3, Math.round(Math.max(Gx, Gy) * 0.1)), n = Gx * Gy
+  const mk = (back) => {
+    const pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = new Float32Array(n * 3)
+    for (let j = 0; j < Gy; j++) for (let i = 0; i < Gx; i++) {
+      const k = j * Gx + i, u = (i + 0.5) / Gx, v = 1 - (j + 0.5) / Gy, t = Math.min(1, Math.max(0, dist[k] - 1) / R), z = ins[k] ? T * Math.sqrt(1 - (1 - t) * (1 - t)) : 0
+      pos[k * 3] = (u - 0.5) * W; pos[k * 3 + 1] = (v - 0.5) * Hh; pos[k * 3 + 2] = back ? -z : z
+      uv[k * 2] = back ? 1 - u : u; uv[k * 2 + 1] = v
+      const sh = back ? 0.55 : 1; let r = sh, g = sh, b = sh
+      if (zero) { const f = Math.max(0, 1 - u * 1.6), c = Math.max(0, u * 1.6 - 0.6); r = sh * (1 - 0.55 * c); g = sh * (1 - 0.35 * f - 0.15 * c); b = sh * (1 - 0.8 * f) }
+      col[k * 3] = r; col[k * 3 + 1] = g; col[k * 3 + 2] = b
+    }
+    const idx = []
+    for (let j = 0; j < Gy - 1; j++) for (let i = 0; i < Gx - 1; i++) {
+      const a = j * Gx + i, b = a + 1, c = a + Gx, d = c + 1
+      if (!(ins[a] || ins[b] || ins[c] || ins[d])) continue
+      if (back) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d)
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g
+  }
+  const out = { gF: mk(false), gB: mk(true), tex, Hh }; d3cache.puff.set(key, out); return out
+}
+function d3parts(ctx, parent, H, o) { // sparkle / rain / orbit particles
+  const { THREE } = ctx, n = o.n || 36, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), c = new Float32Array(n * 3), ph = [], ox = []
+  for (let i = 0; i < n; i++) { ph.push(Math.random()); ox.push(Math.random()) }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3))
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: o.size || 0.2, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts)
+  const col = new THREE.Color(), base = new THREE.Color(o.color || 0xffffff), alt = o.alt != null ? new THREE.Color(o.alt) : null
+  const f = (dt, t) => {
+    for (let i = 0; i < n; i++) {
+      const k = (ph[i] + t * (o.speed || 0.3)) % 1, a = ph[i] * 6.283 + t * (o.spin || 1.2); let x, y, z
+      if (o.mode === 'fall') { x = (ox[i] - 0.5) * H * 1.5; y = H / 2 + 0.3 - k * H * 1.5; z = (ph[i] - 0.5) * 0.8 + 0.3 }
+      else if (o.mode === 'orbit') { const r = H * 0.6 + ox[i] * 0.4; x = Math.cos(a) * r; y = (k - 0.5) * H * 0.9; z = Math.sin(a) * r }
+      else { x = (ox[i] - 0.5) * H * 1.2; y = -H / 2 + k * H * 1.3; z = (ph[i] - 0.5) * 0.8 + 0.3 }
+      p[i * 3] = x; p[i * 3 + 1] = y; p[i * 3 + 2] = z
+      if (o.rain) col.setHSL((ph[i] + t * 0.25) % 1, 1, 0.6); else if (alt && ph[i] > 0.5) col.copy(alt); else col.copy(base)
+      c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b
+    }
+    g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true
+  }
+  ctx.tick.push(f)
+  return () => { const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1); parent.remove(pts); g.dispose(); pts.material.dispose() }
+}
+function d3special(ctx, body, mat, H, id, top) { // each special blook keeps its special look in 3D (Owner Yoshi crown, Chroma, Matrix, Frost, etc.)
+  const { THREE } = ctx, b = byId(id) || {}, offs = [], fx = b.fxa, r = b.rarity
+  const part = (o) => offs.push(d3parts(ctx, body, H, o))
+  const tk = (f) => { ctx.tick.push(f); offs.push(() => { const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1) }) }
+  const glow = (h, sat = 1, l = 0.22, sp = 3, amp = 0.1) => tk((dt, t) => mat.emissive.setHSL(h(t) % 1, sat, l + amp * Math.sin(t * sp)))
+  const cyc = (t) => (t * 0.25) % 1
+  if (r === 'owner') {
+    const gold = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.8, roughness: 0.25, emissive: 0x553300 }), gem = new THREE.MeshStandardMaterial({ color: 0xff3d3d, emissive: 0x880000 })
+    const cr = new THREE.Group(), band = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.62, 0.26, 20), gold); cr.add(band)
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2, sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.55, 8), gold); sp.position.set(Math.cos(a) * 0.5, 0.4, Math.sin(a) * 0.5); cr.add(sp); const gm = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), gem); gm.position.set(Math.cos(a) * 0.5, 0.72, Math.sin(a) * 0.5); cr.add(gm) }
+    cr.scale.setScalar(H / 2.7 * 1.25); body.add(cr); const baseY = top + 0.15
+    tk((dt, t) => { cr.position.y = baseY + Math.sin(t * 2) * 0.06; cr.rotation.y += dt * 1.2 }); offs.push(() => body.remove(cr))
+    part({ n: 70, mode: 'fall', rain: true, speed: 0.4, size: 0.24 }); glow(cyc, 1, 0.2)
+  } else if (b.id === 'ca_slot') {
+    const sy = ['🍒', '🔔', '💎', '7️⃣', '🍋'], reels = []
+    for (let i = 0; i < 3; i++) { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128); g.font = '84px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(sy[(i * 2) % 5], 64, 70); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshLambertMaterial({ map: t })); m.position.set((i - 1) * 0.65, top + 0.5, 0.3); body.add(m); reels.push(m) }
+    tk((dt, t) => reels.forEach((m, i) => { m.rotation.x += dt * (2 + i); m.position.y = top + 0.5 + Math.sin(t * 3 + i) * 0.08 })); offs.push(() => reels.forEach((m) => body.remove(m)))
+    part({ n: 20, color: 0xffd34d, size: 0.2, mode: 'orbit', speed: 0.2 })
+  } else if (r === 'zero') {
+  } else if (fx === 'fireice') { const au = d3aura(ctx, body, H, mat); offs.push(au.off)
+  } else if (fx === 'rainbow') { part({ n: 60, rain: true, mode: 'fall', speed: 0.4 }); glow(cyc, 1, 0.22)
+  } else if (fx === 'matrix') { part({ n: 60, color: 0x37ff6b, mode: 'fall', speed: 0.7, size: 0.2 }); glow(() => 0.38, 1, 0.16, 6, 0.08)
+  } else if (fx === 'frost') { part({ n: 50, color: 0xbff6ff, mode: 'fall', speed: 0.25, size: 0.2 }); glow(() => 0.53, 0.9, 0.2, 2, 0.08)
+  } else if (fx === 'glitch') { part({ n: 30, color: 0xff3dd1, alt: 0x38f0ff, mode: 'rise', speed: 0.9, size: 0.2 }); tk((dt, t) => { const j = Math.sin(t * 17) > 0.8; mat.emissive.setRGB(j ? 0.5 : 0.09, j ? 0.1 : 0.09, j ? 0.55 : 0.09); body.position.x = j ? (Math.random() - 0.5) * 0.25 : 0 }); offs.push(() => { body.position.x = 0 })
+  } else if (fx === 'gold' || r === 'legendary') { part({ n: 34, color: 0xffd34d, mode: 'rise', speed: 0.3 }); glow(() => 0.12, 1, 0.2, 3, 0.09)
+  } else if (fx === 'cosmic' || r === 'mystical') { part({ n: 40, color: 0xb98cff, alt: 0x6fd0ff, mode: 'orbit', speed: 0.25 }); glow(() => 0.75, 1, 0.2, 2.5, 0.1)
+  } else if (r === 'chroma') { part({ n: 40, rain: true, mode: 'orbit', speed: 0.2, size: 0.18 }); glow(cyc, 1, 0.24)
+  } else if (fx === 'juice') { part({ n: 24, color: 0xffa030, mode: 'rise', speed: 0.45 })
+  } else if (fx === 'pulse') { glow(() => 0.0, 1, 0.16, 4, 0.12)
+  } else if (fx === 'wobble') { part({ n: 20, color: 0x7dff7d, mode: 'orbit', speed: 0.2 })
+  } else if (fx === 'bounce') { part({ n: 20, color: 0xffe44d, mode: 'rise', speed: 0.5 })
+  } else if (r === 'epic') { part({ n: 16, color: 0xd28cff, mode: 'rise', speed: 0.25, size: 0.16 })
+  } else if (b.parts) { part({ n: 24, rain: true, mode: 'orbit', speed: 0.15, size: 0.16 })
+  } else if (b.anim) { glow(() => 0.33, 1, 0.2, 2, 0.1) }
+  return () => { offs.forEach((f) => f()); mat.emissive.setHex(0x161616) }
+}
 function d3bodySetter(ctx, body, mat, H, G) {
-  let cur = 0, vox = null, aura = null
+  let cur = 0, grp = null, aura = null, sp = null
   return (id) => {
     const my = ++cur
-    d3model(id, G).then((m) => {
+    d3blookCanvas(id).then((cv) => {
       if (my !== cur) return
-      if (vox) { body.remove(vox); vox.dispose && vox.dispose() }
-      vox = d3voxel(ctx.THREE, m, mat, H); body.add(vox)
+      const b = byId(id), zero = !!(b && b.rarity === 'zero'), p = d3puff(ctx.THREE, cv, H, zero, id)
+      if (grp) body.remove(grp)
+      mat.map = p.tex; mat.alphaTest = 0.45; mat.vertexColors = true; mat.transparent = true; mat.needsUpdate = true
+      grp = new ctx.THREE.Group(); grp.add(new ctx.THREE.Mesh(p.gF, mat)); grp.add(new ctx.THREE.Mesh(p.gB, mat)); body.add(grp)
       if (aura) { aura.off(); aura = null }
-      const b = byId(id); if (b && b.rarity === 'zero') aura = d3aura(ctx, body, H, mat)
+      if (sp) { sp(); sp = null }
+      if (zero) aura = d3aura(ctx, body, H, mat)
+      else sp = d3special(ctx, body, mat, H, id, p.Hh / 2)
     })
   }
 }
