@@ -3964,7 +3964,10 @@ function d3Load() {
   if (document.getElementById('d3-css')) return
   const s = document.createElement('style'); s.id = 'd3-css'
   s.textContent = `
-  .d3-wrap{position:relative;border-radius:20px;overflow:hidden;border:2px solid var(--line,#3a4090);background:#0a0d2a;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+  .du-pane:has(.d3-wrap){max-width:min(100%,1500px);padding-top:.4rem;padding-bottom:.4rem;gap:.35rem}
+  .du-pane:has(.d3-wrap)>h3{display:none}
+  .du-pane:has(.d3-wrap) .du-score{margin:0}.du-pane:has(.d3-wrap) .du-log{margin:0;min-height:0}.du-pane:has(.d3-wrap) .du-acts{margin:0}
+  .d3-wrap{width:100%;position:relative;border-radius:20px;overflow:hidden;border:2px solid var(--line,#3a4090);background:#0a0d2a;box-shadow:0 18px 40px rgba(0,0,0,.45)}
   .d3-stage{position:relative;width:100%;touch-action:manipulation;user-select:none}
   .d3-stage canvas{display:block;width:100%;height:100%}
   .d3-stage .d3-err{position:absolute;inset:0;display:grid;place-items:center;color:#fff;text-align:center;padding:1rem}
@@ -4212,16 +4215,59 @@ function d3special(ctx, body, mat, H, id, top) { // each special blook keeps its
   } else if (b.anim) { glow(() => 0.33, 1, 0.2, 2, 0.1) }
   return () => { offs.forEach((f) => f()); mat.emissive.setHex(0x161616) }
 }
+d3cache.cube = new Map(); d3cache.cgeo = new Map()
+function d3dom(cv) { // the blook's main colour, used for the cube body
+  try {
+    const S = cv.width, d = cv.getContext('2d').getImageData(0, 0, S, S).data, hist = new Map(); let best = null, bw = 0, sr = 0, sg = 0, sb = 0, sn = 0
+    for (let i = 0; i < d.length; i += 16) {
+      if (d[i + 3] < 200) continue
+      const r = d[i], g = d[i + 1], b = d[i + 2]; sr += r; sg += g; sb += b; sn++
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), lum = (r + g + b) / 3; if (lum < 45 || lum > 238) continue
+      const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4), w = (hist.get(key) || 0) + 1 + ((mx - mn) / (mx || 1)) * 2; hist.set(key, w); if (w > bw) { bw = w; best = key }
+    }
+    if (best != null) return [((best >> 8) & 15) * 16 + 8, ((best >> 4) & 15) * 16 + 8, (best & 15) * 16 + 8]
+    if (sn) return [sr / sn, sg / sn, sb / sn]
+  } catch (e) {}
+  return [255, 140, 50]
+}
+function d3cubeGeo(THREE, S, zero) { // soft rounded cube; front face UVs show the art, every other face is solid colour
+  const key = S.toFixed(2) + (zero ? 'z' : ''); if (d3cache.cgeo.has(key)) return d3cache.cgeo.get(key)
+  const g = new THREE.BoxGeometry(S, S, S, 10, 10, 10), pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, n = pos.count, r = S * 0.2, h = S / 2 - r, per = 121, col = new Float32Array(n * 3), v = new THREE.Vector3(), q = new THREE.Vector3()
+  const cl = (x) => Math.max(-h, Math.min(h, x))
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(pos, i); q.set(cl(v.x), cl(v.y), cl(v.z)); v.sub(q)
+    if (v.lengthSq() > 1e-9) { v.normalize(); nor.setXYZ(i, v.x, v.y, v.z); pos.setXYZ(i, q.x + v.x * r, q.y + v.y * r, q.z + v.z * r) }
+    const f = Math.floor(i / per), x = pos.getX(i), y = pos.getY(i)
+    if (f === 4) uv.setXY(i, x / S + 0.5, y / S + 0.5); else uv.setXY(i, 0.02, 0.02)
+    const sh = f === 5 ? 0.78 : f === 4 ? 1 : 0.9, u = x / S + 0.5
+    let cr = sh, cg = sh, cb = sh
+    if (zero) { const fi = Math.max(0, 1 - u * 1.6), ic = Math.max(0, u * 1.6 - 0.6); cr = sh * (1 - 0.5 * ic); cg = sh * (1 - 0.3 * fi - 0.12 * ic); cb = sh * (1 - 0.75 * fi) }
+    col[i * 3] = cr; col[i * 3 + 1] = cg; col[i * 3 + 2] = cb
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); pos.needsUpdate = true; nor.needsUpdate = true; uv.needsUpdate = true
+  d3cache.cgeo.set(key, g); return g
+}
+function d3cube(THREE, cv, H, zero, id) { // every blook is a cube: body in its main colour, its art as the face
+  const key = id + (zero ? ':z' : '') + ':' + H; if (d3cache.cube.has(key)) return d3cache.cube.get(key)
+  const S = H * 0.86, c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), col = d3dom(cv)
+  g.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`; g.fillRect(0, 0, 256, 256)
+  const W = cv.width; let x0 = 0, y0 = 0, x1 = W - 1, y1 = W - 1
+  try { const d = cv.getContext('2d').getImageData(0, 0, W, W).data; x0 = W; y0 = W; x1 = -1; y1 = -1; for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y } if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = W - 1 } } catch (e) {}
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = Math.min(180 / bw, 180 / bh), dw = bw * sc, dh = bh * sc
+  g.imageSmoothingQuality = 'high'; g.drawImage(cv, x0, y0, bw, bh, (256 - dw) / 2, (256 - dh) / 2, dw, dh)
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4
+  const out = { geo: d3cubeGeo(THREE, S, zero), tex, Hh: S }; d3cache.cube.set(key, out); return out
+}
 function d3bodySetter(ctx, body, mat, H, G) {
   let cur = 0, grp = null, aura = null, sp = null
   return (id) => {
     const my = ++cur
     d3blookCanvas(id).then((cv) => {
       if (my !== cur) return
-      const b = byId(id), zero = !!(b && b.rarity === 'zero'), p = d3puff(ctx.THREE, cv, H, zero, id)
+      const b = byId(id), zero = !!(b && b.rarity === 'zero'), p = d3cube(ctx.THREE, cv, H, zero, id)
       if (grp) body.remove(grp)
-      mat.map = p.tex; mat.alphaTest = 0.45; mat.vertexColors = true; mat.transparent = true; mat.needsUpdate = true
-      grp = new ctx.THREE.Group(); grp.add(new ctx.THREE.Mesh(p.gF, mat)); grp.add(new ctx.THREE.Mesh(p.gB, mat)); body.add(grp)
+      mat.map = p.tex; mat.alphaTest = 0; mat.vertexColors = true; mat.transparent = true; mat.needsUpdate = true
+      grp = new ctx.THREE.Group(); grp.add(new ctx.THREE.Mesh(p.geo, mat)); body.add(grp)
       if (aura) { aura.off(); aura = null }
       if (sp) { sp(); sp = null }
       if (zero) aura = d3aura(ctx, body, H, mat)
@@ -4281,6 +4327,22 @@ function d3actor(ctx, x, y, z, ry, H = 2.6, G = 30) { // a 3D blook that plays t
   A.lean = (dir) => run(0.4, (k) => { body.rotation.z = -dir * Math.sin(k * Math.PI) * 0.4; body.position.y = H / 2 + Math.sin(k * Math.PI) * 0.3 })
   A.cheer = () => { A.down = false; run(1.0, (k) => { body.position.y = H / 2 + Math.abs(Math.sin(k * Math.PI * 2)) * 0.9; body.rotation.y = ry + k * Math.PI * 2; body.rotation.z = 0 }) }
   return A
+}
+// ===== Duel match layer: every duel talks to a "match". Today it is you vs a bot; online later plugs in here. =====
+// A match = { id, game, mode:'local'|'online', seed, rng(), players:[{slot,uid,name,blook,bot}], send(move), onMove(cb), emit(move), close() }
+// To go online later: set DUEL_NET.transport = { send(matchId, msg), listen(matchId, cb) } (e.g. a Firestore adapter) and
+// create the match with d3match(game, user, { opponent: {uid,name,blook}, seed }) so both players share one seed and exchange moves via send/onMove.
+const DUEL_NET = { enabled: false, transport: null }
+const d3seed = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+function d3match(game, user, opts) {
+  const o = opts || {}, seed = o.seed || (Math.random() * 4294967296) >>> 0, subs = new Set()
+  const me = { slot: 0, uid: (user && user.name) || 'you', name: (user && user.name) || 'You', blook: d3me(user), bot: false }
+  const opp = o.opponent ? { slot: 1, bot: false, ...o.opponent } : { slot: 1, uid: 'bot', name: 'Bot', blook: d3rand(), bot: true }
+  const m = { id: game + '-' + seed, game, mode: o.opponent ? 'online' : 'local', seed, rng: d3seed(seed), players: [me, opp],
+    send(move) { if (m.mode === 'online' && DUEL_NET.enabled && DUEL_NET.transport) DUEL_NET.transport.send(m.id, { slot: 0, move, t: Date.now() }) },
+    onMove(cb) { subs.add(cb); return () => subs.delete(cb) }, emit(move) { subs.forEach((f) => f(move)) }, close() { subs.clear() } }
+  if (m.mode === 'online' && DUEL_NET.enabled && DUEL_NET.transport) DUEL_NET.transport.listen(m.id, (msg) => { if (msg && msg.slot !== 0) m.emit(msg.move) })
+  return m
 }
 function d3fighter(ctx, x, flip, baseColor = 0x2a2f6b) {
   const { THREE } = ctx, g = new THREE.Group(); g.position.set(x, 0, 0)
@@ -4402,7 +4464,7 @@ function BlookBattle({ user, rep, lv, onBack }) {
     <div className="du-pane">
       <button className="du-back" onClick={onBack}>← Games</button>
       <div className="d3-wrap">
-        <Stage3D build={d3Arena} height="23rem" onReady={setApi} />
+        <Stage3D build={d3Arena} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={setApi} />
         {[['P', f.P, 'l'], ['B', f.B, 'r']].map(([k, x, side]) => (
           <div key={k} className={`d3-hud ${side}`}><div className="du-name">{x.name}{x.g ? ' 🛡️' : ''}</div>{bar(x)}<div className="du-pips">{[0, 1, 2].map((i) => <b key={i} className={x.ch > i ? 'on' : ''} />)}</div></div>
         ))}
@@ -4477,7 +4539,8 @@ function d3DiceTable(ctx) {
 }
 
 function DiceDuel({ user, rep, lv, onBack }) {
-  const av = d3me(user), botB = useMemo(() => d3rand(), [])
+  const M = useMemo(() => d3match('dice', user), []), av = M.players[0].blook, botB = M.players[1].blook
+  useEffect(() => () => M.close(), [])
   const [pd, setPd] = useState([1, 2]), [bd, setBd] = useState([3, 4]), [sc, setSc] = useState([0, 0]), [ph, setPh] = useState('idle'), [msg, setMsg] = useState('Roll to begin. First to 3 round wins.'), [res, setRes] = useState(null), [used, setUsed] = useState(false)
   const A = useRef(null), tm = useRef([]), r6 = () => rint(1, 6)
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
@@ -4506,7 +4569,7 @@ function DiceDuel({ user, rep, lv, onBack }) {
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Dice Duel</h3>
       <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
       <div className="d3-wrap">
-        <Stage3D build={d3DiceTable} height="22rem" onPointer={click} onReady={(a) => { A.current = a; a.show(bd, pd); a.who(botB, av) }} />
+        <Stage3D build={d3DiceTable} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onPointer={click} onReady={(a) => { A.current = a; a.show(bd, pd); a.who(botB, av) }} />
         <div className="d3-top"><span>Bot · {ph === 'rolling' ? '?' : bd[0] + bd[1]}</span><span>You · {ph === 'rolling' ? '?' : pd[0] + pd[1]}</span></div>
       </div>
       <div className="du-log">{msg}</div>
@@ -4584,7 +4647,7 @@ function QuickDraw({ user, rep, lv, onBack }) {
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Quick Draw</h3>
       <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
       <div className="d3-wrap" style={{ cursor: 'crosshair' }}>
-        <Stage3D build={d3Desert} height="23rem" onReady={setApi} onPointer={click}>
+        <Stage3D build={d3Desert} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={setApi} onPointer={click}>
           {ph === 'draw' && <div className="d3-big chunk">DRAW!</div>}
           {ph === 'wait' && <div className="d3-big chunk">…</div>}
         </Stage3D>
@@ -4649,7 +4712,8 @@ function d3Clash(ctx) {
   }
 }
 function Clash({ user, rep, lv, onBack }) {
-  const av = d3me(user), botB = useMemo(() => d3rand(), [])
+  const M = useMemo(() => d3match('clash', user), []), av = M.players[0].blook, botB = M.players[1].blook
+  useEffect(() => () => M.close(), [])
   const [sc, setSc] = useState([0, 0]), [busy, setBusy] = useState(false), [msg, setMsg] = useState('Pick your move. First to 3 wins.'), [res, setRes] = useState(null), hist = useRef([]), tm = useRef([]), A = useRef(null)
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
   const play = (m) => {
@@ -4668,7 +4732,7 @@ function Clash({ user, rep, lv, onBack }) {
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Clash</h3>
       <div className="du-score"><span>You <b>{sc[0]}</b></span><span>Bot <b>{sc[1]}</b></span></div>
-      <div className="d3-wrap"><Stage3D build={d3Clash} height="22rem" onReady={(a) => { A.current = a; a.who(botB, av) }} />
+      <div className="d3-wrap"><Stage3D build={d3Clash} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={(a) => { A.current = a; a.who(botB, av) }} />
         <div className="d3-top"><span>Bot</span><span>You</span></div></div>
       <div className="du-log">{msg}</div>
       <div className="du-acts">{RPS.map(([k, e, n]) => <button key={k} disabled={busy} onClick={() => play(k)}>{e} {n}</button>)}</div>
@@ -4715,7 +4779,8 @@ function d3Memory(ctx) {
   }
 }
 function MemoryMatch({ user, rep, lv, onBack }) {
-  const av = d3me(user), botB = useMemo(() => d3rand(), [])
+  const M = useMemo(() => d3match('memory', user), []), av = M.players[0].blook, botB = M.players[1].blook
+  useEffect(() => () => M.close(), [])
   const mk = () => { const pool = BLOOKS.filter((b) => b.rarity !== 'owner' && !b.id.startsWith('cd_')), ids = []; while (ids.length < 8) { const b = pool[rint(0, pool.length - 1)]; if (!ids.includes(b.id)) ids.push(b.id) } return [...ids, ...ids].sort(() => Math.random() - 0.5).map((id) => ({ id, f: false, m: false })) }
   const [st, setSt] = useState(() => ({ cards: mk(), sel: [], turn: 'p', sc: [0, 0], busy: false, done: false })), [res, setRes] = useState(null), [api, setApi] = useState(null), R = useRef(st), seen = useRef(new Set()), tm = useRef([]); R.current = st
   useEffect(() => () => tm.current.forEach(clearTimeout), [])
@@ -4761,7 +4826,7 @@ function MemoryMatch({ user, rep, lv, onBack }) {
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Memory Match</h3>
       <div className="du-score"><span className={st.turn === 'p' ? 'tn' : ''}>You <b>{st.sc[0]}</b></span><span className={st.turn === 'b' ? 'tn' : ''}>Bot <b>{st.sc[1]}</b></span></div>
-      <div className="d3-wrap" style={{ cursor: st.turn === 'p' ? 'pointer' : 'wait' }}><Stage3D build={d3Memory} height="30rem" onReady={setApi} onPointer={click} /></div>
+      <div className="d3-wrap" style={{ cursor: st.turn === 'p' ? 'pointer' : 'wait' }}><Stage3D build={d3Memory} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={setApi} onPointer={click} /></div>
       <div className="du-log">{st.turn === 'p' ? 'Your turn: flip two cards.' : 'Bot is thinking…'}</div>
       {res && <DuelEnd {...res} onAgain={() => { setRes(null); seen.current = new Set(); setSt({ cards: mk(), sel: [], turn: 'p', sc: [0, 0], busy: false, done: false }) }} onBack={onBack} />}
     </div>
@@ -4847,7 +4912,7 @@ function Sharpshooter({ user, rep, lv, onBack }) {
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Sharpshooter</h3>
       <div className="du-score"><span>You <b>{score}</b></span><span className="chunk">⏱ {t.toFixed(1)}s</span><span>Bot <b>{phase === 'idle' ? 0 : bot}</b></span></div>
       <div className="d3-wrap" style={{ cursor: 'crosshair' }}>
-        <Stage3D build={d3Range} height="26rem" onReady={setApi} onPointer={shoot} />
+        <Stage3D build={d3Range} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={setApi} onPointer={shoot} />
         {phase === 'idle' && <div className="ss-start" style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', gap: '.8rem', background: 'rgba(5,8,30,.55)', color: '#fff' }}><p className="chunk text-xl">Pop more targets than the bot in {T} seconds.</p><button className="btn bg-[#ff3d81] text-white" onClick={start}>🎯 Start</button></div>}
       </div>
       {res && <DuelEnd {...res} onAgain={() => { setRes(null); api && api.clear(); setPhase('idle') }} onBack={onBack} />}
@@ -4886,7 +4951,8 @@ function d3C4(ctx) {
   }
 }
 function ConnectFour({ user, rep, lv, onBack }) {
-  const av = d3me(user), botB = useMemo(() => d3rand(), [])
+  const M = useMemo(() => d3match('c4', user), []), av = M.players[0].blook, botB = M.players[1].blook
+  useEffect(() => () => M.close(), [])
   const [b, setB] = useState(() => Array(42).fill(0)), [turn, setTurn] = useState(1), [res, setRes] = useState(null), [msg, setMsg] = useState('Your move: pick a column.'), [hov, setHov] = useState(-1), [api, setApi] = useState(null), done = useRef(false)
   const place = (c, p) => {
     const r = c4drop(b, c, p); if (!r) return; const [nb, row] = r; setB(nb); api && api.drop(c, row, p)
@@ -4903,7 +4969,7 @@ function ConnectFour({ user, rep, lv, onBack }) {
   const click = (e) => { if (!api || turn !== 1 || done.current) return; const c = api.col(e); if (c >= 0 && !b[c]) { setHov(-1); place(c, 1) } }
   return (
     <div className="du-pane"><button className="du-back" onClick={onBack}>← Games</button><h3 className="chunk text-3xl">Connect Four</h3>
-      <div className="d3-wrap" style={{ cursor: turn === 1 ? 'pointer' : 'wait' }}><Stage3D build={d3C4} height="30rem" onReady={(a) => { a.who(av, botB); setApi(a) }} onPointer={click} onMove={(e) => api && setHov(api.col(e))} onLeave={() => setHov(-1)} /></div>
+      <div className="d3-wrap" style={{ cursor: turn === 1 ? 'pointer' : 'wait' }}><Stage3D build={d3C4} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={(a) => { a.who(av, botB); setApi(a) }} onPointer={click} onMove={(e) => api && setHov(api.col(e))} onLeave={() => setHov(-1)} /></div>
       <div className="du-log">{msg}</div>
       {res && <DuelEnd {...res} onAgain={() => { setRes(null); done.current = false; setB(Array(42).fill(0)); setTurn(1); api && api.clear(); setMsg('Your move: pick a column.') }} onBack={onBack} />}
     </div>
