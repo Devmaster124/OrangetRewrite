@@ -1103,3 +1103,12 @@ html[data-perf="1"] .pk,html[data-perf="1"] .st,html[data-perf="1"] .pm,html[dat
 .bk-panel{background:rgba(40,20,15,.6);border:2px solid var(--line);border-radius:0 18px 18px 18px}
 .bk-stat{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:14px}
 .bk-badges{border-radius:14px}.bk-badges img{border-radius:10px}
+
+.bk-name>span{display:inline-block;max-width:100%}
+.bk-name .dvm,.bk-name .rbl,.bk-name .rbw,.bk-name .brw,.bk-name .bwr,.bk-name .bgw,.bk-name .mpw,.bk-name .bwg{background-color:transparent}
+
+.bk-head{padding-top:30px;overflow:visible}
+.bk-name{background:none !important;border:0 !important;box-shadow:none !important;padding:.2rem .4rem;text-align:left;position:relative;z-index:2}
+.bk-name small{color:var(--tc)}
+.bk-badges{background:none;padding:0}
+.bk-badges img{width:40px;height:40px;object-fit:contain;display:block}
