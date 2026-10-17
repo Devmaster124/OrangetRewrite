@@ -1062,3 +1062,41 @@ html[data-perf="1"] .pk,html[data-perf="1"] .st,html[data-perf="1"] .pm,html[dat
 .rk-hist{display:flex;flex-direction:column;gap:.35rem}.rk-hist>div{display:flex;justify-content:space-between;gap:.8rem;padding:.55rem .9rem;border-radius:12px;border-left:5px solid;background:rgba(10,14,40,.55)}.rk-hist .w{border-color:#2ee66b}.rk-hist .l{border-color:#ff4d5a}.rk-hist .w b{color:#2ee66b}.rk-hist .l b{color:#ff4d5a}
 .rk-ping{display:inline-grid;place-items:center;min-width:1.3rem;height:1.3rem;border-radius:999px;background:#ff3d81;color:#fff;font-size:.75rem;font-weight:900;animation:dubob 1.2s infinite}
 @media (max-width:560px){.cl-card{width:5.6rem;height:7.6rem}.cl-f{font-size:3rem}.rk-name{font-size:2.2rem}.rk-coinw{width:7rem;height:7rem}.rk-coin{font-size:3.2rem}}
+
+/* ---- Blacket-style toasts, profile, bazaar ---- */
+.toast-wrap{left:auto;right:14px;top:14px;transform:none;width:min(94vw,420px)}
+.toast-card{background:var(--t2);border:0;border-radius:6px;padding:.5rem;gap:14px;box-shadow:0 6px 0 rgba(0,0,0,.35);cursor:pointer;align-items:stretch}
+.toast-ic{flex:none;width:64px;min-height:64px;border-radius:6px;display:grid;place-items:center;font:900 42px/1 'Nunito',system-ui,sans-serif;color:#fff;border-bottom:6px solid rgba(0,0,0,.25);text-shadow:0 3px 0 rgba(0,0,0,.35)}
+.toast-ic.err{background:#e74c3c}.toast-ic.ok{background:#2ecc71}
+.toast-tx{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.toast-ti{font-size:1.5rem;line-height:1.1;color:var(--tc)}.toast-sub{font-size:1rem;line-height:1.25;color:var(--mute);word-break:break-word}
+.bk-head{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.bk-mid{min-width:240px;flex:0 1 330px}
+.bk-name{background:var(--t1);border-bottom:5px solid rgba(0,0,0,.3);border-radius:4px;padding:.4rem .8rem;font-size:2rem;text-align:center;line-height:1.05}
+.bk-name small{display:block;font-size:.9rem;opacity:.75;font-family:inherit}
+.bk-lv{display:flex;align-items:center;gap:6px;margin-top:6px}
+.bk-lvn{background:#4a90e2;border-radius:50%;min-width:34px;height:34px;display:grid;place-items:center;font-size:.95rem}
+.bk-bar{flex:1;height:18px;background:var(--t2);border-radius:6px;overflow:hidden}.bk-bar div{height:100%;background:var(--or)}
+.bk-badges{display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start;background:rgba(0,0,0,.35);border-radius:6px;padding:4px}
+.bk-badges button{background:none;border:0;padding:0;cursor:pointer;transition:transform .12s}.bk-badges button:hover{transform:scale(1.12)}
+.bk-badges:empty{display:none}
+.bk-acts{display:flex;flex-wrap:wrap;gap:10px}
+.bk-b{border:0;border-radius:5px;padding:.45rem 1.1rem;color:#fff;font-weight:800;cursor:pointer;border-bottom:5px solid rgba(0,0,0,.3)}
+.bk-o{background:var(--or)}.bk-g{background:#5ed17a}.bk-p{background:#7a3fd1}
+.bk-tab{display:inline-block;background:var(--t1);border-bottom:5px solid rgba(0,0,0,.3);border-radius:6px 6px 0 0;padding:.3rem 1.2rem;font-size:1.5rem}
+.bk-panel{display:flex;flex-wrap:wrap;justify-content:space-around;gap:14px;background:var(--t2);border-radius:0 8px 8px 8px;padding:18px;border-bottom:6px solid rgba(0,0,0,.35)}
+.bk-stat{background:var(--t1);border-radius:5px;min-width:190px;padding:6px 14px;text-align:center}
+.bk-sl{font-size:.95rem;opacity:.85}.bk-sv{display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.9rem;font-weight:900}
+.bk-wheel{align-items:center;border-radius:8px}
+.bk-modal-bg{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:12px}
+.bk-modal{background:var(--s2);color:var(--tc);border-radius:6px;padding:22px 26px;max-width:420px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.bk-modal h3{font-size:1.6rem}.bk-modal p{font-size:1.25rem}
+.bzpanel{background:var(--t2) !important;border-radius:6px}
+.bztile{background:var(--t1) !important;border-radius:6px}
+.bztitle,.bzp h3.chunk{color:#fff}
+.bk-prof,.bk-tab,.bk-name,.bk-stat{color:var(--tc)}.bk-b{color:var(--tc)}.bzp h3.chunk{color:var(--tc)}
+/* ---- Blooket-style game picker ---- */
+.du-games{display:grid !important;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+.du-gc{background:var(--t1,#2b2b2b) !important;border-radius:12px !important;overflow:hidden;padding:0 0 12px !important;text-align:left;display:flex !important;flex-direction:column;gap:4px;color:var(--tc,#fff)}
+.du-gc .du-ge{display:grid;place-items:center;height:120px;font-size:62px;background:var(--gc)}
+.du-gc>span:not(.du-ge){padding:0 12px}
