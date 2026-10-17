@@ -4027,24 +4027,27 @@ function Stage3D({ build, height = '22rem', onReady, onPointer, onMove, onLeave,
     d3Load().then(() => {
       if (dead || !el.current) return
       const THREE = window.THREE, w = el.current.clientWidth || 600, h = el.current.clientHeight || 350
-      R = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); R.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); R.setSize(w, h)
+      R = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); R.setSize(w, h)
       R.outputEncoding = THREE.sRGBEncoding
       el.current.appendChild(R.domElement)
       const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(45, w / h, 0.1, 120)
       const ctx = { THREE, scene, cam, R, el: el.current, tick: [], clock: new THREE.Clock(), shake: 0, t: 0 }
       const api = build(ctx)
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4468, 0.35))
       if (api && !api.confetti) api.confetti = (n) => d3confetti(ctx, n)
+      let acc = 0, nf = 0, lowered = false
       const loop = () => {
         raf = requestAnimationFrame(loop)
         const dt = Math.min(0.05, ctx.clock.getDelta())
         if (!vis || document.hidden) return
+        acc += dt; nf++; if (nf === 120) { if (!lowered && acc / nf > 0.026) { lowered = true; R.setPixelRatio(1.25); rs() } acc = 0; nf = 0 }
         ctx.t += dt
         for (let i = ctx.tick.length - 1; i >= 0; i--) { const f = ctx.tick[i]; if (f) f(dt, ctx.t) }
         R.render(scene, cam)
       }
       loop()
       try { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting }); io.observe(el.current) } catch (e) {}
-      const rs = () => { if (!el.current) return; const w2 = el.current.clientWidth, h2 = el.current.clientHeight; if (!w2 || !h2) return; R.setSize(w2, h2); cam.aspect = w2 / h2; cam.updateProjectionMatrix() }
+      const rs = () => { if (!el.current) return; const w2 = el.current.clientWidth, h2 = el.current.clientHeight; if (!w2 || !h2) return; R.setSize(w2, h2); cam.aspect = w2 / h2; const ref = ctx.refAspect || 1.6; cam.fov = cam.aspect < ref ? Math.min(100, (2 * Math.atan(Math.tan(0.3927) * ref / cam.aspect) * 180) / Math.PI) : 45; cam.updateProjectionMatrix() }
       window.addEventListener('resize', rs); off = () => window.removeEventListener('resize', rs)
       rs()
       onReady && onReady(api)
@@ -4089,14 +4092,14 @@ function d3zeroTint(cv) { // Zeros: left half burns, right half freezes, so they
 function d3blookCanvas(id) {
   if (d3cache.cv.has(id)) return d3cache.cv.get(id)
   const p = (async () => {
-    const b = byId(id) || BLOOKS[0], S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d')
+    const b = byId(id) || BLOOKS[0], S = 384, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d')
     let keys
     if (b.id === 'ca_slot') keys = ['ca_slot']; else if (b.rarity === 'owner') keys = ['vgyoshi']; else if (b.anim) keys = ['blackdragon']; else if (b.parts) keys = [b.parts[0], b.parts[1]]; else keys = [b.inv || b.img || b.id]
     let ims = await Promise.all(keys.map((k) => d3loadImg(d3src(k))))
     if (!ims[0]) { const alts = [b.id, b.img, b.spr, b.inv].filter(Boolean); for (const k of alts) { const im = await d3loadImg(d3src(k)); if (im) { ims = [im]; break } } }
     if (!ims[0]) { // last resort: a coloured tile with the blook's letter, so nothing is ever invisible
       const col = (typeof RARITY !== 'undefined' && RARITY[b.rarity] && RARITY[b.rarity].color) || '#ff7a2f'
-      g.fillStyle = col; g.beginPath(); g.roundRect ? g.roundRect(20, 20, 120, 120, 26) : g.rect(20, 20, 120, 120); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 80px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((b.name || '?')[0].toUpperCase(), 80, 86); return cv
+      g.scale(S / 160, S / 160); g.fillStyle = col; g.beginPath(); g.roundRect ? g.roundRect(20, 20, 120, 120, 26) : g.rect(20, 20, 120, 120); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 80px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((b.name || '?')[0].toUpperCase(), 80, 86); return cv
     }
     const put = (im) => { const r = Math.min(S / im.naturalWidth, S / im.naturalHeight), w = im.naturalWidth * r, h = im.naturalHeight * r; g.drawImage(im, (S - w) / 2, (S - h) / 2, w, h) }
     if (ims.length === 2 && ims[1]) { g.save(); g.beginPath(); g.rect(0, 0, S / 2, S); g.clip(); put(ims[0]); g.restore(); g.save(); g.beginPath(); g.rect(S / 2, 0, S / 2, S); g.clip(); put(ims[1]); g.restore() } else put(ims[0])
@@ -4107,8 +4110,8 @@ function d3blookCanvas(id) {
   d3cache.cv.set(id, p); return p
 }
 function d3flatTex(THREE, id) { // flat texture that always shows the right blook
-  const c = document.createElement('canvas'); c.width = c.height = 160; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding
-  d3blookCanvas(id).then((src) => { c.getContext('2d').drawImage(src, 0, 0); t.needsUpdate = true }); return t
+  const c = document.createElement('canvas'); c.width = c.height = 256; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding
+  d3blookCanvas(id).then((src) => { c.getContext('2d').drawImage(src, 0, 0, 256, 256); t.needsUpdate = true }); return t
 }
 function d3model(id, G) {
   const k = id + ':' + G; if (d3cache.model.has(k)) return d3cache.model.get(k)
@@ -4135,14 +4138,14 @@ function d3voxel(THREE, model, mat, height) {
   return im
 }
 function d3aura(ctx, parent, H, mat) { // fire on one side, ice on the other: for every Zero
-  const { THREE } = ctx, n = 48, A = []
+  const { THREE } = ctx, n = 24, A = []
   ;[[0xff7a2f, -1], [0x7fe9ff, 1]].forEach(([c, side]) => {
     const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), ph = [], ox = []
     for (let i = 0; i < n; i++) { ph.push(Math.random()); ox.push(Math.random()) }
     g.setAttribute('position', new THREE.BufferAttribute(p, 3))
-    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: c, size: 0.22, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts); A.push({ pts, p, ph, ox, side, g })
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: c, size: 0.14, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts); A.push({ pts, p, ph, ox, side, g })
   })
-  const f = (dt, t) => { if (mat) mat.emissive.setRGB(0.22 + 0.12 * Math.sin(t * 3), 0.1, 0.22 + 0.12 * Math.cos(t * 3)); A.forEach((a) => { for (let i = 0; i < n; i++) { const k = (a.ph[i] + t * 0.35) % 1; a.p[i * 3] = a.side * (0.3 + a.ox[i] * H * 0.38) + Math.sin(t * 3 + i) * 0.08; a.p[i * 3 + 1] = -H / 2 + k * H * 1.2; a.p[i * 3 + 2] = Math.sin(i * 1.7) * 0.4 + 0.3 } a.g.attributes.position.needsUpdate = true }) }
+  const f = (dt, t) => { if (mat) mat.emissive.setRGB(0.16 + 0.06 * Math.sin(t * 3), 0.08, 0.16 + 0.06 * Math.cos(t * 3)); A.forEach((a) => { for (let i = 0; i < n; i++) { const k = (a.ph[i] + t * 0.35) % 1; a.p[i * 3] = a.side * (0.3 + a.ox[i] * H * 0.38) + Math.sin(t * 3 + i) * 0.08; a.p[i * 3 + 1] = -H / 2 + k * H * 1.2; a.p[i * 3 + 2] = Math.sin(i * 1.7) * 0.4 + 0.3 } a.g.attributes.position.needsUpdate = true }) }
   ctx.tick.push(f)
   return { off() { if (mat) mat.emissive.setHex(0x161616); const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1); A.forEach((a) => { parent.remove(a.pts); a.g.dispose(); a.pts.material.dispose() }) } }
 }
@@ -4157,7 +4160,7 @@ function d3puff(THREE, cv, H, zero, id) { // smooth, rounded 3D body in the exac
   } catch (e) {}
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = 72 / Math.max(bw, bh), Gx = Math.max(10, Math.round(bw * sc)), Gy = Math.max(10, Math.round(bh * sc))
   const cc = document.createElement('canvas'); cc.width = bw; cc.height = bh; cc.getContext('2d').drawImage(cv, x0, y0, bw, bh, 0, 0, bw, bh)
-  const tex = new THREE.CanvasTexture(cc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4
+  const tex = new THREE.CanvasTexture(cc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8
   const sm = document.createElement('canvas'); sm.width = Gx; sm.height = Gy; const sg = sm.getContext('2d'); sg.drawImage(cc, 0, 0, Gx, Gy)
   let px = null; try { px = sg.getImageData(0, 0, Gx, Gy).data } catch (e) {}
   const ins = new Uint8Array(Gx * Gy), dist = new Float32Array(Gx * Gy)
@@ -4188,10 +4191,10 @@ function d3puff(THREE, cv, H, zero, id) { // smooth, rounded 3D body in the exac
   const out = { gF: mk(false), gB: mk(true), tex, Hh }; d3cache.puff.set(key, out); return out
 }
 function d3parts(ctx, parent, H, o) { // sparkle / rain / orbit particles
-  const { THREE } = ctx, n = o.n || 36, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), c = new Float32Array(n * 3), ph = [], ox = []
+  const { THREE } = ctx, n = Math.ceil((o.n || 36) * 0.5), g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), c = new Float32Array(n * 3), ph = [], ox = []
   for (let i = 0; i < n; i++) { ph.push(Math.random()); ox.push(Math.random()) }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3))
-  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: o.size || 0.2, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts)
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: (o.size || 0.2) * 0.6, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; parent.add(pts)
   const col = new THREE.Color(), base = new THREE.Color(o.color || 0xffffff), alt = o.alt != null ? new THREE.Color(o.alt) : null
   const f = (dt, t) => {
     for (let i = 0; i < n; i++) {
@@ -4212,7 +4215,7 @@ function d3special(ctx, body, mat, H, id, top) { // each special blook keeps its
   const { THREE } = ctx, b = byId(id) || {}, offs = [], fx = b.fxa, r = b.rarity
   const part = (o) => offs.push(d3parts(ctx, body, H, o))
   const tk = (f) => { ctx.tick.push(f); offs.push(() => { const j = ctx.tick.indexOf(f); if (j >= 0) ctx.tick.splice(j, 1) }) }
-  const glow = (h, sat = 1, l = 0.22, sp = 3, amp = 0.1) => tk((dt, t) => mat.emissive.setHSL(h(t) % 1, sat, l + amp * Math.sin(t * sp)))
+  const glow = (h, sat = 1, l = 0.22, sp = 3, amp = 0.1) => tk((dt, t) => mat.emissive.setHSL(h(t) % 1, sat, l * 0.75 + amp * 0.4 * Math.sin(t * sp)))
   const cyc = (t) => (t * 0.25) % 1
   if (r === 'owner') {
     const gold = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.8, roughness: 0.25, emissive: 0x553300 }), gem = new THREE.MeshStandardMaterial({ color: 0xff3d3d, emissive: 0x880000 })
@@ -4231,7 +4234,7 @@ function d3special(ctx, body, mat, H, id, top) { // each special blook keeps its
   } else if (fx === 'rainbow') { part({ n: 60, rain: true, mode: 'fall', speed: 0.4 }); glow(cyc, 1, 0.22)
   } else if (fx === 'matrix') { part({ n: 60, color: 0x37ff6b, mode: 'fall', speed: 0.7, size: 0.2 }); glow(() => 0.38, 1, 0.16, 6, 0.08)
   } else if (fx === 'frost') { part({ n: 50, color: 0xbff6ff, mode: 'fall', speed: 0.25, size: 0.2 }); glow(() => 0.53, 0.9, 0.2, 2, 0.08)
-  } else if (fx === 'glitch') { part({ n: 30, color: 0xff3dd1, alt: 0x38f0ff, mode: 'rise', speed: 0.9, size: 0.2 }); tk((dt, t) => { const j = Math.sin(t * 17) > 0.8; mat.emissive.setRGB(j ? 0.5 : 0.09, j ? 0.1 : 0.09, j ? 0.55 : 0.09); body.position.x = j ? (Math.random() - 0.5) * 0.25 : 0 }); offs.push(() => { body.position.x = 0 })
+  } else if (fx === 'glitch') { part({ n: 30, color: 0xff3dd1, alt: 0x38f0ff, mode: 'rise', speed: 0.9, size: 0.2 }); tk((dt, t) => { const j = Math.sin(t * 17) > 0.8; mat.emissive.setRGB(j ? 0.5 : 0.09, j ? 0.1 : 0.09, j ? 0.55 : 0.09) })
   } else if (fx === 'gold' || r === 'legendary') { part({ n: 34, color: 0xffd34d, mode: 'rise', speed: 0.3 }); glow(() => 0.12, 1, 0.2, 3, 0.09)
   } else if (fx === 'cosmic' || r === 'mystical') { part({ n: 40, color: 0xb98cff, alt: 0x6fd0ff, mode: 'orbit', speed: 0.25 }); glow(() => 0.75, 1, 0.2, 2.5, 0.1)
   } else if (r === 'chroma') { part({ n: 40, rain: true, mode: 'orbit', speed: 0.2, size: 0.18 }); glow(cyc, 1, 0.24)
@@ -4260,8 +4263,8 @@ function d3dom(cv) { // the blook's main colour, used for the cube body
   return [255, 140, 50]
 }
 function d3cubeGeo(THREE, S, zero) { // soft rounded cube; front face UVs show the art, every other face is solid colour
-  const key = 'v2' + S.toFixed(2) + (zero ? 'z' : ''); if (d3cache.cgeo.has(key)) return d3cache.cgeo.get(key)
-  const g = new THREE.BoxGeometry(S, S, S, 10, 10, 10), pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, n = pos.count, r = S * 0.2, h = S / 2 - r, per = 121, col = new Float32Array(n * 3), v = new THREE.Vector3(), q = new THREE.Vector3()
+  const key = 'v3' + S.toFixed(2) + (zero ? 'z' : ''); if (d3cache.cgeo.has(key)) return d3cache.cgeo.get(key)
+  const g = new THREE.BoxGeometry(S, S, S, 16, 16, 16), pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, n = pos.count, r = S * 0.2, h = S / 2 - r, per = 289, col = new Float32Array(n * 3), v = new THREE.Vector3(), q = new THREE.Vector3()
   const cl = (x) => Math.max(-h, Math.min(h, x))
   for (let i = 0; i < n; i++) {
     v.fromBufferAttribute(pos, i); q.set(cl(v.x), cl(v.y), cl(v.z)); v.sub(q)
@@ -4281,8 +4284,8 @@ function d3cubeGeo(THREE, S, zero) { // soft rounded cube; front face UVs show t
   d3cache.cgeo.set(key, g); return g
 }
 function d3cube(THREE, cv, H, zero, id) { // the blook IS the cube: its art on the front/back, its own colours flowing over the sides
-  const key = 'v2' + id + (zero ? ':z' : '') + ':' + H; if (d3cache.cube.has(key)) return d3cache.cube.get(key)
-  const S = H * 0.86, c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'), dom = d3dom(cv), W = cv.width; let x0 = 0, y0 = 0, x1 = W - 1, y1 = W - 1
+  const key = 'v3' + id + (zero ? ':z' : '') + ':' + H; if (d3cache.cube.has(key)) return d3cache.cube.get(key)
+  const S = H * 0.86, c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d'), dom = d3dom(cv), W = cv.width; let x0 = 0, y0 = 0, x1 = W - 1, y1 = W - 1
   try { const d = cv.getContext('2d').getImageData(0, 0, W, W).data; x0 = W; y0 = W; x1 = -1; y1 = -1; for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y } if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = W - 1 } } catch (e) {}
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1, ac = document.createElement('canvas'); ac.width = bw; ac.height = bh; ac.getContext('2d').drawImage(cv, x0, y0, bw, bh, 0, 0, bw, bh)
   // soft background made from the art's OWN colours (so the whole cube looks like that blook)
@@ -4290,10 +4293,12 @@ function d3cube(THREE, cv, H, zero, id) { // the blook IS the cube: its art on t
   let px = null; try { px = lg.getImageData(0, 0, 6, 6) } catch (e) {}
   if (px) { const d = px.data; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] > 24) d[i + 3] = 255; else { d[i] = dom[0]; d[i + 1] = dom[1]; d[i + 2] = dom[2]; d[i + 3] = 255 } } lg.putImageData(px, 0, 0) } else { lg.fillStyle = `rgb(${dom[0] | 0},${dom[1] | 0},${dom[2] | 0})`; lg.fillRect(0, 0, 6, 6) }
   g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'
-  g.drawImage(lo, 0, 0, 256, 256); g.drawImage(lo, 256, 0, 256, 256)
-  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(256, 0, 256, 256)
-  g.drawImage(ac, 0, 0, 256, 256)
-  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4
+  g.drawImage(lo, 0, 0, 512, 512); g.drawImage(lo, 512, 0, 512, 512)
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(512, 0, 512, 512)
+  const asp = bw / bh; let dw = 512, dh = 512, dx = 0, dy = 0
+  if (asp < 0.72 || asp > 1.4) { const k = Math.min(496 / bw, 496 / bh); dw = bw * k; dh = bh * k; dx = (512 - dw) / 2; dy = (512 - dh) / 2 } // tall/wide art is kept undistorted
+  g.drawImage(ac, 0, 0, bw, bh, dx, dy, dw, dh)
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8
   const out = { geo: d3cubeGeo(THREE, S, zero), tex, Hh: S }; d3cache.cube.set(key, out); return out
 }
 function d3bodySetter(ctx, body, mat, H, G) {
@@ -4373,8 +4378,8 @@ function d3actor(ctx, x, y, z, ry, H = 2.6, G = 30) { // a 3D blook that plays t
   ctx.tick.push((dt, t) => {
     if (A.busy) return
     if (A.down) { body.position.y = H / 2 - 0.15; body.rotation.z += (0.5 - body.rotation.z) * Math.min(1, dt * 6); return }
-    body.position.y = H / 2 + Math.sin(t * 2.2 + x) * 0.07 + (A.pump ? Math.abs(Math.sin(t * 8)) * A.pump : 0)
-    body.rotation.z += (0 - body.rotation.z) * Math.min(1, dt * 8); body.rotation.y = ry + Math.sin(t * 0.8 + x) * 0.12
+    body.position.y = H / 2 + Math.sin(t * 2.2 + x) * 0.04 + (A.pump ? Math.abs(Math.sin(t * 8)) * A.pump : 0)
+    body.rotation.z += (0 - body.rotation.z) * Math.min(1, dt * 8); body.rotation.y = ry + Math.sin(t * 0.8 + x) * 0.05
   })
   const run = (dur, fn) => { A.busy++; d3tw(ctx, dur, fn, () => { A.busy-- }) }
   d3tw(ctx, 0.8, (k) => { g.position.y = y + (1 - d3bounce(k)) * 7 }, () => { g.position.y = y })
@@ -4413,12 +4418,13 @@ function d3fighter(ctx, x, flip, baseColor = 0x2a2f6b) {
   ctx.scene.add(g)
   const F = { g, body, mat, glow, shield, x, y: 1.7, busy: false, set: d3bodySetter(ctx, body, mat, 2.7, 36) }
   d3tw(ctx, 0.8, (k) => { g.position.y = (1 - d3bounce(k)) * 7 }, () => { g.position.y = 0 })
-  ctx.tick.push((dt, t) => { if (!F.busy) { body.position.y = F.y + Math.sin(t * 2 + x) * 0.08; body.rotation.y = ry + Math.sin(t * 0.9 + x) * 0.18 } })
+  ctx.tick.push((dt, t) => { if (!F.busy) { body.position.y = F.y + Math.sin(t * 2 + x) * 0.04; body.rotation.y = ry + Math.sin(t * 0.9 + x) * 0.07 } })
   return F
 }
 
 // ---------- Blook Battle arena ----------
 function d3Arena(ctx) {
+  ctx.refAspect = 1.5
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0x0a0d2a); scene.fog = new THREE.Fog(0x0a0d2a, 12, 34)
   scene.add(new THREE.AmbientLight(0x8899ff, 0.75))
@@ -4544,6 +4550,7 @@ function BlookBattle({ user, rep, lv, onBack }) {
 const D3_UP = { 1: [0, 0, 0], 6: [Math.PI, 0, 0], 3: [0, 0, Math.PI / 2], 4: [0, 0, -Math.PI / 2], 2: [-Math.PI / 2, 0, 0], 5: [Math.PI / 2, 0, 0] }
 const D3_PIPS = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] }
 function d3DiceTable(ctx) {
+  ctx.refAspect = 2.1
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0x0e1236); scene.fog = new THREE.Fog(0x0e1236, 14, 30)
   scene.add(new THREE.AmbientLight(0xaab4ff, 0.65))
@@ -4644,6 +4651,7 @@ function DiceDuel({ user, rep, lv, onBack }) {
 
 // ---------- Quick Draw: 3D desert showdown ----------
 function d3Desert(ctx) {
+  ctx.refAspect = 1.6
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0xff9a52); scene.fog = new THREE.Fog(0xff9a52, 14, 48)
   scene.add(new THREE.AmbientLight(0xffd9b0, 0.8))
@@ -4733,6 +4741,7 @@ const d3lights = (ctx, a = 0.8) => { const { THREE, scene } = ctx; scene.add(new
 
 // ---------- Clash: two big 3D flip cards ----------
 function d3Clash(ctx) {
+  ctx.refAspect = 1.7
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0x120a2e); scene.fog = new THREE.Fog(0x120a2e, 14, 34)
   d3lights(ctx, 0.9); d3stars(ctx, 160, 30, 3)
@@ -4763,7 +4772,7 @@ function d3Clash(ctx) {
   return {
     who(b, p) { act.B.set(b); act.P.set(p) },
     face(side, m) { const c = C[side]; c.back.map = FACE[m] || FACE['?']; c.back.needsUpdate = true },
-    shake(on) { C.B.shake = C.P.shake = on; act.B.pump = act.P.pump = on ? 0.5 : 0 },
+    shake(on) { C.B.shake = C.P.shake = on; act.B.pump = act.P.pump = on ? 0.25 : 0 },
     reveal(w) {
       C.B.tgt = C.P.tgt = Math.PI
       setTimeout(() => {
@@ -4807,6 +4816,7 @@ function Clash({ user, rep, lv, onBack }) {
 
 // ---------- Memory Match: a wall of 3D flip cards ----------
 function d3Memory(ctx) {
+  ctx.refAspect = 0.8
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0x0b1230); scene.fog = new THREE.Fog(0x0b1230, 18, 40)
   d3lights(ctx, 0.95); d3stars(ctx, 120, 30, -4)
@@ -4834,7 +4844,7 @@ function d3Memory(ctx) {
   })
   return {
     who(p, b) { act.P.set(p); act.B.set(b) },
-    turn(s) { act.P.pump = s === 'P' ? 0.25 : 0; act.B.pump = s === 'B' ? 0.25 : 0 },
+    turn(s) { act.P.pump = s === 'P' ? 0.1 : 0; act.B.pump = s === 'B' ? 0.1 : 0 },
     hopFor(s) { act[s].hop() },
     cheerFor(s) { act[s].cheer() },
     setIds(ids) { ids.forEach((id, i) => { cards[i].fm.map = d3flatTex(THREE, id); cards[i].fr.visible = true; cards[i].fm.needsUpdate = true }) },
@@ -4899,6 +4909,7 @@ function MemoryMatch({ user, rep, lv, onBack }) {
 
 // ---------- Sharpshooter: a 3D neon shooting gallery ----------
 function d3Range(ctx) {
+  ctx.refAspect = 1.0
   const { THREE, scene, cam } = ctx
   scene.background = new THREE.Color(0x090c22); scene.fog = new THREE.Fog(0x090c22, 8, 30)
   scene.add(new THREE.AmbientLight(0x8899ff, 0.9)); const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(0, 6, 10); scene.add(dl)
@@ -4920,7 +4931,7 @@ function d3Range(ctx) {
   })
   const mkTh = (dir) => { const g = new THREE.Group(), b = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0.08, color: 0xffffff, emissive: 0x161616 }); b.position.y = 1.2; b.rotation.y = dir * 0.6; g.add(b); scene.add(g); return { g, b, dir, th: 0, set: d3bodySetter(ctx, b, mt, 2.4, 32) } }
   const TH = [mkTh(1), mkTh(-1)]
-  ctx.tick.push((dt, t) => TH.forEach((h) => { h.g.position.set(-h.dir * Math.min(cam.aspect, 2.2) * 4.14 * 0.82, -3.0, 2.2); if (!h.th) { h.b.position.y = 1.2 + Math.sin(t * 2.2 + h.dir) * 0.07; h.b.rotation.z = 0 } }))
+  ctx.tick.push((dt, t) => TH.forEach((h) => { h.g.position.set(-h.dir * Math.min(cam.aspect, 2.2) * 4.14 * 0.82, -3.0, 2.2); if (!h.th) { h.b.position.y = 1.2 + Math.sin(t * 2.2 + h.dir) * 0.04; h.b.rotation.z = 0 } }))
   const mkDart = () => { const g = new THREE.Group(), mt = new THREE.MeshLambertMaterial({ color: 0xe8e8f4 }), sh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), mt); sh.rotation.x = Math.PI / 2; g.add(sh); const tip = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0xffd34d })); tip.rotation.x = Math.PI / 2; tip.position.z = 0.55; g.add(tip); const fm = new THREE.MeshLambertMaterial({ color: 0xff3d81, side: THREE.DoubleSide }); const f1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.22), fm), f2 = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.4, 0.22), fm); f1.position.z = f2.position.z = -0.4; g.add(f1); g.add(f2); return g }
   const fling = (o, h) => {
     o.claimed = true
@@ -4986,6 +4997,7 @@ function Sharpshooter({ user, rep, lv, onBack }) {
 
 // ---------- Connect Four: a real standing 3D board ----------
 function d3C4(ctx) {
+  ctx.refAspect = 1.45
   const { THREE, scene, cam } = ctx, S = 1.2, W = 7 * S, H = 6 * S
   scene.background = new THREE.Color(0x0b0f33); scene.fog = new THREE.Fog(0x0b0f33, 16, 38)
   d3lights(ctx, 0.85); d3stars(ctx, 120, 30, 2)
