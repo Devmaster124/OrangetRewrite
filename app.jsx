@@ -417,22 +417,28 @@ const FB = (() => {
 // Realtime Database = free, no per-read limits (only 100 live connections). Used for "who is online" (the part that ate the Firestore quota).
 const RTDB_URL = 'https://oranget-a1acd-default-rtdb.firebaseio.com' // change if your database is in another region
 let rtP = null
+const RTDB_URLS = [RTDB_URL, 'https://oranget-a1acd-default-rtdb.europe-west1.firebasedatabase.app', 'https://oranget-a1acd-default-rtdb.asia-southeast1.firebasedatabase.app']
+const rtTry = (url) => new Promise((ok) => { try { const db = firebase.app().database(url); let d = false; const fin = (v) => { if (!d) { d = true; ok(v) } }; db.ref('.info/connected').on('value', (sn) => { if (sn.val()) fin(db) }); setTimeout(() => fin(null), 4500) } catch (e) { ok(null) } })
 const rtdb = () => rtP || (rtP = new Promise((ok) => {
-  const go = () => { try { const db = firebase.app().database(RTDB_URL); let done = false; const fin = (v) => { if (!done) { done = true; ok(v) } }; db.ref('.info/connected').on('value', (sn) => { if (sn.val()) fin(db) }); setTimeout(() => fin(null), 8000) } catch (e) { ok(null) } }
+  const go = async () => { for (const u of RTDB_URLS) { const db = await rtTry(u); if (db) return ok(db) } console.warn('Realtime Database not reachable, using slower online list'); ok(null) }
   if (window.firebase && firebase.database) return go()
   const sc = document.createElement('script'); sc.src = 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js'; sc.onload = go; sc.onerror = () => ok(null); document.head.appendChild(sc)
 }))
 const RTLAST = { k: '', t: 0, f: 0 }
 async function sendPres(m, uid) {
-  const db = await rtdb(), now = Date.now()
+  const db = await rtdb(), now = Date.now(), fs = () => FB.db.doc('presence/' + uid).set({ name: m.from, at: FB.ts(), s: JSON.stringify(m.s) }).catch(() => {})
   if (db) {
-    const key = JSON.stringify({ ...m.s, tk: 0 }); if (RTLAST.k === key && now - RTLAST.t < 600000) return // only write when something changed
-    RTLAST.k = key; RTLAST.t = now
-    const r = db.ref('presence/' + uid); r.onDisconnect().remove()
-    try { await r.set({ name: m.from, s: JSON.stringify(m.s) }); return } catch (e) { console.warn('RTDB presence denied, using Firestore', e) }
+    const key = JSON.stringify({ ...m.s, tk: 0 })
+    if (RTLAST.k !== key || now - RTLAST.t > 600000) {
+      RTLAST.k = key; RTLAST.t = now
+      const r = db.ref('presence/' + uid); r.onDisconnect().remove()
+      try { await r.set({ name: m.from, s: JSON.stringify(m.s) }) } catch (e) { console.warn('RTDB presence denied', e); RTLAST.f = 0 }
+    }
+    if (now - RTLAST.f > 1800000) { RTLAST.f = now; fs() } // keep a profile copy (picture etc.) for when you are offline
+    return
   }
-  if (now - RTLAST.f < 600000) return
-  RTLAST.f = now; await FB.db.doc('presence/' + uid).set({ name: m.from, at: FB.ts(), s: JSON.stringify(m.s) })
+  if (now - RTLAST.f < 100000) return
+  RTLAST.f = now; await fs()
 }
 const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
@@ -461,24 +467,17 @@ const invCount = (a) => { const m = {}; (a || []).forEach((x) => { m[x] = (m[x] 
 const pushCloud = async () => {
   SYNC.lastW = Date.now(); let u = latest; const c = FB && FB.auth.currentUser
   if (!u || !c) return
-  try {
-    // If another device/tab saved since we loaded, merge instead of overwriting (this is what was wiping blooks)
-    const snap = await FB.db.doc('users/' + c.uid).get(), d = snap.exists ? snap.data() : null
-    if (d && d.blob && SYNC.base && (d.saved || 0) > SYNC.base.saved) {
-      const cu = JSON.parse(d.blob), b = invCount(SYNC.base.inv), mine = invCount(u.inv), cl = invCount(cu.inv), keys = new Set([...Object.keys(b), ...Object.keys(mine), ...Object.keys(cl)]), inv = []
-      keys.forEach((k) => { const n = Math.max(0, (cl[k] || 0) + (mine[k] || 0) - (b[k] || 0)); for (let i = 0; i < n; i++) inv.push(k) })
-      u = { ...u, inv, tokens: Math.max(0, (cu.tokens || 0) + ((u.tokens || 0) - SYNC.base.tokens)) }; latest = u
-      SYNC.onMerge && SYNC.onMerge(u)
-    }
-  } catch (e) { console.warn('cloud merge check failed', e) }
   try { await FB.db.doc('users/' + c.uid).set({ name: u.name, nameLower: u.name.toLowerCase(), blob: JSON.stringify(strip(u)), saved: u.saved, at: FB.ts() }, { merge: true }); SYNC.base = { saved: u.saved, inv: [...(u.inv || [])], tokens: u.tokens || 0 } } catch (e) { console.warn('cloud save failed', e) }
 }
 let lsT = 0
 const lsFlush = () => { clearTimeout(lsT); lsT = 0; const c = FB && FB.auth.currentUser; if (c && latest) { try { localStorage.setItem(cacheKey(c.uid), JSON.stringify(strip(latest))) } catch {} } }
+let lastInvKey = ''
+const invKeyOf = (u) => (u.inv ? u.inv.length + ':' + u.inv.slice(-4).join(',') + ':' + (u.escrow ? JSON.stringify(u.escrow).length : 0) : '')
 const saveUser = (u) => {
   u = { ...u, saved: Date.now() }; latest = u
   clearTimeout(lsT); lsT = setTimeout(lsFlush, 350)
-  clearTimeout(cloudT); cloudT = setTimeout(pushCloud, Math.max(6000, 60000 - (Date.now() - (SYNC.lastW || 0))))
+  const k = invKeyOf(u), urgent = k !== lastInvKey; lastInvKey = k
+  clearTimeout(cloudT); cloudT = setTimeout(pushCloud, urgent ? 1200 : Math.max(6000, 60000 - (Date.now() - (SYNC.lastW || 0))))
 }
 const flushCloud = () => { lsFlush(); clearTimeout(cloudT); return pushCloud() }
 addEventListener('pagehide', flushCloud)
@@ -783,6 +782,8 @@ async function procCmds(list, me, apply) {
     if (c === 'unmod') delete CS.mods[lc(arg)]
     if (c === 'ban') CS.banned[lc(arg)] = 1
     if (c === 'unban') delete CS.banned[lc(arg)]
+    if (c === 'settokens' && mine) { const a = Math.floor(Number(n)); if (a >= 0 && a <= 1e9) apply((u) => ({ ...u, tokens: a })) }
+    if (c === 'halve' && mine) apply((u) => ({ ...u, tokens: Math.floor((u.tokens || 0) / 2) }))
     if (c === 'give' && mine) { const a = Math.floor(Number(n)); if (a >= 1 && a <= 10000000) apply((u) => ({ ...u, tokens: u.tokens + a })) }
   }
   saveCS(); if (change) cmdSubs.forEach((f) => f())
@@ -1668,7 +1669,7 @@ function Chat({ user, eng, go }) {
       if (c === '/password' || c === '/passwordcheck' || c === '/pwcheck') throw new Error("Not building that. Oranget signs people in through Firebase, which never exposes a readable password to anyone, including DEVMASTER, so there's nothing to show. A lookup that reveals another player's password would also let you log in as them, which I won't add. If you need to help someone into their account, I can add a command that triggers Firebase's official password-reset email instead.")
       if (!isOw(user.name) && !(isEt(user.name) && ['/give', '/mute', '/unmute', '/ban', '/unban'].includes(c))) throw new Error('Only DEVMASTER can use that command.')
       if (isEt(user.name) && !isOw(user.name)) { if (c === '/give' && a !== user.name) throw new Error('You can only give coins to yourself.'); if ((c === '/ban' || c === '/mute') && (isProt(a) || a === user.name)) throw new Error('You cannot ban or mute mods or the owner.') }
-      const map = { '/give': () => [a + ':' + b], '/mute': () => [a + ':' + (b || 10)], '/unmute': () => [a], '/ban': () => [a], '/unban': () => [a], '/mod': () => [a], '/unmod': () => [a], '/announce': () => [t.slice(10)] }
+      const map = { '/give': () => [a + ':' + b], '/mute': () => [a + ':' + (b || 10)], '/unmute': () => [a], '/ban': () => [a], '/unban': () => [a], '/mod': () => [a], '/unmod': () => [a], '/settokens': () => [a + ':' + b], '/halve': () => [a], '/announce': () => [t.slice(10)] }
       if (!map[c]) throw new Error('Unknown command. Type /help.')
       if (c !== '/announce' && !a) throw new Error('Add a player name.')
       await sendCmd(c.slice(1), map[c]()[0], user.name); toast('Command sent: ' + t)
@@ -1740,13 +1741,14 @@ const hub = (() => {
       snap.docChanges().forEach((c) => { if (c.type !== 'added' || ids.has(c.doc.id)) return; ids.add(c.doc.id); const d = c.doc.data({ serverTimestamps: 'estimate' }); try { add(JSON.parse(d.m), c.doc.id, ms(d.ts)) } catch {} })
       ok(); notify()
     }, bad)
-    const pollPres = () => FB.db.collection('presence').orderBy('at', 'desc').limit(25).get().then((snap) => {
+    const pollPres = (lim = 120) => FB.db.collection('presence').orderBy('at', 'desc').limit(lim).get().then((snap) => {
       snap.docs.forEach((doc) => { const d = doc.data(); try { add({ t: 'pres', from: d.name, s: JSON.parse(d.s) }, doc.id, ms(d.at)) } catch {} })
       notify(true, 'pres')
     }, bad)
     const rtLive = {}
+    pollPres(120)
     rtdb().then((db) => {
-      if (!db) { pollPres(); setInterval(() => { if (!document.hidden) pollPres() }, 600000); return }
+      if (!db) { setInterval(() => { if (!document.hidden) pollPres(40) }, 150000); return }
       const ref = db.ref('presence'), onv = (sn) => { const d = sn.val(); if (!d || !d.name) return; rtLive[sn.key] = d.name; try { add({ t: 'pres', from: d.name, s: JSON.parse(d.s) }, sn.key, Date.now()); notify(true, 'pres') } catch {} }
       ref.on('child_added', onv); ref.on('child_changed', onv)
       ref.on('child_removed', (sn) => { const n = rtLive[sn.key]; delete rtLive[sn.key]; if (n && pres[n]) { pres[n].at = 0; notify(true, 'pres') } })
@@ -3423,10 +3425,10 @@ function Worlds({ onEnter, onCasino, onDuels, user }) {
     <div className="h-full overflow-y-auto p-3 text-center text-[#4a1f06]">
       <div className="wl2">
         <div className="wl2-head"><div className="mx-auto w-fit"><Blook id="earth" size={84} /></div><h2 className="chunk text-5xl sm:text-6xl">Worlds</h2>
-          <p className="mt-1">{left > 0 ? 'Pick a world to travel to. Duels opens in:' : 'Duels is almost ready!'}</p>
-          <div className="wl2-clock">{box.map(([l, v]) => <div key={l}><b className="chunk text-3xl tabular-nums">{String(v).padStart(2, '0')}</b><span className="text-xs uppercase">{l}</span></div>)}</div></div>
+          <p className="mt-1">Pick a world to travel to. Something is coming…</p>
+          <div className="wl2-clock"><div><b className="chunk text-5xl tracking-[.35em]" style={{ textShadow: '0 0 14px #ff9b3d' }}>?????</b><span className="text-xs uppercase">Something is coming</span></div></div></div>
         <div className="wl2-row"><FishPortal onEnter={onEnter} /><CasinoPortal onEnter={onCasino} />
-          <DuelsPortal onEnter={onDuels} open={left <= 0 || isOw(user.name)} /></div>
+          <DuelsPortal onEnter={onDuels} open={true} /></div>
       </div>
     </div>
   )
@@ -3979,12 +3981,8 @@ function App() {
 function d3Load() {
   if (window.THREE) return Promise.resolve()
   if (window.__d3p) return window.__d3p
-  return (window.__d3p = new Promise((ok, no) => {
-    const s = document.createElement('script')
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
-    s.onload = ok; s.onerror = () => { window.__d3p = null; no(new Error('three.js failed to load')) }
-    document.head.appendChild(s)
-  }))
+  const load = (src) => new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = () => { sc.remove(); no(new Error('load failed')) }; document.head.appendChild(sc) })
+  return (window.__d3p = load('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js').catch(() => load('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js')).catch((e) => { window.__d3p = null; throw e }))
 }
 
 // ---------- styles ----------
@@ -4457,27 +4455,31 @@ function d3Arena(ctx) {
   const hit = (d, color, ko) => {
     d3beep(170, 0.12, 'square', 0.06, 60)
     d.busy = true; d.mat.color.set(0xff5555); d.glow.color.set(0xff3030); d.glow.intensity = 3
-    const x0 = d.g.position.x, dir = d.x < 0 ? -1 : 1
+    const x0 = d.x, dir = d.x < 0 ? -1 : 1
     d3burst(ctx, new THREE.Vector3(d.x, 1.8, 0.5), color, 50, 5); d3wave(ctx, new THREE.Vector3(d.x, 0, 0), color, 3.5); ctx.shake = 1.2
     d3tw(ctx, 0.45, (k) => { d.g.position.x = x0 + dir * Math.sin(k * Math.PI) * 0.8; d.glow.intensity = 3 * (1 - k); d.mat.color.lerpColors(new THREE.Color(0xff5555), new THREE.Color(0xffffff), k) }, () => { d.busy = false; d.glow.intensity = 0 })
   }
   return {
-    set(p, b) { F.P.set(p); F.B.set(b); ['P', 'B'].forEach((s) => { const d = F[s]; d.g.rotation.z = 0; d.g.position.set(d.x, 0, 0); d.body.position.y = d.y; d.mat.opacity = 1; d.mat.color.set(0xffffff); d.busy = false; d.shield.material.opacity = 0 }) },
-    act(side, kind) {
+    set(p, b) { F.P.set(p); F.B.set(b); ['P', 'B'].forEach((s) => { const d = F[s]; d.g.rotation.z = 0; d.g.position.set(d.x, 0, 0); d.body.position.y = d.y; d.mat.opacity = 1; d.mat.color.set(0xffffff); d.busy = false; d.ko = false; d.shield.material.opacity = 0 }) },
+    act(side, kind, cn) {
+      setTimeout(settle, 2200)
       const a = F[side], d = F[side === 'P' ? 'B' : 'P'], dir = side === 'P' ? 1 : -1, reach = Math.abs(d.x - a.x) - 2.7, col = side === 'P' ? 0x38e8ff : 0xff3d81
       if (kind === 'guard') { a.shield.material.opacity = 0.35; d3wave(ctx, new THREE.Vector3(a.x, 0, 0), 0x4fd8ff, 2.5); d3tw(ctx, 1.1, (k) => { a.shield.scale.setScalar(1 + Math.sin(k * Math.PI * 4) * 0.04); a.shield.material.opacity = 0.35 * (1 - k * k) }, () => { a.shield.material.opacity = 0 }); return }
-      const ult = kind === 'ult', lunge = () => {
+      if (kind === 'counter') { a.shield.material.color.set(0xff9b3d); a.shield.material.opacity = 0.35; d3wave(ctx, new THREE.Vector3(a.x, 0, 0), 0xff9b3d, 2.5); d3tw(ctx, 1.1, (k) => { a.shield.material.opacity = 0.35 * (1 - k * k) }, () => { a.shield.material.opacity = 0; a.shield.material.color.set(0x4fd8ff) }); return }
+      if (kind === 'focus' || kind === 'heal') { const c2 = kind === 'heal' ? 0x6dff9a : 0xffd34d; a.glow.color.set(c2); d3burst(ctx, new THREE.Vector3(a.x, 1.2, 0.6), c2, 40, 3); d3beep(kind === 'heal' ? 620 : 440, 0.25, 'sine', 0.05, kind === 'heal' ? 900 : 700); d3tw(ctx, 0.9, (k) => { a.glow.intensity = 3.5 * (1 - k) }, () => { a.glow.intensity = 0 }); return }
+      const ult = kind === 'ult' || kind === 'heavy', lunge = () => {
         let hitDone = false; a.busy = true
-        d3tw(ctx, ult ? 0.7 : 0.6, (k) => {
+        d3tw(ctx, ult ? 0.7 : kind === 'jab' ? 0.38 : 0.6, (k) => {
           const p = k < 0.5 ? k * 2 : 2 - k * 2, e = p * p * (3 - 2 * p)
           a.g.position.x = a.x + dir * reach * e; a.body.position.y = a.y + Math.sin(k * Math.PI) * 0.6; a.body.rotation.z = -dir * Math.sin(k * Math.PI) * 0.35
           if (!hitDone && k >= 0.5) { hitDone = true; hit(d, ult ? 0xffd34d : col); if (ult) { d3wave(ctx, new THREE.Vector3(d.x, 0, 0), 0xffd34d, 7); ctx.shake = 2.8 } }
         }, () => { a.g.position.x = a.x; a.body.rotation.z = 0; a.busy = false; a.glow.intensity = 0; a.body.scale.set(a.body.scale.x < 0 ? -1 : 1, 1, 1) })
       }
       if (ult) { d3beep(500, 0.25, 'sine', 0.05, 1000); d3tw(ctx, 1.3, (k) => { ctx.zoom = -2.4 * Math.sin(k * Math.PI) }, () => { ctx.zoom = 0 }) }
-      if (ult) { a.busy = true; a.glow.color.set(0xffd34d); d3tw(ctx, 0.55, (k) => { a.glow.intensity = 4 * k; a.body.position.y = a.y + k * 0.7; const s = 1 + k * 0.25, sg = a.body.scale.x < 0 ? -1 : 1; a.body.scale.set(sg * s, s, 1); a.mat.color.setRGB(1 + k, 1 + k * 0.6, 1) }, () => { a.mat.color.set(0xffffff); lunge() }) } else lunge()
+      if (ult) { a.busy = true; a.glow.color.set(0xffd34d); d3tw(ctx, 0.55, (k) => { a.glow.intensity = 4 * k; a.body.position.y = a.y + k * 0.7; const s = 1 + k * 0.25, sg = a.body.scale.x < 0 ? -1 : 1; a.body.scale.set(sg * s, s, 1); a.mat.color.setRGB(1 + k, 1 + k * 0.6, 1) }, () => { a.mat.color.set(0xffffff); lunge() }) } else if (kind === 'jab') { lunge(); setTimeout(lunge, 430) } else lunge()
+      if (cn) setTimeout(() => hit(a, 0xff9b3d), ult ? 1100 : 380)
     },
-    ko(side) { const d = F[side]; d.busy = true; crowd.forEach((a) => a.cheer()); if (side === 'B') d3confetti(ctx, 150); d3beep(120, 0.4, 'sawtooth', 0.07, 40); d3burst(ctx, new THREE.Vector3(d.x, 1.6, 0), 0xffffff, 70, 6); d3tw(ctx, 0.9, (k) => { d.g.rotation.z = (d.x < 0 ? 1 : -1) * k * 1.4; d.g.position.y = -k * 0.4; d.mat.opacity = 1 - k * 0.7 }) },
+    ko(side) { const d = F[side]; d.ko = true; d.busy = true; crowd.forEach((a) => a.cheer()); if (side === 'B') d3confetti(ctx, 150); d3beep(120, 0.4, 'sawtooth', 0.07, 40); d3burst(ctx, new THREE.Vector3(d.x, 1.6, 0), 0xffffff, 70, 6); d3tw(ctx, 0.9, (k) => { d.g.rotation.z = (d.x < 0 ? 1 : -1) * k * 1.4; d.g.position.y = -k * 0.4; d.mat.opacity = 1 - k * 0.7 }) },
   }
 }
 
@@ -4488,32 +4490,48 @@ function BlookBattle({ user, rep, lv, onBack }) {
   const start = (id) => {
     setIntro(true); setTimeout(() => setIntro(false), 1300)
     const p = bstat(id), pool = BLOOKS.filter((b) => b.rarity !== 'owner' && RKD.indexOf(b.rarity) >= Math.max(0, p.ri - 1) && RKD.indexOf(b.rarity) <= p.ri && !b.id.startsWith('cd_')), bb = pool.length ? pool[rint(0, pool.length - 1)] : BLOOKS[0], b = bstat(bb.id); b.atk *= [0.8, 1, 1.2][lv]
-    setRes(null); setF({ P: { ...p, hp: p.max, ch: 0, g: false }, B: { ...b, hp: b.max, ch: 0, g: false }, turn: 'p', log: 'Your move!', hit: null, dmg: null, k: 0, last: null })
+    setRes(null); setF({ P: { ...p, hp: p.max, ch: 0, g: false, buff: false, ctr: false, hcd: 0 }, B: { ...b, hp: b.max, ch: 0, g: false, buff: false, ctr: false, hcd: 0 }, turn: 'p', log: 'Your move!', hit: null, dmg: null, k: 0, last: null })
   }
   const strike = (A, D, kind) => {
-    A = { ...A, g: false }; D = { ...D }
-    if (kind === 'guard') { A.g = true; A.hp = Math.min(A.max, A.hp + Math.round(A.max * 0.08)); return [A, D, `${A.name} raises a guard!`, 0] }
-    const ult = kind === 'ult'; let dmg = A.atk * (0.85 + Math.random() * 0.3) * (ult ? 2.4 : 1); const crit = !ult && Math.random() < 0.12; if (crit) dmg *= 1.6
-    if (D.g) dmg *= 0.4; dmg = Math.round(dmg); D.hp = Math.max(0, D.hp - dmg); A.ch = ult ? 0 : Math.min(3, A.ch + 1)
-    return [A, D, `${A.name} ${ult ? 'unleashes an ULTIMATE' : crit ? 'lands a CRITICAL hit' : 'hits'} for ${dmg}!`, dmg]
+    A = { ...A }; D = { ...D }; const wasCtr = D.ctr; A.g = false; A.ctr = false; if (A.hcd > 0) A.hcd--
+    if (kind === 'guard') { A.g = true; A.hp = Math.min(A.max, A.hp + Math.round(A.max * 0.08)); return [A, D, `${A.name} raises a guard!`, 0, false] }
+    if (kind === 'counter') { A.ctr = true; return [A, D, `${A.name} takes a counter stance!`, 0, false] }
+    if (kind === 'focus') { A.buff = true; A.ch = Math.min(3, A.ch + 1); return [A, D, `${A.name} focuses: the next hit will crit!`, 0, false] }
+    if (kind === 'heal') { const h = Math.round(A.max * 0.2); A.hp = Math.min(A.max, A.hp + h); A.hcd = 3; return [A, D, `${A.name} heals ${h} HP!`, 0, false] }
+    if (kind === 'heavy') { A.ch = Math.max(0, A.ch - 1); if (Math.random() < 0.25) return [A, D, `${A.name}'s heavy strike MISSES!`, 0, false] }
+    const mult = kind === 'ult' ? 2.4 : kind === 'heavy' ? 1.9 : kind === 'jab' ? 1.15 : 1
+    let dmg = A.atk * (0.85 + Math.random() * 0.3) * mult, crit = false
+    if (A.buff) { dmg *= 1.7; A.buff = false; crit = true } else if ((kind === 'atk' || kind === 'jab') && Math.random() < 0.12) { dmg *= 1.6; crit = true }
+    if (D.g) dmg *= 0.4; dmg = Math.round(dmg)
+    if (wasCtr) { const back = Math.round(D.atk * 1.2 * (0.85 + Math.random() * 0.3)); A.hp = Math.max(0, A.hp - back); D.ctr = false; return [A, D, `${D.name} COUNTERS for ${back}!`, back, true] }
+    D.hp = Math.max(0, D.hp - dmg); if (kind === 'ult') A.ch = 0; else if (kind !== 'heavy') A.ch = Math.min(3, A.ch + 1)
+    return [A, D, `${A.name} ${kind === 'ult' ? 'unleashes an ULTIMATE' : kind === 'heavy' ? 'smashes with a heavy strike' : kind === 'jab' ? 'jabs twice' : crit ? 'lands a CRITICAL hit' : 'hits'} for ${dmg}!`, dmg, false]
   }
+  const NODMG = ['guard', 'counter', 'focus', 'heal']
   const act = (kind) => {
     if (!f || f.turn !== 'p' || f.P.hp <= 0) return
     if (kind === 'ult' && f.P.ch < 3) return
-    const [P, B, t, d] = strike(f.P, f.B, kind)
-    setF({ ...f, P, B, log: t, hit: kind === 'guard' ? null : 'B', dmg: d, k: f.k + 1, last: { by: 'P', kind }, turn: B.hp <= 0 ? 'end' : 'b' })
+    if (kind === 'heavy' && f.P.ch < 1) return
+    if (kind === 'heal' && f.P.hcd > 0) return
+    const [P, B, t, d, cn] = strike(f.P, f.B, kind)
+    setF({ ...f, P, B, log: t, hit: NODMG.includes(kind) || !d ? null : cn ? 'P' : 'B', dmg: d, k: f.k + 1, last: { by: 'P', kind, cn }, turn: B.hp <= 0 || P.hp <= 0 ? 'end' : 'b' })
   }
   useEffect(() => {
     if (!f || f.turn !== 'b') return
     const t = setTimeout(() => {
-      const kind = f.B.ch >= 3 && Math.random() < 0.75 ? 'ult' : f.B.hp < f.B.max * 0.35 && Math.random() < 0.35 ? 'guard' : 'atk'
-      const [B, P, tx, d] = strike(f.B, f.P, kind)
-      setF({ ...f, P, B, log: tx, hit: kind === 'guard' ? null : 'P', dmg: d, k: f.k + 1, last: { by: 'B', kind }, turn: P.hp <= 0 ? 'end' : 'p' })
+      const B0 = f.B, P0 = f.P, r = Math.random(); let kind = 'atk'
+      if (B0.ch >= 3 && r < 0.85) kind = 'ult'
+      else if (B0.hp < B0.max * 0.35 && !B0.hcd && r < 0.6) kind = 'heal'
+      else if (P0.ch >= 3 && r < 0.55) kind = Math.random() < 0.5 ? 'counter' : 'guard'
+      else if (B0.buff) kind = B0.ch >= 1 && r < 0.5 ? 'heavy' : 'atk'
+      else { const pool = ['atk', 'atk', 'jab', 'focus', P0.ch >= 2 ? 'counter' : 'jab']; if (B0.ch >= 1) pool.push('heavy'); kind = pool[rint(0, pool.length - 1)] }
+      const [B, P, tx, d, cn] = strike(B0, P0, kind)
+      setF({ ...f, P, B, log: tx, hit: NODMG.includes(kind) || !d ? null : cn ? 'B' : 'P', dmg: d, k: f.k + 1, last: { by: 'B', kind, cn }, turn: P.hp <= 0 || B.hp <= 0 ? 'end' : 'p' })
     }, 1500)
     return () => clearTimeout(t)
   }, [f && f.turn, f && f.k])
   useEffect(() => { if (api && f) api.set(f.P.id, f.B.id) }, [api, f && f.P.id, f && f.B.id])
-  useEffect(() => { if (api && f && f.k > 0 && f.last) api.act(f.last.by, f.last.kind) }, [f && f.k])
+  useEffect(() => { if (api && f && f.k > 0 && f.last) api.act(f.last.by, f.last.kind, f.last.cn) }, [f && f.k])
   useEffect(() => {
     if (!f || f.turn !== 'end' || res) return
     const win = f.B.hp <= 0, tok = win ? 20 + f.B.ri * 5 : 0
@@ -4535,12 +4553,20 @@ function BlookBattle({ user, rep, lv, onBack }) {
         <Stage3D build={d3Arena} height={"clamp(16rem, calc(100dvh - 15rem), 56rem)"} onReady={setApi} />
         {intro && <div className="d3-big chunk" style={{ animation: 'd3up 1.3s ease-out forwards' }}>FIGHT!</div>}
         {[['P', f.P, 'l'], ['B', f.B, 'r']].map(([k, x, side]) => (
-          <div key={k} className={`d3-hud ${side}`}><div className="du-name">{x.name}{x.g ? ' 🛡️' : ''}</div>{bar(x)}<div className="du-pips">{[0, 1, 2].map((i) => <b key={i} className={x.ch > i ? 'on' : ''} />)}</div></div>
+          <div key={k} className={`d3-hud ${side}`}><div className="du-name">{x.name}{x.g ? ' 🛡️' : ''}{x.ctr ? ' ↩️' : ''}{x.buff ? ' 🎯' : ''}</div>{bar(x)}<div className="du-pips">{[0, 1, 2].map((i) => <b key={i} className={x.ch > i ? 'on' : ''} />)}</div></div>
         ))}
         {f.hit && f.dmg ? <div key={f.k} className={`d3-dmg ${f.hit === 'P' ? 'l' : 'r'}`} style={{ animationDelay: '.35s', opacity: 0 }}>-{f.dmg}</div> : null}
       </div>
       <div className="du-log" aria-live="polite">{f.log}</div>
-      <div className="du-acts"><button disabled={!can} onClick={() => act('atk')}>⚔️ Attack</button><button disabled={!can} onClick={() => act('guard')}>🛡️ Guard</button><button disabled={!can || f.P.ch < 3} className="ult" onClick={() => act('ult')}>💥 Ultimate</button></div>
+      <div className="du-acts" style={{ flexWrap: 'wrap' }}>
+        <button disabled={!can} onClick={() => act('atk')} title="Normal hit, +1 charge">⚔️ Attack</button>
+        <button disabled={!can} onClick={() => act('jab')} title="Two quick hits, +1 charge">⚡ Jab</button>
+        <button disabled={!can || f.P.ch < 1} onClick={() => act('heavy')} title="Costs 1 charge: big hit, 25% to miss">🔨 Heavy</button>
+        <button disabled={!can} onClick={() => act('focus')} title="Next hit is a big crit, +1 charge">🎯 Focus</button>
+        <button disabled={!can} onClick={() => act('guard')} title="Take 60% less damage and heal a little">🛡️ Guard</button>
+        <button disabled={!can} onClick={() => act('counter')} title="If they attack, block it and hit back">↩️ Counter</button>
+        <button disabled={!can || f.P.hcd > 0} onClick={() => act('heal')} title="Heal 20% (3 turn cooldown)">💚 Heal{f.P.hcd > 0 ? ` (${f.P.hcd})` : ''}</button>
+        <button disabled={!can || f.P.ch < 3} className="ult" onClick={() => act('ult')} title="Needs 3 charges">💥 Ultimate</button></div>
       {res && <DuelEnd {...res} onAgain={() => { setF(null); setSel(sel) }} onBack={onBack} />}
     </div>
   )
@@ -4671,6 +4697,7 @@ function d3Desert(ctx) {
     ctx.shake *= 0.85; cam.position.x = (Math.random() - 0.5) * ctx.shake; cam.position.y = 2.4 + (Math.random() - 0.5) * ctx.shake
   })
   const reset = () => { ['P', 'B'].forEach((s) => { const d = F[s]; d.g.rotation.z = 0; d.g.position.set(d.x, 0, 0); d.mat.opacity = 1; d.busy = false; d.body.position.y = d.y; d.glow.intensity = 0 }) }
+  const settle = () => ['P', 'B'].forEach((k) => { const d = F[k]; if (d.ko) return; d.g.position.x = d.x; d.body.rotation.z = 0; d.busy = false; d.mat.color.set(0xffffff); d.glow.intensity = 0 })
   return {
     set(p, b) { F.P.set(p); F.B.set(b); reset() },
     wait() { reset() },
