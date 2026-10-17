@@ -1112,3 +1112,15 @@ html[data-perf="1"] .pk,html[data-perf="1"] .st,html[data-perf="1"] .pm,html[dat
 .bk-name small{color:var(--tc)}
 .bk-badges{background:none;padding:0}
 .bk-badges img{width:40px;height:40px;object-fit:contain;display:block}
+
+.bk-name{display:inline-block !important;background:rgba(0,0,0,.28) !important;border:2px solid var(--line) !important;border-radius:14px !important;padding:.35rem .9rem !important;text-align:left}
+.bk-mid{flex:0 1 auto}
+
+.stp{--ink:#1a120d;--panel:#271b14;--cream:#fff3e3;--line:rgba(255,255,255,.2);--hi:rgba(255,255,255,.1);--or:#f7953a;--mute:#e7cfb4;color:#fff3e3}
+.stp .mute{color:#e7cfb4;opacity:1}
+.stp-side nav button.dng{color:#ff9d9d}
+.du-lobby{display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:16px;background:rgba(0,0,0,.35);border:2px solid var(--line);color:#fff}
+.du-lh{font-size:1.4rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.du-lp{font-weight:800;opacity:.85;white-space:nowrap}
+.du-lj{background:#2ecc71;color:#fff;border:0;border-radius:12px;padding:.5rem 1.4rem;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.du-lj:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
