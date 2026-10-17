@@ -583,7 +583,7 @@ const chat = (() => { // one shared live listener for the whole app
     const code = (e && e.code) || ''
     if (code === 'permission-denied' || code === 'firestore/permission-denied') return 'Firebase blocked this message (permission-denied). The Firestore chat rules must allow signed-in users to post.'
     if (code === 'unauthenticated') return 'Your Firebase session expired. Sign out and sign back in, then retry.'
-    if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'timeout') return 'Chat server timed out. Check your connection and try again.'
+    if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'timeout') return `Chat server timed out (${code}): ${(e && e.message) || 'No additional details'}. Check your connection and try again.`
     if (code === 'resource-exhausted') return 'Chat is temporarily rate-limited. Please wait a little and retry.'
     return `Message failed${code ? ` (${code})` : ''}: ${(e && e.message) || 'check your connection and Firebase settings.'}`
   }
