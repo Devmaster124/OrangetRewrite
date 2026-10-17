@@ -712,12 +712,12 @@ CS.admins = CS.admins || {}; CS.badges = CS.badges || {}; CS.rainbow = CS.rainbo
 const OKC = new Map(), cmdSubs = new Set()
 // ---- Toast notifications: command results and errors pop up here instead of sitting inline ----
 const toastSubs = new Set()
-const toast = (text, kind) => { if (!text) return; text = String(text); const bad = kind ? kind === 'err' : /^(only|unknown|add|not |could|command not|you |that |error|fail|no |can't|cannot|this browser|firebase|use |this erases|badge ids|owner commands|message failed|not building)/i.test(text); const t = { id: Math.random().toString(36).slice(2), text, kind: bad ? 'err' : 'ok' }; toastSubs.forEach((f) => f(t)) }
+const toast = (text, kind, o) => { if (!text) return; text = String(text); const bad = kind ? kind === 'err' : /^(only|unknown|add|not |could|command not|you |that |error|fail|no |can't|cannot|this browser|firebase|use |this erases|badge ids|owner commands|message failed|not building)/i.test(text); const t = { id: Math.random().toString(36).slice(2), text, kind: bad ? 'err' : 'ok', ...(o || {}) }; toastSubs.forEach((f) => f(t)) }
 function Toasts() {
   const [list, setList] = useState([])
-  useEffect(() => { const f = (t) => { setList((l) => [...l.slice(-3), t]); setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 5200) }; toastSubs.add(f); return () => toastSubs.delete(f) }, [])
+  useEffect(() => { const f = (t) => { setList((l) => [...l.slice(-3), t]); setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), t.ms || 5200) }; toastSubs.add(f); return () => toastSubs.delete(f) }, [])
   return ReactDOM.createPortal(
-    <div className="toast-wrap" aria-live="polite">{list.map((t) => <div key={t.id} className="toast-card" onClick={() => setList((l) => l.filter((x) => x.id !== t.id))}><div className={`toast-ic ${t.kind}`}>{t.kind === 'err' ? '!' : '✓'}</div><div className="toast-tx"><div className="toast-ti">{t.kind === 'err' ? 'Error' : 'Success'}</div><div className="toast-sub">{t.text}</div></div></div>)}</div>,
+    <div className="toast-wrap" aria-live="polite">{list.map((t) => <div key={t.id} className="toast-card" onClick={() => setList((l) => l.filter((x) => x.id !== t.id))}><div className={`toast-ic ${t.kind}`} style={t.icon === 'gavel' ? { background: 'transparent', borderBottom: 0, textShadow: 'none' } : undefined}>{t.icon === 'gavel' ? <svg viewBox="0 0 64 64" width="56" height="56" fill="#fff" aria-hidden="true"><g transform="rotate(45 32 28)"><rect x="10" y="6" width="44" height="18" rx="7" /><rect x="28" y="22" width="8" height="28" rx="3" /></g><rect x="4" y="50" width="30" height="8" rx="4" /></svg> : t.kind === 'err' ? '!' : '✓'}</div><div className="toast-tx"><div className="toast-ti">{t.title || (t.kind === 'err' ? 'Error' : 'Success')}</div><div className="toast-sub">{t.text}</div></div></div>)}</div>,
     document.body
   )
 }
@@ -1621,30 +1621,33 @@ function LobbyRow({ l, onJoin }) {
   )
 }
 function ProfileCard({ name, me, snap, onClose, onTrade }) {
-  const [bd, setBd] = useState(null)
-  const box = (label, v) => <div className="bk-stat"><div className="bk-sl">{label}</div><div className="bk-sv">{v}</div></div>
-  const title = roleOf(name)
+  const [bd, setBd] = useState(null), [, tick] = useState(0)
+  useEffect(() => { const f = () => tick((n) => n + 1); cmdSubs.add(f); return () => { cmdSubs.delete(f) } }, []) // mod / artist roles arrive after the profile opens, so re-draw when they do
+  const title = roleOf(name), bl = badgesOf(name), pct = snap && snap.px != null ? snap.px : 0
   return (
-    <div className="app-bg fixed inset-0 z-30 overflow-y-auto p-5 sm:p-8" role="dialog" aria-label={`${name} profile`}>
+    <div className="app-bg fixed inset-0 z-30 overflow-y-auto" style={{ padding: 'max(3.2rem, calc(env(safe-area-inset-top) + 2.4rem)) 1.25rem 2rem' }} role="dialog" aria-label={`${name} profile`}>
       <div className="bk-prof mx-auto max-w-5xl space-y-6">
-        <div className="bk-acts">
+        <section className="bk-head">
+          <div className="bob p-1"><Blook id={snap ? snap.av : 'toast'} size={110} /></div>
+          <div className="bk-mid">
+            <div className="bk-name chunk"><span className={nmCls(name)}>{name}</span><small>{title}</small></div>
+            {snap && <div className="bk-lv"><span className="chunk bk-lvn">{snap.lv}</span><div className="bk-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: pct + '%' }} /></div></div>}
+          </div>
+          <div className="bk-badges" style={{ position: 'relative', zIndex: 3 }}>{bl.map((id) => <button key={id} type="button" onClick={() => setBd(id)} aria-label={BADGE_DEFS[id].n} title={BADGE_DEFS[id].n} style={{ position: 'relative', zIndex: 3, touchAction: 'manipulation', cursor: 'pointer' }}><img src={BADGE_DEFS[id].img} width="40" height="40" alt={BADGE_DEFS[id].n} draggable={false} style={{ pointerEvents: 'none' }} /></button>)}</div>
+        </section>
+        <div className="bk-acts" style={{ position: 'relative', zIndex: 3 }}>
           <button className="bk-b bk-o" onClick={onClose}>← Back</button>
           {name !== me && <button className="bk-b bk-g" onClick={onTrade}>Request trade</button>}
         </div>
-        <section className="bk-head">
-          <div className="p-1"><Blook id={snap ? snap.av : 'toast'} size={110} /></div>
-          <div className="bk-mid">
-            <div className="bk-name chunk"><span className={nmCls(name)}>{name}</span><small>{title}</small></div>
-            {snap && <div className="bk-lv"><span className="chunk bk-lvn">{snap.lv}</span><div className="bk-bar"><div style={{ width: '100%', opacity: .35 }} /></div></div>}
-          </div>
-          <div className="bk-badges">{badgesOf(name).map((id) => <button key={id} onClick={() => setBd(id)} aria-label={BADGE_DEFS[id].n} title={BADGE_DEFS[id].n}><img src={BADGE_DEFS[id].img} width="40" height="40" alt={BADGE_DEFS[id].n} draggable={false} /></button>)}</div>
-        </section>
         {bd && <BadgeModal id={bd} onClose={() => setBd(null)} />}
         <section>
-          <div className="bk-tab chunk">Stats</div>
+          <h3 className="bk-tab chunk">Stats</h3>
           {snap ? (
             <div className="bk-panel">
-              {box('Tokens', Number(snap.tk || 0).toLocaleString())}{box('Blooks Unlocked', `${snap.ub} / ${BLOOKS.length}`)}{box('Blook Score', snap.sc)}{box('Packs Opened', Number(snap.pk || 0).toLocaleString())}{box('Messages Sent', Number(snap.ms || 0).toLocaleString())}{box('Trades Made', snap.tr)}{box('Level', snap.lv)}{box('Joined', fmtD(snap.cr))}
+              <div className="bk-stat"><div className="bk-sl">Tokens</div><div className="bk-sv"><Coins size={34} />{Number(snap.tk || 0).toLocaleString()}</div></div>
+              <div className="bk-stat"><div className="bk-sl">Blooks Unlocked</div><div className="bk-sv"><Boxes size={34} />{snap.ub} / {BLOOKS.length}</div></div>
+              <div className="bk-stat"><div className="bk-sl">Packs Opened</div><div className="bk-sv"><Store size={34} />{Number(snap.pk || 0).toLocaleString()}</div></div>
+              <div className="bk-stat"><div className="bk-sl">Messages Sent</div><div className="bk-sv"><MessageCircle size={34} />{Number(snap.ms || 0).toLocaleString()}</div></div>
             </div>
           ) : <div className="bk-panel"><p>No profile info yet. Profiles appear while a player has Oranget open.</p></div>}
         </section>
@@ -1779,7 +1782,7 @@ const levelOf = (u) => 1 + Math.floor(xpOf(u) / 100)
 const scoreOf = (u) => u.inv.reduce((s, id) => s + (PTS[byId(id)?.rarity] || 0), 0)
 const joinedOf = () => { try { const t = FB && FB.auth.currentUser && FB.auth.currentUser.metadata.creationTime; return t ? Date.parse(t) || 0 : 0 } catch { return 0 } }
 const fmtD = (t) => (t ? new Date(t).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown')
-const snapOf = (u) => ({ av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '', cr: u.created || joinedOf() })
+const snapOf = (u) => ({ px: xpOf(u) % 100, av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '', cr: u.created || joinedOf() })
 
 const hub = (() => {
   let log = [], pres = {}, ids = new Set(), subs = new Map(), started = false, status = '', state = 'retry', ver = 0, pend = new Set(), qf = false, qs = false
@@ -1891,7 +1894,7 @@ const BZS = (() => {
   const notify = () => { if (qn) return; qn = true; setTimeout(() => { qn = false; ver++; subs.forEach((f) => f()) }, 220) }
   const start = () => {
     if (started || !FB || !FB.auth.currentUser) return; started = true
-    const uid = FB.auth.currentUser.uid, fail = (e) => { err = e && e.code === 'permission-denied' ? 'The Bazaar needs the new Firestore rule. Publish it, then reload.' : 'Bazaar reconnecting…'; notify() }
+    const uid = FB.auth.currentUser.uid, fail = (e) => { err = e && e.code === 'permission-denied' ? 'Bazaar blocked by Firestore rules (permission-denied).' : e && e.code === 'resource-exhausted' ? 'Firebase daily free limit reached. Bazaar and chat return after it resets (midnight Pacific time).' : 'Bazaar problem: ' + ((e && (e.code || e.message)) || 'unknown'); notify() }
     FB.db.collection('bazaar').where('state', '==', 'open').onSnapshot((sn) => { sn.docChanges().forEach((c) => { if (c.type === 'removed') omap.delete(c.doc.id); else omap.set(c.doc.id, { ...c.doc.data(), id: c.doc.id }) }); dirty = true; err = ''; notify() }, fail)
     FB.db.collection('bazaar').where('sellerUid', '==', uid).onSnapshot((sn) => { mine = sn.docs.map((d) => ({ ...d.data(), id: d.id })); notify() }, fail)
   }
@@ -1932,11 +1935,13 @@ function useTradeEngine(user, update) {
       if (BZ_CLAIMING.has(d.id)) return; BZ_CLAIMING.add(d.id)
       try {
         let won = null; const r = FB.db.doc('bazaar/' + d.id)
-        await FB.db.runTransaction(async (t) => { const sn = await t.get(r); if (sn.exists && sn.data().state === 'sold' && sn.data().sellerUid === FB.auth.currentUser.uid) { won = sn.data(); t.update(r, { state: 'collected' }) } })
+        try {
+          await FB.db.runTransaction(async (t) => { const sn = await t.get(r); if (sn.exists && sn.data().state === 'sold' && sn.data().sellerUid === FB.auth.currentUser.uid) { won = sn.data(); t.update(r, { state: 'collected' }) } })
+        } catch (er) { if (er && er.code === 'permission-denied') won = d; else throw er } // rule not updated: still pay once (guarded by the escrow entry below)
         if (!won) return
         const c = latest.current, e = (c.escrow || []).find((x) => x.id === d.id)
-        if (e) update({ ...c, escrow: c.escrow.filter((x) => x.id !== d.id), tokens: c.tokens + Math.floor(won.price * 0.95), sales: (c.sales || 0) + 1 })
-      } catch {} finally { BZ_CLAIMING.delete(d.id) }
+        if (e) { update({ ...c, escrow: c.escrow.filter((x) => x.id !== d.id), tokens: c.tokens + Math.floor(won.price * 0.95), sales: (c.sales || 0) + 1 }); const bk = byId(won.blook || e.blook); toast(`${won.buyer || 'Someone'} has bought your ${bk ? bk.name : 'blook'} for ${Number(won.price).toLocaleString()} tokens!`, 'ok', { title: 'Bazaar', icon: 'gavel', ms: 9000 }) }
+      } catch (e) { console.warn('Bazaar sale could not be collected:', e); toast('Could not collect a Bazaar sale: ' + ((e && (e.code || e.message)) || 'error'), 'err') } finally { BZ_CLAIMING.delete(d.id) }
     })
   }, [kS])
   useEffect(() => { // buyer side: finish or refund any purchase that was interrupted, so the "waiting" tag never gets stuck
@@ -2042,7 +2047,7 @@ function useTradeEngine(user, update) {
         await FB.db.runTransaction(async (t) => { const sn = await t.get(r); if (!sn.exists || sn.data().state !== 'open') throw new Error('gone'); if (sn.data().price !== l.price) throw new Error('moved'); t.update(r, { state: 'sold', buyer: u.name, buyerUid: FB.auth.currentUser.uid, soldAt: Date.now() }) })
         const c = latest.current; update({ ...c, buying: rest(c), inv: [...c.inv, l.blook] })
         return 'Bought ' + byId(l.blook).name + '! It is in your collection now.'
-      } catch (e) { return e && e.message === 'gone' ? fail('Someone already bought that one.') : e && e.message === 'moved' ? fail('That listing just changed. Check the price and try again.', 1) : e && e.code === 'permission-denied' ? fail('The Bazaar needs the new Firestore rule.', 1) : fail('Could not buy that. Try again.', 1) }
+      } catch (e) { return e && e.message === 'gone' ? fail('Someone already bought that one.') : e && e.message === 'moved' ? fail('That listing just changed. Check the price and try again.', 1) : e && e.code === 'permission-denied' ? fail('The Bazaar needs the new Firestore rule.', 1) : fail('Could not buy that (' + ((e && (e.code || e.message)) || 'error') + '). Try again.', 1) }
       finally { BZ_BUSY.delete(l.id) }
     },
   }
@@ -2182,6 +2187,7 @@ function Bazaar({ user, eng }) {
   const rows = useMemo(() => bz.list.filter((l) => (l.state === 'open' || l.state === 'pending') && !String(l.blook).startsWith('fuse:') && (pack === 'all' || byId(l.blook).pack === pack) && (qq === '' || byId(l.blook).name.toLowerCase().includes(qq) || l.seller.toLowerCase().includes(qq)))
     .sort((a, b) => sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : sort === 'rarity' ? RO.indexOf(byId(b.blook).rarity) - RO.indexOf(byId(a.blook).rarity) : b.at - a.at), [bz, pack, sort, qq]), [lim, setLim] = useState(150)
   const sel = ask && bz.byId[ask]
+  useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 6000); return () => clearTimeout(t) }, [msg]) // old buy messages no longer stick around
   const tab = (k, l) => <button key={k} onClick={() => setView(k)} className={`bzt ${view === k ? 'on' : ''}`}>{l}</button>
   return (
     <div className="bzp flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1 text-[#4a1f06]">
