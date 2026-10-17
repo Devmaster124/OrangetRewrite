@@ -3890,14 +3890,14 @@ function OnlineC4({ user, rep, onBack }) {
 }
 
 // ---- Online duels for every game mode: one lobby system, game state lives in duels/{id}.s ----
-const rnd = (n) => Math.floor(Math.random() * n)
+const rndN = (n) => Math.floor(Math.random() * n)
 const EMJ = ['🍊', '🍎', '🍇', '🍋', '🍓', '🍉']
 const initOnline = (game) => game === 'battle' ? { hp: [100, 100], en: [0, 0], p1: null, p2: null, log: 'Pick your move.' }
-  : game === 'dice' ? { d: [[rnd(6) + 1, rnd(6) + 1, rnd(6) + 1], [rnd(6) + 1, rnd(6) + 1, rnd(6) + 1]], p1: null, p2: null, sc: [0, 0], log: 'Choose a die to reroll, or keep.' }
+  : game === 'dice' ? { d: [[rndN(6) + 1, rndN(6) + 1, rndN(6) + 1], [rndN(6) + 1, rndN(6) + 1, rndN(6) + 1]], p1: null, p2: null, sc: [0, 0], log: 'Choose a die to reroll, or keep.' }
   : game === 'draw' ? { go: 0, r1: null, r2: null, sc: [0, 0], log: 'Wait for DRAW…' }
   : game === 'clash' ? { p1: null, p2: null, sc: [0, 0], log: 'Pick your move.' }
   : game === 'memory' ? { cards: [...EMJ, ...EMJ].sort(() => Math.random() - 0.5), open: [], matched: [], turn: 1, sc: [0, 0], wait: false }
-  : { s1: null, s2: null, seed: rnd(1e6) }
+  : { s1: null, s2: null, seed: rndN(1e6) }
 const oppSeat = (n) => (n === 1 ? 2 : 1)
 function OnlineGame({ game, user, rep, onBack }) {
   const [list, setList] = useState([]), [id, setId] = useState(null), [g, setG] = useState(null), [err, setErr] = useState(''), [res, setRes] = useState(null), [now, setNow] = useState(Date.now()), paid = useRef(false), busy = useRef(false)
@@ -3912,7 +3912,7 @@ function OnlineGame({ game, user, rep, onBack }) {
     if (!g.winner) setRes({ win: false, gain: 0, tok: 0, tie: true }); else { const w = g.winner === seat; setRes({ win: w, ...rep(w, w ? 30 : 0) }) }
   }, [g && g.status])
   const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ game, host: user.name, hostUid: uid, guest: null, guestUid: null, status: 'open', winner: 0, s: initOnline(game), at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch { setErr('Could not create a lobby. Check the Firestore rule for duels.') } }
-  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rnd(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch { setErr('That lobby is gone.') } }
+  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rndN(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch { setErr('That lobby is gone.') } }
   const leave = async () => { try { if (id && g && g.status === 'open' && seat === 1) await FB.db.doc('duels/' + id).delete(); else if (id && g && g.status === 'playing' && seat) await FB.db.doc('duels/' + id).update({ status: 'done', winner: oppSeat(seat), upd: Date.now() }) } catch {} ; onBack() }
   const mineIn = s && (game === 'draw' ? s['r' + seat] !== null : s['p' + seat] !== undefined && s['p' + seat] !== null) || (game === 'shoot' && s && s['s' + seat] !== null)
   const theirIn = s && (game === 'draw' ? s['r' + oppSeat(seat)] !== null : game === 'shoot' ? s['s' + oppSeat(seat)] !== null : s['p' + oppSeat(seat)] !== undefined && s['p' + oppSeat(seat)] !== null)
@@ -3927,10 +3927,10 @@ function OnlineGame({ game, user, rep, onBack }) {
     const dead = [hp[0] <= 0, hp[1] <= 0], done = dead[0] || dead[1]
     return { s: { hp, en, p1: null, p2: null, log: `P1 ${BM[mv[0]]} · P2 ${BM[mv[1]]}` }, ...(done ? { status: 'done', winner: dead[0] && dead[1] ? 0 : dead[0] ? 2 : 1 } : {}) } })
   const dice = (k) => mutate((st, me) => { if (st['p' + me] !== null) return null; const n = { ...st, [`p${me}`]: k }; if (n.p1 === null || n.p2 === null) return { s: n }
-    const d = st.d.map((x, i) => { const y = [...x], p = i ? n.p2 : n.p1; if (p >= 0) y[p] = rnd(6) + 1; return y }), t = d.map((x) => x[0] + x[1] + x[2]), sc = [...st.sc]
+    const d = st.d.map((x, i) => { const y = [...x], p = i ? n.p2 : n.p1; if (p >= 0) y[p] = rndN(6) + 1; return y }), t = d.map((x) => x[0] + x[1] + x[2]), sc = [...st.sc]
     if (t[0] > t[1]) sc[0]++; else if (t[1] > t[0]) sc[1]++
     const done = sc[0] >= 3 || sc[1] >= 3
-    return { s: { d: done ? d : [[rnd(6) + 1, rnd(6) + 1, rnd(6) + 1], [rnd(6) + 1, rnd(6) + 1, rnd(6) + 1]], p1: null, p2: null, sc, log: `Totals ${t[0]} vs ${t[1]}` }, ...(done ? { status: 'done', winner: sc[0] > sc[1] ? 1 : 2 } : {}) } })
+    return { s: { d: done ? d : [[rndN(6) + 1, rndN(6) + 1, rndN(6) + 1], [rndN(6) + 1, rndN(6) + 1, rndN(6) + 1]], p1: null, p2: null, sc, log: `Totals ${t[0]} vs ${t[1]}` }, ...(done ? { status: 'done', winner: sc[0] > sc[1] ? 1 : 2 } : {}) } })
   const RPS = ['✊', '✋', '✌️']
   const clash = (k) => mutate((st, me) => { if (st['p' + me] !== null) return null; const n = { ...st, [`p${me}`]: k }; if (n.p1 === null || n.p2 === null) return { s: n }
     const sc = [...st.sc], a = n.p1, b = n.p2; if (a !== b) { if ((a + 1) % 3 === b) sc[1]++; else sc[0]++ }
@@ -3939,7 +3939,7 @@ function OnlineGame({ game, user, rep, onBack }) {
   const fire = () => { if (!s || s['r' + seat] !== null) return; const early = Date.now() < s.go, ms = early ? -1 : Date.now() - s.go; mutate((st, me) => { if (st['r' + me] !== null) return null; const n = { ...st, [`r${me}`]: ms }; if (n.r1 === null || n.r2 === null) return { s: n }
     const a = n.r1 < 0 ? 1e9 : n.r1, b = n.r2 < 0 ? 1e9 : n.r2, sc = [...st.sc]; if (a < b) sc[0]++; else if (b < a) sc[1]++
     const done = sc[0] >= 2 || sc[1] >= 2
-    return { s: { go: Date.now() + 3000 + rnd(3000), r1: null, r2: null, sc, log: `P1 ${n.r1 < 0 ? 'false start' : n.r1 + 'ms'} · P2 ${n.r2 < 0 ? 'false start' : n.r2 + 'ms'}` }, ...(done ? { status: 'done', winner: sc[0] > sc[1] ? 1 : 2 } : {}) } }) }
+    return { s: { go: Date.now() + 3000 + rndN(3000), r1: null, r2: null, sc, log: `P1 ${n.r1 < 0 ? 'false start' : n.r1 + 'ms'} · P2 ${n.r2 < 0 ? 'false start' : n.r2 + 'ms'}` }, ...(done ? { status: 'done', winner: sc[0] > sc[1] ? 1 : 2 } : {}) } }) }
   const flip = (k) => mutate((st, me) => { if (st.turn !== me || st.wait || st.open.includes(k) || st.matched.includes(k)) return null; const open = [...st.open, k]; if (open.length < 2) return { s: { ...st, open } }
     if (st.cards[open[0]] === st.cards[k]) { const matched = [...st.matched, ...open], sc = [...st.sc]; sc[me - 1]++; const done = matched.length === st.cards.length; return { s: { ...st, open: [], matched, sc }, ...(done ? { status: 'done', winner: sc[0] === sc[1] ? 0 : sc[0] > sc[1] ? 1 : 2 } : {}) } }
     return { s: { ...st, open, wait: true } } })
@@ -3947,7 +3947,7 @@ function OnlineGame({ game, user, rep, onBack }) {
   // sharpshooter: same seed for both, each plays 15s locally and submits a score
   const [sh, setSh] = useState({ on: false, t: 0, score: 0, tg: null }), shRef = useRef(sh)
   useEffect(() => { shRef.current = sh }, [sh])
-  useEffect(() => { if (game !== 'shoot' || !sh.on) return; const iv = setInterval(() => { const c = shRef.current, t = c.t + 1; if (t >= 25) { clearInterval(iv); setSh({ ...c, on: false, t, tg: null }); mutate((st, me) => { if (st['s' + me] !== null) return null; const n = { ...st, [`s${me}`]: c.score }; if (n.s1 === null || n.s2 === null) return { s: n }; return { s: n, status: 'done', winner: n.s1 === n.s2 ? 0 : n.s1 > n.s2 ? 1 : 2 } }) } else setSh({ ...c, t, tg: t % 1 === 0 ? { x: rnd(80) + 5, y: rnd(70) + 5 } : c.tg }) }, 600); return () => clearInterval(iv) }, [sh.on])
+  useEffect(() => { if (game !== 'shoot' || !sh.on) return; const iv = setInterval(() => { const c = shRef.current, t = c.t + 1; if (t >= 25) { clearInterval(iv); setSh({ ...c, on: false, t, tg: null }); mutate((st, me) => { if (st['s' + me] !== null) return null; const n = { ...st, [`s${me}`]: c.score }; if (n.s1 === null || n.s2 === null) return { s: n }; return { s: n, status: 'done', winner: n.s1 === n.s2 ? 0 : n.s1 > n.s2 ? 1 : 2 } }) } else setSh({ ...c, t, tg: t % 1 === 0 ? { x: rndN(80) + 5, y: rndN(70) + 5 } : c.tg }) }, 600); return () => clearInterval(iv) }, [sh.on])
   const mv = (k, label, on, dis) => <button key={k} className="btn bg-white/25 text-white disabled:opacity-40" disabled={dis} onClick={on}>{label}</button>
   const head = g && s ? <p className="chunk text-xl">{g.status === 'done' ? 'Game over' : 'You are P' + seat} <span className="text-base opacity-70">vs {seat === 1 ? g.guest : g.host}</span></p> : null
   const wait = <p className="mt-2 opacity-80">{mineIn ? 'Waiting for your opponent…' : 'Make your move.'}</p>
