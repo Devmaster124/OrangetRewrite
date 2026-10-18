@@ -490,7 +490,7 @@ const saveUser = (u) => {
   u = { ...u, saved: Date.now() }; latest = u
   clearTimeout(lsT); lsT = setTimeout(lsFlush, 350)
   const k = invKeyOf(u), urgent = k !== lastInvKey; lastInvKey = k
-  clearTimeout(cloudT); cloudT = setTimeout(pushCloud, urgent ? 1200 : Math.max(6000, 60000 - (Date.now() - (SYNC.lastW || 0))))
+  clearTimeout(cloudT); cloudT = setTimeout(pushCloud, urgent ? 1200 : Math.max(6000, 240000 - (Date.now() - (SYNC.lastW || 0))))
 }
 const flushCloud = () => { lsFlush(); clearTimeout(cloudT); return pushCloud() }
 addEventListener('pagehide', flushCloud)
@@ -1589,6 +1589,7 @@ function Blooks({ user, update, eng }) {
         <p className="mt-1 text-sm text-[#7a3409]">Tap a blook to see it bigger, sell it, or list it on the Bazaar.{(user.escrow || []).length > 0 ? ` ${user.escrow.length} listed on the Bazaar.` : ''}</p>
         <div className="mt-3 flex gap-2" role="tablist">{[['all', 'Collection'], ['secret', '???']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`btn ${tab === k ? 'bg-[#5a2608] text-white' : 'bg-white/60 text-[#5a2608]'}`}>{l}</button>)}</div>
         {tab === 'all' && isOw(user.name) && counts.yoshiking > 0 && <div className="mt-4 rounded-[2rem] border-b-8 border-black/30 p-5 shadow-lg" style={{ background: 'linear-gradient(135deg,#3a2600,#7a5200)' }}><h3 className="chunk border-b-4 border-yellow-300/70 pb-1 text-3xl dvm">Owner</h3><div className="mt-3 flex flex-wrap gap-3">{tile(byId('yoshiking'))}</div></div>}
+        {tab === 'all' && counts.pinksmile > 0 && <div className="mt-4 rounded-[2rem] border-b-8 border-black/30 p-5 shadow-lg" style={{ background: 'linear-gradient(135deg,#3a0a3a,#8a1a8a)' }}><h3 className="chunk border-b-4 border-pink-300/70 pb-1 text-3xl" style={{ color: '#ff9bf0' }}>Staff</h3><div className="mt-3 flex flex-wrap gap-3">{tile(byId('pinksmile'))}</div></div>}
         {tab === 'all' && <div className="mt-4 rounded-[2rem] border-b-8 border-black/20 bg-[#f7953a] p-5 shadow-lg">
           {PACKS.filter((p) => !p.secret && (!p.lab || Object.keys(counts).some(isLab))).map((p) => (
             <section key={p.id} className="mb-7 last:mb-0">
@@ -3549,16 +3550,137 @@ function Loader({ full }) {
   )
 }
 
+// ================= Raid (DEVMASTER only for now): fully 3D third-person lobby =================
+function RaidWorld({ user, onExit }) {
+  const mountRef = useRef(null), joyRef = useRef(null), knobRef = useRef(null), inp = useRef({ x: 0, y: 0, jump: false, run: false })
+  const [err, setErr] = useState(''), touch = useMemo(() => 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0, [])
+  useEffect(() => {
+    const T = window.THREE, el = mountRef.current
+    if (!T) { setErr('The 3D engine did not load. Check your connection and reload.'); return }
+    let renderer
+    try { renderer = new T.WebGLRenderer({ antialias: true }) } catch { setErr('This device could not start WebGL.'); return }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(el.clientWidth, el.clientHeight); renderer.shadowMap.enabled = true
+    el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block'; renderer.domElement.style.touchAction = 'none'
+    const scene = new T.Scene(); scene.background = new T.Color(0x120a1f); scene.fog = new T.Fog(0x120a1f, 40, 130)
+    const camera = new T.PerspectiveCamera(60, el.clientWidth / el.clientHeight, 0.1, 300)
+    scene.add(new T.HemisphereLight(0xffd9a0, 0x2a1540, 0.75))
+    const sun = new T.DirectionalLight(0xffe1b0, 0.9); sun.position.set(20, 40, 12); sun.castShadow = true
+    Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 100 }); sun.shadow.mapSize.set(1024, 1024); scene.add(sun)
+    // floor: dark plain with a checkered stone platform
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d')
+    cx.fillStyle = '#4a2f66'; cx.fillRect(0, 0, 128, 128); cx.fillStyle = '#5b3a7c'; cx.fillRect(0, 0, 64, 64); cx.fillRect(64, 64, 64, 64)
+    const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(14, 14)
+    const plat = new T.Mesh(new T.CylinderGeometry(24, 25, 1.2, 64), new T.MeshStandardMaterial({ map: tex, roughness: 0.9 })); plat.position.y = -0.6; plat.receiveShadow = true; scene.add(plat)
+    const ground = new T.Mesh(new T.CircleGeometry(160, 48), new T.MeshStandardMaterial({ color: 0x0c0614, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.3; scene.add(ground)
+    const rim = new T.Mesh(new T.TorusGeometry(24.6, 0.35, 12, 96), new T.MeshBasicMaterial({ color: 0xff9b3d })); rim.rotation.x = Math.PI / 2; rim.position.y = 0.05; scene.add(rim)
+    // pillars (solid): ring of 8
+    const solids = [], flames = []
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2, px = Math.cos(a) * 17, pz = Math.sin(a) * 17
+      const col = new T.Mesh(new T.BoxGeometry(2.2, 8, 2.2), new T.MeshStandardMaterial({ color: 0x3a2a52, roughness: 0.8 })); col.position.set(px, 4, pz); col.castShadow = col.receiveShadow = true; scene.add(col)
+      const fl = new T.Mesh(new T.SphereGeometry(0.8, 16, 12), new T.MeshBasicMaterial({ color: 0xff7a1a })); fl.position.set(px, 8.9, pz); scene.add(fl); flames.push(fl)
+      const pl = new T.PointLight(0xff8a2a, 0.6, 22); pl.position.set(px, 9.4, pz); scene.add(pl)
+      solids.push({ x: px, z: pz, r: 2 })
+    }
+    // raid gate at the back (placeholder for the raid entrance)
+    const gate = new T.Group(); gate.position.set(0, 0, -21)
+    for (const sx of [-4.5, 4.5]) { const p = new T.Mesh(new T.BoxGeometry(2, 12, 2), new T.MeshStandardMaterial({ color: 0x2c1f40 })); p.position.set(sx, 6, 0); p.castShadow = true; gate.add(p); solids.push({ x: sx, z: -21, r: 2 }) }
+    const arch = new T.Mesh(new T.TorusGeometry(4.5, 0.9, 12, 40, Math.PI), new T.MeshStandardMaterial({ color: 0x2c1f40 })); arch.position.y = 12; gate.add(arch)
+    const portal = new T.Mesh(new T.CircleGeometry(4.2, 40), new T.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0.8, side: T.DoubleSide })); portal.position.set(0, 7.2, 0); gate.add(portal)
+    scene.add(gate)
+    const label = (text, w, h, size, color) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(text, w / 2, h / 2); g.fillStyle = color; g.fillText(text, w / 2, h / 2); const s = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false })); return s }
+    const gl = label('RAID GATE · COMING SOON', 768, 96, 54, '#ffd9a0'); gl.scale.set(12, 1.5, 1); gl.position.set(0, 15.2, -21); scene.add(gl)
+    // embers
+    const N = 160, ep = new Float32Array(N * 3); for (let i = 0; i < N; i++) { ep[i * 3] = (Math.random() - 0.5) * 60; ep[i * 3 + 1] = Math.random() * 18; ep[i * 3 + 2] = (Math.random() - 0.5) * 60 }
+    const eg = new T.BufferGeometry(); eg.setAttribute('position', new T.BufferAttribute(ep, 3)); const embers = new T.Points(eg, new T.PointsMaterial({ color: 0xffa040, size: 0.28, transparent: true, opacity: 0.85 })); scene.add(embers)
+    // the player: blocky 3rd-person character
+    const hero = new T.Group(), M = (c) => new T.MeshStandardMaterial({ color: c, roughness: 0.7 }), box = (w, h, d, c) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), M(c)); m.castShadow = true; return m }
+    const body = box(1.3, 1.6, 0.8, 0xf7953a); body.position.y = 2.2; hero.add(body)
+    const head = box(1.2, 1.1, 1.1, 0xffd9a8); head.position.y = 3.6; hero.add(head)
+    for (const ex of [-0.28, 0.28]) { const e = new T.Mesh(new T.BoxGeometry(0.2, 0.26, 0.05), new T.MeshBasicMaterial({ color: 0x111111 })); e.position.set(ex, 3.7, 0.56); hero.add(e) }
+    const limb = (x, y, w, h, c) => { const g = new T.Group(); g.position.set(x, y, 0); const m = box(w, h, w, c); m.position.y = -h / 2; g.add(m); hero.add(g); return g }
+    const armL = limb(-0.95, 2.85, 0.45, 1.5, 0xffd9a8), armR = limb(0.95, 2.85, 0.45, 1.5, 0xffd9a8), legL = limb(-0.35, 1.4, 0.55, 1.4, 0x3d4a8a), legR = limb(0.35, 1.4, 0.55, 1.4, 0x3d4a8a)
+    const nm = label(user.name, 384, 72, 44, '#ffffff'); nm.scale.set(5, 0.95, 1); nm.position.y = 5.2; hero.add(nm)
+    scene.add(hero)
+    const st = { x: 0, z: 10, y: 0, vy: 0, face: Math.PI, yaw: 0, pitch: 0.45, dist: 11, t: 0, mv: 0 }, keys = {}
+    const kd = (e) => { if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); keys[e.code] = true }, ku = (e) => { keys[e.code] = false }
+    addEventListener('keydown', kd); addEventListener('keyup', ku)
+    // camera drag (mouse or finger) outside the joystick
+    const drag = {}
+    const pd = (e) => { drag[e.pointerId] = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId) } catch {} }
+    const pm = (e) => { const d = drag[e.pointerId]; if (!d) return; st.yaw -= (e.clientX - d.x) * 0.006; st.pitch = Math.max(0.12, Math.min(1.15, st.pitch + (e.clientY - d.y) * 0.005)); d.x = e.clientX; d.y = e.clientY }
+    const pu = (e) => { delete drag[e.pointerId] }
+    el.addEventListener('pointerdown', pd); el.addEventListener('pointermove', pm); el.addEventListener('pointerup', pu); el.addEventListener('pointercancel', pu)
+    const onWheel = (e) => { st.dist = Math.max(5, Math.min(18, st.dist + e.deltaY * 0.01)) }; el.addEventListener('wheel', onWheel, { passive: true })
+    const resize = () => { const w = el.clientWidth, h = el.clientHeight || 1; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix() }; addEventListener('resize', resize)
+    let raf = 0, last = performance.now()
+    const loop = (now) => {
+      raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; st.t += dt
+      let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + inp.current.x, iy = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + inp.current.y
+      if (keys.KeyQ) st.yaw += 1.8 * dt; if (keys.KeyE) st.yaw -= 1.8 * dt
+      const len = Math.hypot(ix, iy); if (len > 1) { ix /= len; iy /= len }
+      const run = keys.ShiftLeft || keys.ShiftRight || inp.current.run, speed = (run ? 15 : 9) * Math.min(1, len)
+      const fx = -Math.sin(st.yaw), fz = -Math.cos(st.yaw), rx = Math.cos(st.yaw), rz = -Math.sin(st.yaw)
+      let dx = fx * iy + rx * ix, dz = fz * iy + rz * ix; const dl = Math.hypot(dx, dz)
+      if (dl > 0.001) { dx /= dl; dz /= dl; st.x += dx * speed * dt; st.z += dz * speed * dt; let da = Math.atan2(dx, dz) - st.face; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; st.face += da * Math.min(1, dt * 14) }
+      for (const s of solids) { const ox = st.x - s.x, oz = st.z - s.z, d = Math.hypot(ox, oz), min = s.r + 0.7; if (d < min && d > 0.0001) { st.x = s.x + (ox / d) * min; st.z = s.z + (oz / d) * min } }
+      const rr = Math.hypot(st.x, st.z); if (rr > 23) { st.x *= 23 / rr; st.z *= 23 / rr }
+      if ((keys.Space || inp.current.jump) && st.y <= 0.001) st.vy = 11; st.vy -= 28 * dt; st.y += st.vy * dt; if (st.y < 0) { st.y = 0; st.vy = 0 }
+      st.mv += ((dl > 0.001 ? Math.min(1, len) : 0) - st.mv) * Math.min(1, dt * 10)
+      const sw = Math.sin(st.t * (run ? 14 : 10)) * 0.9 * st.mv; legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw; armR.rotation.x = sw
+      hero.position.set(st.x, st.y, st.z); hero.rotation.y = st.face
+      const cp = Math.cos(st.pitch); camera.position.set(st.x + Math.sin(st.yaw) * cp * st.dist, st.y + 2 + Math.sin(st.pitch) * st.dist, st.z + Math.cos(st.yaw) * cp * st.dist); camera.lookAt(st.x, st.y + 2.6, st.z)
+      portal.rotation.z += dt * 1.2; portal.material.opacity = 0.65 + Math.sin(st.t * 3) * 0.15
+      flames.forEach((f, i) => { const s = 1 + Math.sin(st.t * 6 + i) * 0.12; f.scale.set(s, s, s) })
+      const p = eg.attributes.position; for (let i = 0; i < N; i++) { let y = p.getY(i) + dt * (0.8 + (i % 5) * 0.2); if (y > 20) y = 0; p.setY(i, y) } p.needsUpdate = true
+      renderer.render(scene, camera)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => {
+      cancelAnimationFrame(raf); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', resize)
+      el.removeEventListener('pointerdown', pd); el.removeEventListener('pointermove', pm); el.removeEventListener('pointerup', pu); el.removeEventListener('pointercancel', pu); el.removeEventListener('wheel', onWheel)
+      scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose() }) } })
+      renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
+    }
+  }, [])
+  // on-screen joystick (touch devices)
+  const joy = useRef(null)
+  const jMove = (e) => { const j = joy.current; if (!j || j.id !== e.pointerId) return; const R = 52; let dx = e.clientX - j.cx, dy = e.clientY - j.cy; const d = Math.hypot(dx, dy); if (d > R) { dx = (dx / d) * R; dy = (dy / d) * R } inp.current.x = dx / R; inp.current.y = -dy / R; if (knobRef.current) knobRef.current.style.transform = `translate(${dx}px, ${dy}px)` }
+  const jDown = (e) => { e.stopPropagation(); const r = joyRef.current.getBoundingClientRect(); joy.current = { id: e.pointerId, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; try { joyRef.current.setPointerCapture(e.pointerId) } catch {} jMove(e) }
+  const jUp = (e) => { e.stopPropagation(); if (!joy.current || joy.current.id !== e.pointerId) return; joy.current = null; inp.current.x = 0; inp.current.y = 0; if (knobRef.current) knobRef.current.style.transform = 'translate(0,0)' }
+  const hud = { position: 'absolute', zIndex: 2, color: '#fff', textShadow: '0 2px 6px rgba(0,0,0,.7)' }
+  return (
+    <div className="fixed inset-0 z-50" style={{ background: '#120a1f', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}>
+      <div ref={mountRef} style={{ position: 'absolute', inset: 0 }} />
+      {err && <div style={{ ...hud, inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 24 }}><p className="chunk text-2xl">{err}</p></div>}
+      <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', left: 14, display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button className="bk-b bk-o" onClick={onExit}>← Back</button>
+      </div>
+      <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
+        <div className="chunk" style={{ fontSize: 28 }}>Raid Lobby</div><div style={{ fontSize: 14, opacity: 0.85 }}>1 / 4 players · {user.name}</div>
+      </div>
+      <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', right: 14 }}><button className="bk-b" disabled style={{ opacity: 0.55 }}>Start raid · soon</button></div>
+      {!touch && <div style={{ ...hud, bottom: 16, left: 0, right: 0, textAlign: 'center', fontSize: 14, pointerEvents: 'none' }}>WASD / Arrow keys move · Shift run · Space jump · drag to look · Q / E turn · scroll to zoom</div>}
+      {touch && <>
+        <div ref={joyRef} onPointerDown={jDown} onPointerMove={jMove} onPointerUp={jUp} onPointerCancel={jUp} style={{ ...hud, left: 'max(24px, env(safe-area-inset-left))', bottom: 'max(28px, env(safe-area-inset-bottom))', width: 132, height: 132, borderRadius: '50%', background: 'rgba(255,255,255,.14)', border: '3px solid rgba(255,255,255,.4)', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
+          <div ref={knobRef} style={{ width: 58, height: 58, borderRadius: '50%', background: 'rgba(255,255,255,.55)', boxShadow: '0 3px 10px rgba(0,0,0,.4)' }} />
+        </div>
+        <button onPointerDown={(e) => { e.stopPropagation(); inp.current.jump = true }} onPointerUp={() => { inp.current.jump = false }} onPointerCancel={() => { inp.current.jump = false }} className="chunk" style={{ ...hud, right: 'max(28px, env(safe-area-inset-right))', bottom: 'max(44px, env(safe-area-inset-bottom))', width: 84, height: 84, borderRadius: '50%', background: 'rgba(255,155,61,.8)', border: '3px solid rgba(255,255,255,.6)', fontSize: 18, touchAction: 'none' }}>Jump</button>
+      </>}
+    </div>
+  )
+}
+
 // ---------- Worlds (coming soon): 7 day countdown ----------
 const WORLDS_AT = Date.parse('2026-10-18T12:00:00-04:00')
-function Worlds({ onEnter, onCasino, onDuels, user }) {
+function Worlds({ onEnter, onCasino, onDuels, onRaid, user }) {
   const now = useNow(1000), left = Math.max(0, WORLDS_AT - now), box = [['Days', Math.floor(left / 864e5)], ['Hours', Math.floor(left / 36e5) % 24], ['Minutes', Math.floor(left / 6e4) % 60], ['Seconds', Math.floor(left / 1000) % 60]]
   return (
     <div className="h-full overflow-y-auto p-3 text-center text-[#4a1f06]">
       <div className="wl2">
         <div className="wl2-head"><div className="mx-auto w-fit"><Blook id="earth" size={84} /></div><h2 className="chunk text-5xl sm:text-6xl">Worlds</h2>
           <p className="mt-1">Pick a world to travel to. Something is coming…</p>
-          <div className="wl2-clock"><div><b className="chunk text-5xl tracking-[.35em]" style={{ textShadow: '0 0 14px #ff9b3d' }}>?????</b><span className="text-xs uppercase">Something is coming</span></div></div></div>
+          <div className="wl2-clock" onClick={isOw(user.name) ? onRaid : undefined} role={isOw(user.name) ? 'button' : undefined} style={isOw(user.name) ? { cursor: 'pointer' } : undefined}><div><b className="chunk text-5xl tracking-[.35em]" style={{ textShadow: '0 0 14px #ff9b3d' }}>?????</b><span className="text-xs uppercase">Something is coming</span></div></div></div>
         <div className="wl2-row"><FishPortal onEnter={onEnter} /><CasinoPortal onEnter={onCasino} />
           <DuelsPortal onEnter={onDuels} open={true} /></div>
       </div>
@@ -3934,8 +4056,8 @@ function OnlineC4({ user, rep, onBack }) {
     if (!g || g.status !== 'done' || !seat || paid.current) return; paid.current = true
     if (!g.winner) setRes({ win: false, gain: 0, tok: 0, tie: true }); else { const w = g.winner === seat; setRes({ win: w, ...rep(w, w ? 30 : 0) }) }
   }, [g && g.status])
-  const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, board: Array(42).fill(0), turn: 1, status: 'open', winner: 0, at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch { setErr('Could not create a lobby. Check the Firestore rule for duels.') } }
-  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const s = await t.get(r); if (!s.exists || s.data().status !== 'open') throw new Error('gone'); t.update(r, { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : 'That lobby is gone.') } }
+  const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, board: Array(42).fill(0), turn: 1, status: 'open', winner: 0, at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch (e) { setErr(e && e.code === 'resource-exhausted' ? 'Firebase daily free limit reached. Duels return after it resets (midnight Pacific) or once billing is upgraded.' : 'Could not create a lobby. Check the Firestore rule for duels.') } }
+  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const s = await t.get(r); if (!s.exists || s.data().status !== 'open') throw new Error('gone'); t.update(r, { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : e && e.code === 'resource-exhausted' ? 'Firebase daily free limit reached. Duels return after it resets (midnight Pacific) or once billing is upgraded.' : 'That lobby is gone.') } }
   const move = async (c) => {
     if (busy.current || !g || g.status !== 'playing' || g.turn !== seat) return; busy.current = true
     try { const r = FB.db.doc('duels/' + id); await FB.db.runTransaction(async (t) => { const s = await t.get(r), d = s.data(); if (d.status !== 'playing' || d.turn !== seat) throw new Error('no'); const b = [...d.board], row = c4row(b, c); if (row < 0) throw new Error('full'); b[row * 7 + c] = seat; const win = c4line(b, seat), full = b.every(Boolean); t.update(r, { board: b, turn: seat === 1 ? 2 : 1, upd: Date.now(), ...(win ? { status: 'done', winner: seat } : full ? { status: 'done', winner: 0 } : {}) }) }) } catch {} finally { busy.current = false }
@@ -3989,8 +4111,8 @@ function OnlineGame({ game, user, rep, onBack }) {
     if (!g || g.status !== 'done' || !seat || paid.current) return; paid.current = true
     if (!g.winner) setRes({ win: false, gain: 0, tok: 0, tie: true }); else { const w = g.winner === seat; setRes({ win: w, ...rep(w, w ? 30 : 0) }) }
   }, [g && g.status])
-  const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ game, host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, status: 'open', winner: 0, s: initOnline(game), at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch { setErr('Could not create a lobby. Check the Firestore rule for duels.') } }
-  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rndN(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : 'That lobby is gone.') } }
+  const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ game, host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, status: 'open', winner: 0, s: initOnline(game), at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch (e) { setErr(e && e.code === 'resource-exhausted' ? 'Firebase daily free limit reached. Duels return after it resets (midnight Pacific) or once billing is upgraded.' : 'Could not create a lobby. Check the Firestore rule for duels.') } }
+  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rndN(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : e && e.code === 'resource-exhausted' ? 'Firebase daily free limit reached. Duels return after it resets (midnight Pacific) or once billing is upgraded.' : 'That lobby is gone.') } }
   const leave = async () => { try { if (id && g && g.status === 'open' && seat === 1) await FB.db.doc('duels/' + id).delete(); else if (id && g && g.status === 'playing' && seat) await FB.db.doc('duels/' + id).update({ status: 'done', winner: oppSeat(seat), upd: Date.now() }) } catch {} ; onBack() }
   const mineIn = s && (game === 'draw' ? s['r' + seat] !== null : s['p' + seat] !== undefined && s['p' + seat] !== null) || (game === 'shoot' && s && s['s' + seat] !== null)
   const theirIn = s && (game === 'draw' ? s['r' + oppSeat(seat)] !== null : game === 'shoot' ? s['s' + oppSeat(seat)] !== null : s['p' + oppSeat(seat)] !== undefined && s['p' + oppSeat(seat)] !== null)
@@ -4171,6 +4293,7 @@ function Dashboard({ user, update, onLogout }) {
   const pending = eng.view.invites.length
   if (CS.banned[lc(user.name)]) return <div className="grid h-[100dvh] place-items-center bg-[#5a2608] p-6 text-center text-white"><div><h1 className="chunk text-5xl">Banned</h1><p className="mt-3">This account was banned from Oranget.</p><button className="btn mt-5 bg-white/20" onClick={onLogout}>Log out</button></div></div>
   if (world === 'casino') return <CasinoWorld user={user} update={update} eng={eng} onExit={() => setWorld(null)} />
+  if (world === 'raid' && isOw(user.name)) return <RaidWorld user={user} onExit={() => setWorld(null)} />
   if (world === 'duels') return <DuelsWorld user={user} update={update} onExit={() => setWorld(null)} />
   if (world === 'fishing') return <FishingWorld user={user} update={update} eng={eng} onExit={() => setWorld(null)} />
   return (
@@ -4201,7 +4324,7 @@ function Dashboard({ user, update, onLogout }) {
             {tab === 'bazaar' && <Bazaar user={user} eng={eng} />}
             {tab === 'leaders' && <Leaderboard user={user} eng={eng} go={go} />}
             {tab === 'chat' && <Chat user={user} eng={eng} go={go} />}
-            {tab === 'worlds' && <Worlds user={user} onEnter={() => setWorld('fishing')} onCasino={() => setWorld('casino')} onDuels={() => setWorld('duels')} />}
+            {tab === 'worlds' && <Worlds user={user} onEnter={() => setWorld('fishing')} onCasino={() => setWorld('casino')} onDuels={() => setWorld('duels')} onRaid={() => setWorld('raid')} />}
             {tab === 'trade' && <FitBox><Trade user={user} eng={eng} /></FitBox>}
           </div></Boundary>
         )}
