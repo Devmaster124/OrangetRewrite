@@ -1926,7 +1926,7 @@ const BZS = (() => {
     FB.db.collection('bazaar').where('state', '==', 'open').onSnapshot((sn) => { sn.docChanges().forEach((c) => { if (c.type === 'removed') omap.delete(c.doc.id); else omap.set(c.doc.id, { ...c.doc.data(), id: c.doc.id }) }); dirty = true; err = ''; notify() }, fail)
     FB.db.collection('bazaar').where('sellerUid', '==', uid).onSnapshot((sn) => { mine = sn.docs.map((d) => ({ ...d.data(), id: d.id })); notify() }, fail)
   }
-  return { sub(f) { subs.add(f); start(); const id = setInterval(start, 3000); return () => { subs.delete(f); clearInterval(id) } }, open: () => { if (dirty) { arr = [...omap.values()].filter((d) => !hidden.has(d.id)); dirty = false } return arr }, mine: () => mine, err: () => err, ver: () => ver, hide: (id) => { hidden.add(id); dirty = true; notify() }, unhide: (id) => { hidden.delete(id); dirty = true; notify() } }
+  return { sub(f) { subs.add(f); start(); const id = setInterval(start, 3000); return () => { subs.delete(f); clearInterval(id) } }, open: () => { if (dirty) { arr = [...omap.values()].filter((d) => !hidden.has(d.id) && !CS.banned[lc(d.seller || '')]); dirty = false } return arr }, mine: () => mine, err: () => err, ver: () => ver, hide: (id) => { hidden.add(id); dirty = true; notify() }, unhide: (id) => { hidden.delete(id); dirty = true; notify() } }
 })()
 const ENG_T = new Set(['*', 'inv', 'acc', 'off', 'lock', 'say', 'cancel', 'done', 'gcreate', 'gjoin', 'gleave', 'gsay', 'gstrike', 'gann'])
 let lastSay = 0
@@ -3553,22 +3553,20 @@ function Loader({ full }) {
 // ================= Raid (DEVMASTER only for now): fully 3D third-person open-world lobby =================
 // A green valley ringed by mountains, a river, a winding dirt path to a walled castle town, forests and wind-swayed grass.
 const raidAvatarSrc = (id) => { const b = byId(id) || BLOOKS[0]; if (b.rarity === 'owner') return IMG.vgyoshi || null; for (const k of [b.inv, b.img, b.id]) if (k && IMG[k]) return IMG[k]; if (b.parts) { const p = byId(b.parts[0]); if (p) for (const k of [p.inv, p.img, p.id]) if (k && IMG[k]) return IMG[k] } return null }
-const RAID_R = 240, RAID_G = 2.2, RAID_WATER = 0.35, RAID_TX = 130, RAID_TZ = -140, RAID_GT = 3.6
+const RAID_R = 330, RAID_G = 2.2, RAID_WATER = -50, RAID_TX = 50000, RAID_TZ = 50000, RAID_GT = 3.6
 const rSmooth = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
 const raidN = (x, z) => Math.sin(x * 0.013 + 1.7) * Math.cos(z * 0.011 - 0.4) + 0.5 * Math.sin(x * 0.031 + z * 0.027) + 0.25 * Math.sin(x * 0.07 - z * 0.06)
 const raidRidge = (x, z) => { const a = 1 - Math.abs(Math.sin(x * 0.009 + 0.8 * Math.sin(z * 0.007)) * Math.cos(z * 0.0085 + 0.5)); return a * a }
 const raidRiverZ = (x) => 78 + 28 * Math.sin(x * 0.018)
 const raidH = (x, z) => {
-  const r = Math.hypot(x, z); let h = RAID_G + (2.2 + 1.5 * raidN(x, z) * 0.5 - RAID_G) * rSmooth(34, 74, r)
-  h += rSmooth(235, 340, r) * (42 + 170 * raidRidge(x, z) + 15 * raidN(x * 1.7, z * 1.7))
-  const rf = rSmooth(16, 5, Math.abs(z - raidRiverZ(x))) * (1 - rSmooth(150, 235, Math.abs(x))); h += (RAID_WATER - 1.3 - h) * rf
-  return h + (RAID_GT - h) * (1 - rSmooth(40, 66, Math.hypot(x - RAID_TX, z - RAID_TZ)))
+  const r = Math.hypot(x, z)
+  return RAID_G + (2.2 + 1.2 * raidN(x, z) * 0.5 - RAID_G) * rSmooth(66, 120, r) + rSmooth(280, 520, r) * (8 + 12 * raidRidge(x, z)) // flat hub, gentle meadow, soft far hills
 }
 const RAID_PATH = [[20, -34], [34, -68], [18, -98], [58, -124], [96, -134], [RAID_TX - 38, RAID_TZ + 4]]
-const raidPathPts = (T) => new T.CatmullRomCurve3(RAID_PATH.map((p) => new T.Vector3(p[0], 0, p[1]))).getPoints(70)
+const raidPathPts = () => []
 function RaidWorld({ user, onExit }) {
   const mountRef = useRef(null), joyRef = useRef(null), knobRef = useRef(null), inp = useRef({ x: 0, y: 0, jump: false, run: false })
-  const [err, setErr] = useState(''), touch = useMemo(() => 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0, [])
+  const padRef = useRef(null), [pad, setPad] = useState(null), [queued, setQueued] = useState(''), [err, setErr] = useState(''), touch = useMemo(() => 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0, [])
   useEffect(() => {
     const T = window.THREE, el = mountRef.current
     if (!T) { setErr('The 3D engine did not load. Check your connection and reload.'); return }
@@ -3613,53 +3611,37 @@ function RaidWorld({ user, onExit }) {
         }
         tg.setAttribute('color', new T.BufferAttribute(col, 3)) }
       const terrain = new T.Mesh(tg, new T.MeshLambertMaterial({ map: mtex, vertexColors: true })); terrain.receiveShadow = true; scene.add(terrain)
-      // ---- river water with scrolling ripples
-      const wc = document.createElement('canvas'); wc.width = wc.height = 128; const w2 = wc.getContext('2d'); w2.fillStyle = '#6fc4e8'; w2.fillRect(0, 0, 128, 128)
-      for (let i = 0; i < 90; i++) { w2.strokeStyle = `rgba(255,255,255,${0.1 + rnd() * 0.25})`; w2.lineWidth = 1 + rnd() * 1.5; const x = rnd() * 128, y = rnd() * 128; w2.beginPath(); w2.moveTo(x, y); w2.quadraticCurveTo(x + 10, y + 3, x + 22, y); w2.stroke() }
-      const wtex = new T.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = T.RepeatWrapping; wtex.repeat.set(220, 220)
-      const water = new T.Mesh(new T.PlaneGeometry(1300, 1300), new T.MeshStandardMaterial({ map: wtex, color: 0x4fb4e0, transparent: true, opacity: 0.86, roughness: 0.12, metalness: 0.05 })); water.rotation.x = -Math.PI / 2; water.position.y = RAID_WATER; scene.add(water)
       // ---- stone plaza hub: fire pillars and the raid gate
       const pc = document.createElement('canvas'); pc.width = pc.height = 128; const p2 = pc.getContext('2d'); p2.fillStyle = '#8a8794'; p2.fillRect(0, 0, 128, 128); p2.fillStyle = '#7b7886'; p2.fillRect(0, 0, 64, 64); p2.fillRect(64, 64, 64, 64)
-      const ptex = new T.CanvasTexture(pc); ptex.wrapS = ptex.wrapT = T.RepeatWrapping; ptex.repeat.set(10, 10)
-      const plaza = new T.Mesh(new T.CylinderGeometry(30, 31, 0.5, 64), new T.MeshLambertMaterial({ map: ptex })); plaza.position.y = RAID_G - 0.2; plaza.receiveShadow = true; scene.add(plaza)
+      const ptex = new T.CanvasTexture(pc); ptex.wrapS = ptex.wrapT = T.RepeatWrapping; ptex.repeat.set(22, 22)
+      const plaza = new T.Mesh(new T.CylinderGeometry(62, 64, 0.5, 96), new T.MeshLambertMaterial({ map: ptex })); plaza.position.y = RAID_G - 0.2; plaza.receiveShadow = true; scene.add(plaza)
       const solids = [], flames = []
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2, px = Math.cos(a) * 20, pz = Math.sin(a) * 20
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2, px = Math.cos(a) * 54, pz = Math.sin(a) * 54
         const col = new T.Mesh(new T.BoxGeometry(2.2, 8, 2.2), new T.MeshLambertMaterial({ color: 0x6d6880 })); col.position.set(px, RAID_G + 4, pz); col.castShadow = col.receiveShadow = true; scene.add(col)
         const fl = new T.Mesh(new T.SphereGeometry(0.8, 16, 12), new T.MeshBasicMaterial({ color: 0xff7a1a })); fl.position.set(px, RAID_G + 8.9, pz); scene.add(fl); flames.push(fl)
         solids.push({ x: px, z: pz, r: 2 })
       }
-      const gate = new T.Group(); gate.position.set(0, RAID_G, -25)
-      for (const sx of [-4.5, 4.5]) { const p = new T.Mesh(new T.BoxGeometry(2, 12, 2), new T.MeshLambertMaterial({ color: 0x4a4260 })); p.position.set(sx, 6, 0); p.castShadow = true; gate.add(p); solids.push({ x: sx, z: -25, r: 2 }) }
-      const arch = new T.Mesh(new T.TorusGeometry(4.5, 0.9, 12, 40, Math.PI), new T.MeshLambertMaterial({ color: 0x4a4260 })); arch.position.y = 12; gate.add(arch)
-      const portal = new T.Mesh(new T.CircleGeometry(4.2, 40), new T.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0.8, side: T.DoubleSide })); portal.position.set(0, 7.2, 0); gate.add(portal)
-      scene.add(gate)
+      const portal = new T.Mesh(new T.RingGeometry(5, 7.5, 56), new T.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, side: T.DoubleSide })); portal.rotation.x = -Math.PI / 2; portal.position.set(0, RAID_G + 0.15, 0); scene.add(portal)
       const label = (text, w, h, size, color) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(text, w / 2, h / 2); g.fillStyle = color; g.fillText(text, w / 2, h / 2); return new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false, toneMapped: false })) }
-      const gl = label('RAID GATE · COMING SOON', 768, 96, 54, '#ffd9a0'); gl.scale.set(12, 1.5, 1); gl.position.set(0, RAID_G + 15.2, -25); scene.add(gl)
-      // ---- walled castle town (instanced)
-      const TX = RAID_TX, TZ = RAID_TZ, GT = RAID_GT, toGate = Math.atan2(-TZ, -TX)
+      const gl = label('RAID HUB', 512, 96, 60, '#ffd9a0'); gl.scale.set(14, 2.6, 1); gl.position.set(0, RAID_G + 7, 0); scene.add(gl)
+      const PADS = [['Meadow Raid', 0x4cd964, 0.25], ['Forest Depths', 0x2fbf9a, 0.75], ['Stone Ruins', 0xffb347, 1.25], ['Boss Rush', 0xff4f6a, 1.75]].map((p) => ({ n: p[0], c: p[1], x: Math.cos(Math.PI * p[2]) * 36, z: Math.sin(Math.PI * p[2]) * 36 }))
+      PADS.forEach((p) => {
+        const disc = new T.Mesh(new T.CircleGeometry(7, 40), new T.MeshBasicMaterial({ color: p.c, transparent: true, opacity: 0.4, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, RAID_G + 0.14, p.z); scene.add(disc)
+        const ring = new T.Mesh(new T.TorusGeometry(7, 0.28, 8, 56), new T.MeshBasicMaterial({ color: p.c })); ring.rotation.x = Math.PI / 2; ring.position.set(p.x, RAID_G + 0.2, p.z); scene.add(ring)
+        const beam = new T.Mesh(new T.CylinderGeometry(6.6, 6.6, 28, 32, 1, true), new T.MeshBasicMaterial({ color: p.c, transparent: true, opacity: 0.13, side: T.DoubleSide, depthWrite: false })); beam.position.set(p.x, RAID_G + 14, p.z); scene.add(beam)
+        const t1 = label(p.n, 512, 80, 54, '#ffffff'); t1.scale.set(13, 2.1, 1); t1.position.set(p.x, RAID_G + 11, p.z); scene.add(t1)
+        const t2 = label('0 / 4 queued', 384, 64, 40, '#ffe9b0'); t2.scale.set(8.5, 1.4, 1); t2.position.set(p.x, RAID_G + 8.9, p.z); scene.add(t2)
+      })
       const mk = (geo, color, n) => new T.InstancedMesh(geo, new T.MeshLambertMaterial({ color }), n)
-      const houses = [], towers = [], wallSeg = []
-      for (let k = 0; k < 28; k++) { const a = (k / 28) * Math.PI * 2; let da = Math.abs(a - ((toGate + Math.PI * 2) % (Math.PI * 2))); da = Math.min(da, Math.PI * 2 - da); if (da < 0.2) continue; const wx = TX + Math.cos(a) * 38, wz = TZ + Math.sin(a) * 38; wallSeg.push({ x: wx, z: wz, a }); if (k % 4 === 0) towers.push({ x: wx, z: wz }) }
-      let tries = 0; while (houses.length < 70 && tries++ < 900) { const a = rnd() * Math.PI * 2, rr = 6 + Math.sqrt(rnd()) * 27, x = TX + Math.cos(a) * rr, z = TZ + Math.sin(a) * rr; if (Math.abs(x - TX) < 3.2 || Math.abs(z - TZ) < 3.2) continue; if (Math.hypot(x - (TX + 18), z - (TZ - 18)) < 17) continue; if (houses.some((h) => Math.hypot(h.x - x, h.z - z) < 8.4)) continue; houses.push({ x, z, w: 5 + rnd() * 2.5, d: 5 + rnd() * 2.5, h: 4 + rnd() * 3, y: rnd() * 6.28, roof: [0xb8442f, 0x2f5fb8, 0x3f8f4f, 0xc9772c][Math.floor(rnd() * 4)] }) }
-      const hb = mk(new T.BoxGeometry(1, 1, 1), 0xffffff, houses.length), hr = mk(new T.ConeGeometry(0.78, 1, 4), 0xffffff, houses.length)
-      houses.forEach((h, i) => { dummy.position.set(h.x, GT + h.h / 2, h.z); dummy.rotation.set(0, h.y, 0); dummy.scale.set(h.w, h.h, h.d); dummy.updateMatrix(); hb.setMatrixAt(i, dummy.matrix); cc.setHSL(0.1, 0.25, 0.7 + rnd() * 0.15); hb.setColorAt(i, cc); dummy.position.set(h.x, GT + h.h + 1.6, h.z); dummy.rotation.set(0, h.y + Math.PI / 4, 0); dummy.scale.set(h.w * 1.35, 3.2, h.d * 1.35); dummy.updateMatrix(); hr.setMatrixAt(i, dummy.matrix); cc.setHex(h.roof); hr.setColorAt(i, cc); solids.push({ x: h.x, z: h.z, r: Math.max(h.w, h.d) * 0.62 }) })
-      const wb = mk(new T.BoxGeometry(9, 7, 2.2), 0x7d8296, wallSeg.length)
-      wallSeg.forEach((w, i) => { dummy.position.set(w.x, GT + 3.5, w.z); dummy.rotation.set(0, -w.a + Math.PI / 2, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); wb.setMatrixAt(i, dummy.matrix); solids.push({ x: w.x, z: w.z, r: 4.4 }) })
-      const tw = mk(new T.CylinderGeometry(2.6, 3, 12, 10), 0x6f7488, towers.length + 5), tr = mk(new T.ConeGeometry(3.6, 5.5, 10), 0x2f4a8f, towers.length + 5)
-      const castle = [{ x: TX + 18, z: TZ - 18, h: 24 }, { x: TX + 8, z: TZ - 28, h: 15 }, { x: TX + 28, z: TZ - 8, h: 15 }, { x: TX + 28, z: TZ - 28, h: 15 }, { x: TX + 8, z: TZ - 8, h: 15 }]
-      towers.forEach((t, i) => { dummy.position.set(t.x, GT + 6, t.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); tw.setMatrixAt(i, dummy.matrix); dummy.position.set(t.x, GT + 14.7, t.z); dummy.updateMatrix(); tr.setMatrixAt(i, dummy.matrix); solids.push({ x: t.x, z: t.z, r: 3.2 }) })
-      castle.forEach((t, j) => { const i = towers.length + j; dummy.position.set(t.x, GT + t.h / 2, t.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, t.h / 12, 1); dummy.updateMatrix(); tw.setMatrixAt(i, dummy.matrix); dummy.position.set(t.x, GT + t.h + 2.75 * (t.h > 20 ? 1.4 : 1), t.z); dummy.scale.set(1, t.h > 20 ? 1.4 : 1, 1); dummy.updateMatrix(); tr.setMatrixAt(i, dummy.matrix); solids.push({ x: t.x, z: t.z, r: 3.4 }) })
-      const keep = new T.Mesh(new T.BoxGeometry(16, 16, 16), new T.MeshLambertMaterial({ color: 0x80869a })); keep.position.set(TX + 18, GT + 8, TZ - 18); keep.castShadow = keep.receiveShadow = true; scene.add(keep); solids.push({ x: TX + 18, z: TZ - 18, r: 11 })
-      ;[hb, hr, wb, tw, tr].forEach((m) => { m.castShadow = true; m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; scene.add(m) })
-      const tl = label('CASTLE TOWN', 512, 80, 52, '#ffffff'); tl.scale.set(18, 2.8, 1); tl.position.set(TX - 38, GT + 18, TZ + 4); scene.add(tl)
+      const TX = RAID_TX, TZ = RAID_TZ // (no town any more; kept far away so the exclusion checks below stay harmless)
       // ---- forests: trunks, layered round canopies and pines (instanced, smooth shaded)
       const blobG = new T.IcosahedronGeometry(1, 2); { const p = blobG.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + 0.14 * Math.sin(p.getX(i) * 5.1 + p.getY(i) * 3.7) * Math.cos(p.getZ(i) * 4.3); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k) } blobG.computeVertexNormals() }
       const slopeAt = (x, z) => Math.abs(raidH(x + 1.5, z) - raidH(x, z)) + Math.abs(raidH(x, z + 1.5) - raidH(x, z))
       const trees = []; let ttry = 0
-      while (trees.length < 1000 && ttry++ < 6000) {
-        const a = rnd() * Math.PI * 2, r = 42 + Math.sqrt(rnd()) * 300, x = Math.cos(a) * r, z = Math.sin(a) * r, h = raidH(x, z)
-        if (h < RAID_WATER + 0.9 || h > 70 || slopeAt(x, z) > 1.6 || Math.hypot(x - TX, z - TZ) < 50 || Math.abs(z - raidRiverZ(x)) < 14 || pathD(x, z) < 5) continue
+      while (trees.length < 650 && ttry++ < 6000) {
+        const a = rnd() * Math.PI * 2, r = 72 + Math.sqrt(rnd()) * 330, x = Math.cos(a) * r, z = Math.sin(a) * r, h = raidH(x, z)
+        if (h > 70 || slopeAt(x, z) > 1.6 || Math.hypot(x - TX, z - TZ) < 50 || Math.abs(z - raidRiverZ(x)) < 14 || pathD(x, z) < 5) continue
         trees.push({ x, z, h, s: 0.8 + rnd() * 1.0, pine: rnd() < 0.45, t: rnd() })
       }
       const pines = trees.filter((t) => t.pine), rounds = trees.filter((t) => !t.pine)
@@ -3672,8 +3654,8 @@ function RaidWorld({ user, onExit }) {
       rounds.forEach((t, i) => { for (let k = 0; k < 3; k++) { const o = BO[k]; dummy.position.set(t.x + o[0] * t.s, t.h + o[1] * t.s, t.z + o[2] * t.s); dummy.rotation.set(0, t.t * 6.28 + k, 0); const s2 = o[3] * t.s; dummy.scale.set(s2, s2 * 0.82, s2); dummy.updateMatrix(); blobM[k].setMatrixAt(i, dummy.matrix); cc.setHSL(0.25 + t.t * 0.07, 0.55, 0.26 + t.t * 0.08 + k * 0.025); blobM[k].setColorAt(i, cc) } })
       ;[trunks, ...pineM, ...blobM].forEach((m) => { m.castShadow = true; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; scene.add(m) })
       trees.forEach((t) => { if (Math.hypot(t.x, t.z) < RAID_R + 12) solids.push({ x: t.x, z: t.z, r: 0.85 * t.s }) })
-      const rocks = mk(new T.DodecahedronGeometry(1.4, 1), 0xffffff, 140)
-      for (let i = 0; i < 140; i++) { let x = 0, z = 0, g = 0; do { const a = rnd() * Math.PI * 2, r = 40 + Math.sqrt(rnd()) * 280; x = Math.cos(a) * r; z = Math.sin(a) * r; g++ } while (g < 20 && (Math.hypot(x - TX, z - TZ) < 48 || Math.abs(z - raidRiverZ(x)) < 10)); const s = 0.8 + rnd() * 2.4; dummy.position.set(x, raidH(x, z) + s * 0.35, z); dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); dummy.scale.set(s, s * 0.7, s * 1.1); dummy.updateMatrix(); rocks.setMatrixAt(i, dummy.matrix); cc.setHSL(0.09, 0.07, 0.36 + rnd() * 0.2); rocks.setColorAt(i, cc); if (Math.hypot(x, z) < RAID_R + 8) solids.push({ x, z, r: s * 1.05 }) }
+      const rocks = mk(new T.DodecahedronGeometry(1.4, 1), 0xffffff, 70)
+      for (let i = 0; i < 70; i++) { let x = 0, z = 0, g = 0; do { const a = rnd() * Math.PI * 2, r = 70 + Math.sqrt(rnd()) * 300; x = Math.cos(a) * r; z = Math.sin(a) * r; g++ } while (g < 20 && (Math.hypot(x - TX, z - TZ) < 48 || Math.abs(z - raidRiverZ(x)) < 10)); const s = 0.8 + rnd() * 2.4; dummy.position.set(x, raidH(x, z) + s * 0.35, z); dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); dummy.scale.set(s, s * 0.7, s * 1.1); dummy.updateMatrix(); rocks.setMatrixAt(i, dummy.matrix); cc.setHSL(0.09, 0.07, 0.36 + rnd() * 0.2); rocks.setColorAt(i, cc); if (Math.hypot(x, z) < RAID_R + 8) solids.push({ x, z, r: s * 1.05 }) }
       rocks.castShadow = true; rocks.instanceMatrix.needsUpdate = true; rocks.instanceColor.needsUpdate = true; scene.add(rocks)
       // ---- animated grass: crossed tapered blades, swayed in the vertex shader; re-scattered around the player as you walk
       const bladeGeo = (() => { const pos = [], nor = [], idx = []; for (let k = 0; k < 3; k++) { const ang = (k * Math.PI) / 3, ca = Math.cos(ang), sa = Math.sin(ang), base = pos.length / 3; for (let row = 0; row <= 3; row++) { const y = row / 3, wd = 0.26 * (1 - y * 0.92); for (const sx of [-1, 1]) { pos.push(sx * wd * ca, y, sx * wd * sa); nor.push(0, 1, 0) } } for (let row = 0; row < 3; row++) { const a = base + row * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2) } } const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setIndex(idx); return g })()
@@ -3687,8 +3669,8 @@ function RaidWorld({ user, onExit }) {
         const i0 = Math.floor((cx - GR) / GRID), i1 = Math.ceil((cx + GR) / GRID), j0 = Math.floor((cz - GR) / GRID), j1 = Math.ceil((cz + GR) / GRID)
         for (let i = i0; i <= i1 && n < GMAX; i++) for (let j = j0; j <= j1 && n < GMAX; j++) {
           const x = (i + hs(i, j, 1)) * GRID, z = (j + hs(i, j, 2)) * GRID, d = Math.hypot(x - cx, z - cz); if (d > GR) continue
-          if (Math.hypot(x, z) < 31 || Math.hypot(x - TX, z - TZ) < 40) continue
-          const h = raidH(x, z); if (h < RAID_WATER + 0.5 || h > 90 || Math.abs(raidH(x + 1, z) - h) > 0.75) continue
+          if (Math.hypot(x, z) < 64) continue
+          const h = raidH(x, z); if (h > 90 || Math.abs(raidH(x + 1, z) - h) > 0.75) continue
           if (pathD(x, z) < 2.4) continue
           const fade = 1 - rSmooth(GR - 14, GR, d)
           dummy.position.set(x, h, z); dummy.rotation.set(0, hs(i, j, 3) * 6.28, 0); dummy.scale.set(0.9 + hs(i, j, 5) * 0.7, (0.7 + hs(i, j, 4) * 1.2) * fade, 0.9 + hs(i, j, 5) * 0.7); dummy.updateMatrix(); grass.setMatrixAt(n, dummy.matrix)
@@ -3697,17 +3679,18 @@ function RaidWorld({ user, onExit }) {
         }
         grass.count = n; flw.count = nf; grass.instanceMatrix.needsUpdate = true; if (grass.instanceColor) grass.instanceColor.needsUpdate = true; flw.instanceMatrix.needsUpdate = true; if (flw.instanceColor) flw.instanceColor.needsUpdate = true
       }
-      scatter(0, 14)
+      scatter(0, 70)
       // ---- the player: YOUR profile blook as a thick 3D slab (stacked layers), always facing the camera
       const hero = new T.Group(), skin = new T.Group(); hero.add(skin); scene.add(hero)
-      const BH = 4.4, LAYERS = 9, DEPTH = 0.7, av = snapOf(user).av, src = raidAvatarSrc(av)
-      const buildSlab = (aspect, map) => { for (let i = 0; i < LAYERS; i++) { const f = i / (LAYERS - 1), z = (f - 0.5) * DEPTH, edge = Math.abs(f - 0.5) * 2, m = new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.45, side: T.DoubleSide, toneMapped: false }); m.color.setScalar(i === 0 || i === LAYERS - 1 ? 1 : 0.62 + 0.3 * edge); const pl = new T.Mesh(new T.PlaneGeometry(BH * aspect, BH), m); pl.position.set(0, BH / 2, z); skin.add(pl) } }
-      if (src) new T.TextureLoader().load(src, (t) => buildSlab((t.image.width || 1) / (t.image.height || 1), t), undefined, () => buildSlab(1, null))
+      const BH = 4.4, LAYERS = 14, DEPTH = 1.1, av = snapOf(user).av, src = raidAvatarSrc(av)
+      const buildSlab = (aspect, map) => { for (let i = 0; i < LAYERS; i++) { const f = i / (LAYERS - 1), z = (f - 0.5) * DEPTH, edge = Math.abs(f - 0.5) * 2, m = new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.45, side: T.DoubleSide, toneMapped: false }); m.color.setScalar(i === LAYERS - 1 ? 1 : i === 0 ? 0.78 : 0.55 + 0.35 * edge); const pl = new T.Mesh(new T.PlaneGeometry(BH * aspect, BH), m); pl.position.set(0, BH / 2, z); skin.add(pl) } }
+      const isZero = (byId(av) || {}).rarity === 'zero', invertTex = (img) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = 255 - d.data[i]; d.data[i + 1] = 255 - d.data[i + 1]; d.data[i + 2] = 255 - d.data[i + 2] } g.putImageData(d, 0, 0); return new T.CanvasTexture(c) } // Zero blooks show their inverse art
+      if (src) new T.TextureLoader().load(src, (t) => { let tex = t; if (isZero) { try { tex = invertTex(t.image) } catch {} } buildSlab((t.image.width || 1) / (t.image.height || 1), tex) }, undefined, () => buildSlab(1, null))
       else buildSlab(1, null)
       const nm = label(user.name, 384, 72, 44, '#ffffff'); nm.scale.set(5, 0.95, 1); nm.position.y = BH + 1; hero.add(nm)
       const blob = new T.Mesh(new T.CircleGeometry(1.7, 20), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false })); blob.rotation.x = -Math.PI / 2; scene.add(blob)
-      const st = { x: 0, z: 14, y: 0, vy: 0, yaw: 0, pitch: 0.42, dist: 12, t: 0, mv: 0, lx: 0, ly: 0 }, keys = {}
-      const kd = (e) => { if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); keys[e.code] = true }, ku = (e) => { keys[e.code] = false }
+      const st = { x: 0, z: 70, y: 0, vy: 0, face: Math.PI, yaw: 0, pitch: 0.42, dist: 12, t: 0, mv: 0, lx: 0, ly: 0 }, keys = {}
+      const kd = (e) => { if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); keys[e.code] = true; if (e.code === 'KeyF' && padRef.current) setQueued(padRef.current) }, ku = (e) => { keys[e.code] = false }
       addEventListener('keydown', kd); addEventListener('keyup', ku)
       const drag = {}
       const pd = (e) => { drag[e.pointerId] = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId) } catch {} }
@@ -3725,23 +3708,23 @@ function RaidWorld({ user, onExit }) {
         const run = keys.ShiftLeft || keys.ShiftRight || inp.current.run, speed = (run ? 30 : 14) * Math.min(1, len)
         const fx = -Math.sin(st.yaw), fz = -Math.cos(st.yaw), rx = Math.cos(st.yaw), rz = -Math.sin(st.yaw)
         let dx = fx * jy + rx * jx, dz = fz * jy + rz * jx; const dl = Math.hypot(dx, dz)
-        if (dl > 0.001) { dx /= dl; dz /= dl; const nx = st.x + dx * speed * dt, nz = st.z + dz * speed * dt; if (raidH(nx, nz) > RAID_WATER - 0.9) { st.x = nx; st.z = nz } } // the deep river is not walkable
+        if (dl > 0.001) { dx /= dl; dz /= dl; st.x += dx * speed * dt; st.z += dz * speed * dt }
         for (const s of solids) { const ox = st.x - s.x; if (ox > 14 || ox < -14) continue; const oz = st.z - s.z, d = Math.hypot(ox, oz), min = s.r + 0.8; if (d < min && d > 0.0001) { st.x = s.x + (ox / d) * min; st.z = s.z + (oz / d) * min } }
-        const rr = Math.hypot(st.x, st.z); if (rr > RAID_R) { st.x *= RAID_R / rr; st.z *= RAID_R / rr }
+        const rr = Math.hypot(st.x, st.z); if (rr > RAID_R) { st.x *= RAID_R / rr; st.z *= RAID_R / rr } // wide open meadow, walk anywhere
         const gy = raidH(st.x, st.z)
         if ((keys.Space || inp.current.jump) && st.y <= 0.001) st.vy = 12; st.vy -= 30 * dt; st.y += st.vy * dt; if (st.y < 0) { st.y = 0; st.vy = 0 }
         st.mv += ((dl > 0.001 ? Math.min(1, len) : 0) - st.mv) * Math.min(1, dt * 10); st.lx += (jx - st.lx) * Math.min(1, dt * 8); st.ly += (jy - st.ly) * Math.min(1, dt * 8)
         const hop = Math.abs(Math.sin(st.t * (run ? 13 : 10))) * 0.4 * st.mv, sq = Math.sin(st.t * 3) * 0.015
-        hero.position.set(st.x, gy + st.y + hop, st.z); hero.rotation.y = st.yaw; skin.rotation.z = -st.lx * 0.28; skin.rotation.x = -st.ly * 0.14; skin.scale.set(1 + sq - hop * 0.04, 1 - sq + hop * 0.05, 1)
+        hero.position.set(st.x, gy + st.y + hop, st.z); if (dl > 0.001) { let da = Math.atan2(dx, dz) - st.face; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; st.face += da * Math.min(1, dt * 12) } hero.rotation.y = st.face; skin.rotation.z = Math.sin(st.t * (run ? 13 : 10)) * 0.07 * st.mv; skin.rotation.x = 0.14 * st.mv; skin.scale.set(1 + sq - hop * 0.04, 1 - sq + hop * 0.05, 1)
         blob.position.set(st.x, gy + 0.06, st.z); const bs = Math.max(0.5, 1 - st.y * 0.06); blob.scale.set(bs, bs, bs)
         const cp = Math.cos(st.pitch), cx = st.x + Math.sin(st.yaw) * cp * st.dist, cz = st.z + Math.cos(st.yaw) * cp * st.dist; let cy = gy + st.y + 2 + Math.sin(st.pitch) * st.dist
         cy = Math.max(cy, raidH(cx, cz) + 1.6); camera.position.set(cx, cy, cz); camera.lookAt(st.x, gy + st.y + 2.6, st.z)
         sun.position.set(st.x + 80, gy + 120, st.z + 50); sun.target.position.set(st.x, gy, st.z); sun.target.updateMatrixWorld()
         dome.position.set(camera.position.x, 0, camera.position.z); sunSpr.position.set(camera.position.x + 1100, 1300, camera.position.z + 700)
         clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > camera.position.x + 1300) c.position.x = camera.position.x - 1300 })
-        wtex.offset.x = st.t * 0.0035; wtex.offset.y = st.t * 0.0015
         if (Math.hypot(st.x - lastC.x, st.z - lastC.z) > 16) scatter(st.x, st.z)
-        portal.rotation.z += dt * 1.2; portal.material.opacity = 0.65 + Math.sin(st.t * 3) * 0.15
+        portal.rotation.z += dt * 0.8; portal.material.opacity = 0.65 + Math.sin(st.t * 3) * 0.15
+        { let near = null; for (const p of PADS) if (Math.hypot(st.x - p.x, st.z - p.z) < 7.5) near = p.n; if (near !== padRef.current) { padRef.current = near; setPad(near) } }
         flames.forEach((f, i) => { const s = 1 + Math.sin(st.t * 6 + i) * 0.12; f.scale.set(s, s, s) })
         renderer.render(scene, camera)
       }
@@ -3772,6 +3755,7 @@ function RaidWorld({ user, onExit }) {
         <div className="chunk" style={{ fontSize: 28 }}>Raid Lobby</div><div style={{ fontSize: 14, opacity: 0.85 }}>1 / 4 players · {user.name}</div>
       </div>
       <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', right: 14 }}><button className="bk-b" disabled style={{ opacity: 0.55 }}>Start raid · soon</button></div>
+      {(pad || queued) && <div style={{ ...hud, bottom: touch ? 170 : 56, left: 0, right: 0, textAlign: 'center' }}>{pad ? <button className="bk-b bk-g chunk" onClick={() => setQueued(pad)} style={{ fontSize: 20 }}>{queued === pad ? `Queued for ${pad}` : `Queue for ${pad}${touch ? '' : '  (F)'}`}</button> : <div className="chunk" style={{ fontSize: 18 }}>Queued for {queued} · raids launch soon</div>}</div>}
       {!touch && <div style={{ ...hud, bottom: 16, left: 0, right: 0, textAlign: 'center', fontSize: 14, pointerEvents: 'none' }}>WASD / Arrow keys move · Shift run · Space jump · drag to look · Q / E turn · scroll to zoom</div>}
       {touch && <>
         <div ref={joyRef} onPointerDown={jDown} onPointerMove={jMove} onPointerUp={jUp} onPointerCancel={jUp} style={{ ...hud, left: 'max(24px, env(safe-area-inset-left))', bottom: 'max(28px, env(safe-area-inset-bottom))', width: 132, height: 132, borderRadius: '50%', background: 'rgba(255,255,255,.14)', border: '3px solid rgba(255,255,255,.4)', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
