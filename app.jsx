@@ -3550,98 +3550,210 @@ function Loader({ full }) {
   )
 }
 
-// ================= Raid (DEVMASTER only for now): fully 3D third-person lobby =================
+// ================= Raid (DEVMASTER only for now): fully 3D third-person open-world lobby =================
+// A green valley ringed by mountains, a river, a winding dirt path to a walled castle town, forests and wind-swayed grass.
+const raidAvatarSrc = (id) => { const b = byId(id) || BLOOKS[0]; if (b.rarity === 'owner') return IMG.vgyoshi || null; for (const k of [b.inv, b.img, b.id]) if (k && IMG[k]) return IMG[k]; if (b.parts) { const p = byId(b.parts[0]); if (p) for (const k of [p.inv, p.img, p.id]) if (k && IMG[k]) return IMG[k] } return null }
+const RAID_R = 240, RAID_G = 2.2, RAID_WATER = 0.35, RAID_TX = 130, RAID_TZ = -140, RAID_GT = 3.6
+const rSmooth = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
+const raidN = (x, z) => Math.sin(x * 0.013 + 1.7) * Math.cos(z * 0.011 - 0.4) + 0.5 * Math.sin(x * 0.031 + z * 0.027) + 0.25 * Math.sin(x * 0.07 - z * 0.06)
+const raidRidge = (x, z) => { const a = 1 - Math.abs(Math.sin(x * 0.009 + 0.8 * Math.sin(z * 0.007)) * Math.cos(z * 0.0085 + 0.5)); return a * a }
+const raidRiverZ = (x) => 78 + 28 * Math.sin(x * 0.018)
+const raidH = (x, z) => {
+  const r = Math.hypot(x, z); let h = RAID_G + (2.2 + 1.5 * raidN(x, z) * 0.5 - RAID_G) * rSmooth(34, 74, r)
+  h += rSmooth(235, 340, r) * (42 + 170 * raidRidge(x, z) + 15 * raidN(x * 1.7, z * 1.7))
+  const rf = rSmooth(16, 5, Math.abs(z - raidRiverZ(x))) * (1 - rSmooth(150, 235, Math.abs(x))); h += (RAID_WATER - 1.3 - h) * rf
+  return h + (RAID_GT - h) * (1 - rSmooth(40, 66, Math.hypot(x - RAID_TX, z - RAID_TZ)))
+}
+const RAID_PATH = [[20, -34], [34, -68], [18, -98], [58, -124], [96, -134], [RAID_TX - 38, RAID_TZ + 4]]
+const raidPathPts = (T) => new T.CatmullRomCurve3(RAID_PATH.map((p) => new T.Vector3(p[0], 0, p[1]))).getPoints(70)
 function RaidWorld({ user, onExit }) {
   const mountRef = useRef(null), joyRef = useRef(null), knobRef = useRef(null), inp = useRef({ x: 0, y: 0, jump: false, run: false })
   const [err, setErr] = useState(''), touch = useMemo(() => 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0, [])
   useEffect(() => {
     const T = window.THREE, el = mountRef.current
     if (!T) { setErr('The 3D engine did not load. Check your connection and reload.'); return }
-    let renderer
-    try { renderer = new T.WebGLRenderer({ antialias: true }) } catch { setErr('This device could not start WebGL.'); return }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(el.clientWidth, el.clientHeight); renderer.shadowMap.enabled = true
-    el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block'; renderer.domElement.style.touchAction = 'none'
-    const scene = new T.Scene(); scene.background = new T.Color(0x120a1f); scene.fog = new T.Fog(0x120a1f, 40, 130)
-    const camera = new T.PerspectiveCamera(60, el.clientWidth / el.clientHeight, 0.1, 300)
-    scene.add(new T.HemisphereLight(0xffd9a0, 0x2a1540, 0.75))
-    const sun = new T.DirectionalLight(0xffe1b0, 0.9); sun.position.set(20, 40, 12); sun.castShadow = true
-    Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 100 }); sun.shadow.mapSize.set(1024, 1024); scene.add(sun)
-    // floor: dark plain with a checkered stone platform
-    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d')
-    cx.fillStyle = '#4a2f66'; cx.fillRect(0, 0, 128, 128); cx.fillStyle = '#5b3a7c'; cx.fillRect(0, 0, 64, 64); cx.fillRect(64, 64, 64, 64)
-    const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(14, 14)
-    const plat = new T.Mesh(new T.CylinderGeometry(24, 25, 1.2, 64), new T.MeshStandardMaterial({ map: tex, roughness: 0.9 })); plat.position.y = -0.6; plat.receiveShadow = true; scene.add(plat)
-    const ground = new T.Mesh(new T.CircleGeometry(160, 48), new T.MeshStandardMaterial({ color: 0x0c0614, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.3; scene.add(ground)
-    const rim = new T.Mesh(new T.TorusGeometry(24.6, 0.35, 12, 96), new T.MeshBasicMaterial({ color: 0xff9b3d })); rim.rotation.x = Math.PI / 2; rim.position.y = 0.05; scene.add(rim)
-    // pillars (solid): ring of 8
-    const solids = [], flames = []
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2, px = Math.cos(a) * 17, pz = Math.sin(a) * 17
-      const col = new T.Mesh(new T.BoxGeometry(2.2, 8, 2.2), new T.MeshStandardMaterial({ color: 0x3a2a52, roughness: 0.8 })); col.position.set(px, 4, pz); col.castShadow = col.receiveShadow = true; scene.add(col)
-      const fl = new T.Mesh(new T.SphereGeometry(0.8, 16, 12), new T.MeshBasicMaterial({ color: 0xff7a1a })); fl.position.set(px, 8.9, pz); scene.add(fl); flames.push(fl)
-      const pl = new T.PointLight(0xff8a2a, 0.6, 22); pl.position.set(px, 9.4, pz); scene.add(pl)
-      solids.push({ x: px, z: pz, r: 2 })
-    }
-    // raid gate at the back (placeholder for the raid entrance)
-    const gate = new T.Group(); gate.position.set(0, 0, -21)
-    for (const sx of [-4.5, 4.5]) { const p = new T.Mesh(new T.BoxGeometry(2, 12, 2), new T.MeshStandardMaterial({ color: 0x2c1f40 })); p.position.set(sx, 6, 0); p.castShadow = true; gate.add(p); solids.push({ x: sx, z: -21, r: 2 }) }
-    const arch = new T.Mesh(new T.TorusGeometry(4.5, 0.9, 12, 40, Math.PI), new T.MeshStandardMaterial({ color: 0x2c1f40 })); arch.position.y = 12; gate.add(arch)
-    const portal = new T.Mesh(new T.CircleGeometry(4.2, 40), new T.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0.8, side: T.DoubleSide })); portal.position.set(0, 7.2, 0); gate.add(portal)
-    scene.add(gate)
-    const label = (text, w, h, size, color) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(text, w / 2, h / 2); g.fillStyle = color; g.fillText(text, w / 2, h / 2); const s = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false })); return s }
-    const gl = label('RAID GATE · COMING SOON', 768, 96, 54, '#ffd9a0'); gl.scale.set(12, 1.5, 1); gl.position.set(0, 15.2, -21); scene.add(gl)
-    // embers
-    const N = 160, ep = new Float32Array(N * 3); for (let i = 0; i < N; i++) { ep[i * 3] = (Math.random() - 0.5) * 60; ep[i * 3 + 1] = Math.random() * 18; ep[i * 3 + 2] = (Math.random() - 0.5) * 60 }
-    const eg = new T.BufferGeometry(); eg.setAttribute('position', new T.BufferAttribute(ep, 3)); const embers = new T.Points(eg, new T.PointsMaterial({ color: 0xffa040, size: 0.28, transparent: true, opacity: 0.85 })); scene.add(embers)
-    // the player: blocky 3rd-person character
-    const hero = new T.Group(), M = (c) => new T.MeshStandardMaterial({ color: c, roughness: 0.7 }), box = (w, h, d, c) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), M(c)); m.castShadow = true; return m }
-    const body = box(1.3, 1.6, 0.8, 0xf7953a); body.position.y = 2.2; hero.add(body)
-    const head = box(1.2, 1.1, 1.1, 0xffd9a8); head.position.y = 3.6; hero.add(head)
-    for (const ex of [-0.28, 0.28]) { const e = new T.Mesh(new T.BoxGeometry(0.2, 0.26, 0.05), new T.MeshBasicMaterial({ color: 0x111111 })); e.position.set(ex, 3.7, 0.56); hero.add(e) }
-    const limb = (x, y, w, h, c) => { const g = new T.Group(); g.position.set(x, y, 0); const m = box(w, h, w, c); m.position.y = -h / 2; g.add(m); hero.add(g); return g }
-    const armL = limb(-0.95, 2.85, 0.45, 1.5, 0xffd9a8), armR = limb(0.95, 2.85, 0.45, 1.5, 0xffd9a8), legL = limb(-0.35, 1.4, 0.55, 1.4, 0x3d4a8a), legR = limb(0.35, 1.4, 0.55, 1.4, 0x3d4a8a)
-    const nm = label(user.name, 384, 72, 44, '#ffffff'); nm.scale.set(5, 0.95, 1); nm.position.y = 5.2; hero.add(nm)
-    scene.add(hero)
-    const st = { x: 0, z: 10, y: 0, vy: 0, face: Math.PI, yaw: 0, pitch: 0.45, dist: 11, t: 0, mv: 0 }, keys = {}
-    const kd = (e) => { if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); keys[e.code] = true }, ku = (e) => { keys[e.code] = false }
-    addEventListener('keydown', kd); addEventListener('keyup', ku)
-    // camera drag (mouse or finger) outside the joystick
-    const drag = {}
-    const pd = (e) => { drag[e.pointerId] = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId) } catch {} }
-    const pm = (e) => { const d = drag[e.pointerId]; if (!d) return; st.yaw -= (e.clientX - d.x) * 0.006; st.pitch = Math.max(0.12, Math.min(1.15, st.pitch + (e.clientY - d.y) * 0.005)); d.x = e.clientX; d.y = e.clientY }
-    const pu = (e) => { delete drag[e.pointerId] }
-    el.addEventListener('pointerdown', pd); el.addEventListener('pointermove', pm); el.addEventListener('pointerup', pu); el.addEventListener('pointercancel', pu)
-    const onWheel = (e) => { st.dist = Math.max(5, Math.min(18, st.dist + e.deltaY * 0.01)) }; el.addEventListener('wheel', onWheel, { passive: true })
-    const resize = () => { const w = el.clientWidth, h = el.clientHeight || 1; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix() }; addEventListener('resize', resize)
-    let raf = 0, last = performance.now()
-    const loop = (now) => {
-      raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; st.t += dt
-      let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + inp.current.x, iy = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + inp.current.y
-      if (keys.KeyQ) st.yaw += 1.8 * dt; if (keys.KeyE) st.yaw -= 1.8 * dt
-      const len = Math.hypot(ix, iy); if (len > 1) { ix /= len; iy /= len }
-      const run = keys.ShiftLeft || keys.ShiftRight || inp.current.run, speed = (run ? 15 : 9) * Math.min(1, len)
-      const fx = -Math.sin(st.yaw), fz = -Math.cos(st.yaw), rx = Math.cos(st.yaw), rz = -Math.sin(st.yaw)
-      let dx = fx * iy + rx * ix, dz = fz * iy + rz * ix; const dl = Math.hypot(dx, dz)
-      if (dl > 0.001) { dx /= dl; dz /= dl; st.x += dx * speed * dt; st.z += dz * speed * dt; let da = Math.atan2(dx, dz) - st.face; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; st.face += da * Math.min(1, dt * 14) }
-      for (const s of solids) { const ox = st.x - s.x, oz = st.z - s.z, d = Math.hypot(ox, oz), min = s.r + 0.7; if (d < min && d > 0.0001) { st.x = s.x + (ox / d) * min; st.z = s.z + (oz / d) * min } }
-      const rr = Math.hypot(st.x, st.z); if (rr > 23) { st.x *= 23 / rr; st.z *= 23 / rr }
-      if ((keys.Space || inp.current.jump) && st.y <= 0.001) st.vy = 11; st.vy -= 28 * dt; st.y += st.vy * dt; if (st.y < 0) { st.y = 0; st.vy = 0 }
-      st.mv += ((dl > 0.001 ? Math.min(1, len) : 0) - st.mv) * Math.min(1, dt * 10)
-      const sw = Math.sin(st.t * (run ? 14 : 10)) * 0.9 * st.mv; legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw; armR.rotation.x = sw
-      hero.position.set(st.x, st.y, st.z); hero.rotation.y = st.face
-      const cp = Math.cos(st.pitch); camera.position.set(st.x + Math.sin(st.yaw) * cp * st.dist, st.y + 2 + Math.sin(st.pitch) * st.dist, st.z + Math.cos(st.yaw) * cp * st.dist); camera.lookAt(st.x, st.y + 2.6, st.z)
-      portal.rotation.z += dt * 1.2; portal.material.opacity = 0.65 + Math.sin(st.t * 3) * 0.15
-      flames.forEach((f, i) => { const s = 1 + Math.sin(st.t * 6 + i) * 0.12; f.scale.set(s, s, s) })
-      const p = eg.attributes.position; for (let i = 0; i < N; i++) { let y = p.getY(i) + dt * (0.8 + (i % 5) * 0.2); if (y > 20) y = 0; p.setY(i, y) } p.needsUpdate = true
-      renderer.render(scene, camera)
-    }
-    raf = requestAnimationFrame(loop)
-    return () => {
-      cancelAnimationFrame(raf); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', resize)
-      el.removeEventListener('pointerdown', pd); el.removeEventListener('pointermove', pm); el.removeEventListener('pointerup', pu); el.removeEventListener('pointercancel', pu); el.removeEventListener('wheel', onWheel)
-      scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose() }) } })
-      renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
-    }
+    let cleanup = null
+    try {
+      const renderer = new T.WebGLRenderer({ antialias: true })
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(el.clientWidth, el.clientHeight); renderer.shadowMap.enabled = true
+      renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15
+      el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block'; renderer.domElement.style.touchAction = 'none'
+      const HAZE = 0x9fd2ee, scene = new T.Scene(); scene.background = new T.Color(HAZE); scene.fog = new T.Fog(HAZE, 230, 1150)
+      const camera = new T.PerspectiveCamera(60, el.clientWidth / el.clientHeight, 0.1, 3500)
+      scene.add(new T.HemisphereLight(0xbfe3ff, 0x4d6a2f, 0.85))
+      const sun = new T.DirectionalLight(0xfff0cf, 1.05); sun.castShadow = true
+      Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 380 }); sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; scene.add(sun); scene.add(sun.target)
+      let seed = 1337; const rnd = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+      const hs = (i, j, k) => { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296 }
+      const dummy = new T.Object3D(), cc = new T.Color()
+      const path = raidPathPts(T), pathD = (x, z) => { let m = 1e9; for (let i = 0; i < path.length - 1; i++) { const a = path[i], b = path[i + 1], vx = b.x - a.x, vz = b.z - a.z, t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1))), d = Math.hypot(x - a.x - vx * t, z - a.z - vz * t); if (d < m) m = d } return m }
+      // ---- sky: gradient dome, sun, textured clouds
+      const sc = document.createElement('canvas'); sc.width = 4; sc.height = 256; const sg = sc.getContext('2d'), gr = sg.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#1f78d6'); gr.addColorStop(0.42, '#5fb4ea'); gr.addColorStop(0.5, '#a9dcf3'); gr.addColorStop(1, '#a9dcf3'); sg.fillStyle = gr; sg.fillRect(0, 0, 4, 256)
+      const dome = new T.Mesh(new T.SphereGeometry(2200, 24, 16), new T.MeshBasicMaterial({ map: new T.CanvasTexture(sc), side: T.BackSide, fog: false, depthWrite: false, toneMapped: false })); scene.add(dome)
+      const soft = (rgb, n) => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); for (let i = 0; i < n; i++) { const x = n === 1 ? 128 : 40 + rnd() * 176, y = n === 1 ? 64 : 36 + rnd() * 56, rr = n === 1 ? 62 : 18 + rnd() * 30, r = g.createRadialGradient(x, y, 1, x, y, rr); r.addColorStop(0, `rgba(${rgb},${n === 1 ? 1 : 0.5})`); r.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = r; g.fillRect(0, 0, 256, 128) } return new T.CanvasTexture(c) }
+      const sunSpr = new T.Sprite(new T.SpriteMaterial({ map: soft('255,244,205', 1), fog: false, depthWrite: false, toneMapped: false })); sunSpr.scale.set(520, 260, 1); scene.add(sunSpr)
+      const cloudTex = [soft('255,255,255', 14), soft('250,252,255', 11), soft('255,255,255', 17)], clouds = []
+      for (let i = 0; i < 26; i++) { const c = new T.Sprite(new T.SpriteMaterial({ map: cloudTex[i % 3], transparent: true, opacity: 0.85, fog: false, depthWrite: false, toneMapped: false })); const sz = 260 + rnd() * 320; c.scale.set(sz, sz * 0.45, 1); c.position.set((rnd() - 0.5) * 2400, 260 + rnd() * 160, (rnd() - 0.5) * 2400); c.userData.v = 3 + rnd() * 5; scene.add(c); clouds.push(c) }
+      // ---- terrain: smooth heightfield, coloured by slope / height / path / riverbank
+      const mc = document.createElement('canvas'); mc.width = mc.height = 256; const m2 = mc.getContext('2d'); m2.fillStyle = '#d8d8d8'; m2.fillRect(0, 0, 256, 256)
+      for (let i = 0; i < 3200; i++) { const v = 150 + Math.floor(rnd() * 105), x = rnd() * 256, y = rnd() * 256; m2.strokeStyle = `rgb(${v},${v},${v})`; m2.lineWidth = 1 + rnd() * 1.6; m2.beginPath(); m2.moveTo(x, y); m2.lineTo(x + (rnd() - 0.5) * 5, y - 3 - rnd() * 7); m2.stroke() }
+      const mtex = new T.CanvasTexture(mc); mtex.wrapS = mtex.wrapT = T.RepeatWrapping; mtex.repeat.set(160, 160); mtex.anisotropy = 4
+      const tg = new T.PlaneGeometry(1300, 1300, 320, 320); tg.rotateX(-Math.PI / 2)
+      { const p = tg.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, raidH(p.getX(i), p.getZ(i))); tg.computeVertexNormals()
+        const col = new Float32Array(p.count * 3), nrm = tg.attributes.normal
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), z = p.getZ(i), h = p.getY(i), slope = 1 - nrm.getY(i), n = raidN(x * 2.3, z * 2.3) * 0.5
+          let r = 0.2 + 0.05 * n, g = 0.46 + 0.07 * n, b = 0.14 + 0.03 * n
+          const dp = pathD(x, z), pf = rSmooth(3.4, 1.6, dp) * 0.9; r += (0.46 - r) * pf; g += (0.35 - g) * pf; b += (0.22 - b) * pf
+          const rk = rSmooth(0.2, 0.55, slope); r += (0.56 - r) * rk; g += (0.48 - g) * rk; b += (0.37 - b) * rk
+          const rk2 = rSmooth(0.45, 0.7, slope); r += (0.42 - r) * rk2; g += (0.4 - g) * rk2; b += (0.41 - b) * rk2
+          const hf = rSmooth(70, 200, h); r += (0.5 - r) * hf; g += (0.55 - g) * hf; b += (0.62 - b) * hf
+          const bank = rSmooth(1.4, 0.4, h) * (1 - rk); r += (0.4 - r) * bank; g += (0.36 - g) * bank; b += (0.24 - b) * bank
+          col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b
+        }
+        tg.setAttribute('color', new T.BufferAttribute(col, 3)) }
+      const terrain = new T.Mesh(tg, new T.MeshLambertMaterial({ map: mtex, vertexColors: true })); terrain.receiveShadow = true; scene.add(terrain)
+      // ---- river water with scrolling ripples
+      const wc = document.createElement('canvas'); wc.width = wc.height = 128; const w2 = wc.getContext('2d'); w2.fillStyle = '#6fc4e8'; w2.fillRect(0, 0, 128, 128)
+      for (let i = 0; i < 90; i++) { w2.strokeStyle = `rgba(255,255,255,${0.1 + rnd() * 0.25})`; w2.lineWidth = 1 + rnd() * 1.5; const x = rnd() * 128, y = rnd() * 128; w2.beginPath(); w2.moveTo(x, y); w2.quadraticCurveTo(x + 10, y + 3, x + 22, y); w2.stroke() }
+      const wtex = new T.CanvasTexture(wc); wtex.wrapS = wtex.wrapT = T.RepeatWrapping; wtex.repeat.set(220, 220)
+      const water = new T.Mesh(new T.PlaneGeometry(1300, 1300), new T.MeshStandardMaterial({ map: wtex, color: 0x4fb4e0, transparent: true, opacity: 0.86, roughness: 0.12, metalness: 0.05 })); water.rotation.x = -Math.PI / 2; water.position.y = RAID_WATER; scene.add(water)
+      // ---- stone plaza hub: fire pillars and the raid gate
+      const pc = document.createElement('canvas'); pc.width = pc.height = 128; const p2 = pc.getContext('2d'); p2.fillStyle = '#8a8794'; p2.fillRect(0, 0, 128, 128); p2.fillStyle = '#7b7886'; p2.fillRect(0, 0, 64, 64); p2.fillRect(64, 64, 64, 64)
+      const ptex = new T.CanvasTexture(pc); ptex.wrapS = ptex.wrapT = T.RepeatWrapping; ptex.repeat.set(10, 10)
+      const plaza = new T.Mesh(new T.CylinderGeometry(30, 31, 0.5, 64), new T.MeshLambertMaterial({ map: ptex })); plaza.position.y = RAID_G - 0.2; plaza.receiveShadow = true; scene.add(plaza)
+      const solids = [], flames = []
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2, px = Math.cos(a) * 20, pz = Math.sin(a) * 20
+        const col = new T.Mesh(new T.BoxGeometry(2.2, 8, 2.2), new T.MeshLambertMaterial({ color: 0x6d6880 })); col.position.set(px, RAID_G + 4, pz); col.castShadow = col.receiveShadow = true; scene.add(col)
+        const fl = new T.Mesh(new T.SphereGeometry(0.8, 16, 12), new T.MeshBasicMaterial({ color: 0xff7a1a })); fl.position.set(px, RAID_G + 8.9, pz); scene.add(fl); flames.push(fl)
+        solids.push({ x: px, z: pz, r: 2 })
+      }
+      const gate = new T.Group(); gate.position.set(0, RAID_G, -25)
+      for (const sx of [-4.5, 4.5]) { const p = new T.Mesh(new T.BoxGeometry(2, 12, 2), new T.MeshLambertMaterial({ color: 0x4a4260 })); p.position.set(sx, 6, 0); p.castShadow = true; gate.add(p); solids.push({ x: sx, z: -25, r: 2 }) }
+      const arch = new T.Mesh(new T.TorusGeometry(4.5, 0.9, 12, 40, Math.PI), new T.MeshLambertMaterial({ color: 0x4a4260 })); arch.position.y = 12; gate.add(arch)
+      const portal = new T.Mesh(new T.CircleGeometry(4.2, 40), new T.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0.8, side: T.DoubleSide })); portal.position.set(0, 7.2, 0); gate.add(portal)
+      scene.add(gate)
+      const label = (text, w, h, size, color) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(text, w / 2, h / 2); g.fillStyle = color; g.fillText(text, w / 2, h / 2); return new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false, toneMapped: false })) }
+      const gl = label('RAID GATE · COMING SOON', 768, 96, 54, '#ffd9a0'); gl.scale.set(12, 1.5, 1); gl.position.set(0, RAID_G + 15.2, -25); scene.add(gl)
+      // ---- walled castle town (instanced)
+      const TX = RAID_TX, TZ = RAID_TZ, GT = RAID_GT, toGate = Math.atan2(-TZ, -TX)
+      const mk = (geo, color, n) => new T.InstancedMesh(geo, new T.MeshLambertMaterial({ color }), n)
+      const houses = [], towers = [], wallSeg = []
+      for (let k = 0; k < 28; k++) { const a = (k / 28) * Math.PI * 2; let da = Math.abs(a - ((toGate + Math.PI * 2) % (Math.PI * 2))); da = Math.min(da, Math.PI * 2 - da); if (da < 0.2) continue; const wx = TX + Math.cos(a) * 38, wz = TZ + Math.sin(a) * 38; wallSeg.push({ x: wx, z: wz, a }); if (k % 4 === 0) towers.push({ x: wx, z: wz }) }
+      let tries = 0; while (houses.length < 70 && tries++ < 900) { const a = rnd() * Math.PI * 2, rr = 6 + Math.sqrt(rnd()) * 27, x = TX + Math.cos(a) * rr, z = TZ + Math.sin(a) * rr; if (Math.abs(x - TX) < 3.2 || Math.abs(z - TZ) < 3.2) continue; if (Math.hypot(x - (TX + 18), z - (TZ - 18)) < 17) continue; if (houses.some((h) => Math.hypot(h.x - x, h.z - z) < 8.4)) continue; houses.push({ x, z, w: 5 + rnd() * 2.5, d: 5 + rnd() * 2.5, h: 4 + rnd() * 3, y: rnd() * 6.28, roof: [0xb8442f, 0x2f5fb8, 0x3f8f4f, 0xc9772c][Math.floor(rnd() * 4)] }) }
+      const hb = mk(new T.BoxGeometry(1, 1, 1), 0xffffff, houses.length), hr = mk(new T.ConeGeometry(0.78, 1, 4), 0xffffff, houses.length)
+      houses.forEach((h, i) => { dummy.position.set(h.x, GT + h.h / 2, h.z); dummy.rotation.set(0, h.y, 0); dummy.scale.set(h.w, h.h, h.d); dummy.updateMatrix(); hb.setMatrixAt(i, dummy.matrix); cc.setHSL(0.1, 0.25, 0.7 + rnd() * 0.15); hb.setColorAt(i, cc); dummy.position.set(h.x, GT + h.h + 1.6, h.z); dummy.rotation.set(0, h.y + Math.PI / 4, 0); dummy.scale.set(h.w * 1.35, 3.2, h.d * 1.35); dummy.updateMatrix(); hr.setMatrixAt(i, dummy.matrix); cc.setHex(h.roof); hr.setColorAt(i, cc); solids.push({ x: h.x, z: h.z, r: Math.max(h.w, h.d) * 0.62 }) })
+      const wb = mk(new T.BoxGeometry(9, 7, 2.2), 0x7d8296, wallSeg.length)
+      wallSeg.forEach((w, i) => { dummy.position.set(w.x, GT + 3.5, w.z); dummy.rotation.set(0, -w.a + Math.PI / 2, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); wb.setMatrixAt(i, dummy.matrix); solids.push({ x: w.x, z: w.z, r: 4.4 }) })
+      const tw = mk(new T.CylinderGeometry(2.6, 3, 12, 10), 0x6f7488, towers.length + 5), tr = mk(new T.ConeGeometry(3.6, 5.5, 10), 0x2f4a8f, towers.length + 5)
+      const castle = [{ x: TX + 18, z: TZ - 18, h: 24 }, { x: TX + 8, z: TZ - 28, h: 15 }, { x: TX + 28, z: TZ - 8, h: 15 }, { x: TX + 28, z: TZ - 28, h: 15 }, { x: TX + 8, z: TZ - 8, h: 15 }]
+      towers.forEach((t, i) => { dummy.position.set(t.x, GT + 6, t.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); tw.setMatrixAt(i, dummy.matrix); dummy.position.set(t.x, GT + 14.7, t.z); dummy.updateMatrix(); tr.setMatrixAt(i, dummy.matrix); solids.push({ x: t.x, z: t.z, r: 3.2 }) })
+      castle.forEach((t, j) => { const i = towers.length + j; dummy.position.set(t.x, GT + t.h / 2, t.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, t.h / 12, 1); dummy.updateMatrix(); tw.setMatrixAt(i, dummy.matrix); dummy.position.set(t.x, GT + t.h + 2.75 * (t.h > 20 ? 1.4 : 1), t.z); dummy.scale.set(1, t.h > 20 ? 1.4 : 1, 1); dummy.updateMatrix(); tr.setMatrixAt(i, dummy.matrix); solids.push({ x: t.x, z: t.z, r: 3.4 }) })
+      const keep = new T.Mesh(new T.BoxGeometry(16, 16, 16), new T.MeshLambertMaterial({ color: 0x80869a })); keep.position.set(TX + 18, GT + 8, TZ - 18); keep.castShadow = keep.receiveShadow = true; scene.add(keep); solids.push({ x: TX + 18, z: TZ - 18, r: 11 })
+      ;[hb, hr, wb, tw, tr].forEach((m) => { m.castShadow = true; m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; scene.add(m) })
+      const tl = label('CASTLE TOWN', 512, 80, 52, '#ffffff'); tl.scale.set(18, 2.8, 1); tl.position.set(TX - 38, GT + 18, TZ + 4); scene.add(tl)
+      // ---- forests: trunks, layered round canopies and pines (instanced, smooth shaded)
+      const blobG = new T.IcosahedronGeometry(1, 2); { const p = blobG.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + 0.14 * Math.sin(p.getX(i) * 5.1 + p.getY(i) * 3.7) * Math.cos(p.getZ(i) * 4.3); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k) } blobG.computeVertexNormals() }
+      const slopeAt = (x, z) => Math.abs(raidH(x + 1.5, z) - raidH(x, z)) + Math.abs(raidH(x, z + 1.5) - raidH(x, z))
+      const trees = []; let ttry = 0
+      while (trees.length < 1000 && ttry++ < 6000) {
+        const a = rnd() * Math.PI * 2, r = 42 + Math.sqrt(rnd()) * 300, x = Math.cos(a) * r, z = Math.sin(a) * r, h = raidH(x, z)
+        if (h < RAID_WATER + 0.9 || h > 70 || slopeAt(x, z) > 1.6 || Math.hypot(x - TX, z - TZ) < 50 || Math.abs(z - raidRiverZ(x)) < 14 || pathD(x, z) < 5) continue
+        trees.push({ x, z, h, s: 0.8 + rnd() * 1.0, pine: rnd() < 0.45, t: rnd() })
+      }
+      const pines = trees.filter((t) => t.pine), rounds = trees.filter((t) => !t.pine)
+      const trunkG = new T.CylinderGeometry(0.4, 0.75, 6, 8); trunkG.translate(0, 3, 0)
+      const trunks = mk(trunkG, 0x6b4a2b, trees.length), pineG = new T.ConeGeometry(3.4, 8, 10); pineG.translate(0, 0, 0)
+      const pineM = [0, 1, 2].map(() => mk(pineG, 0xffffff, Math.max(1, pines.length))), blobM = [0, 1, 2].map(() => mk(blobG, 0xffffff, Math.max(1, rounds.length)))
+      trees.forEach((t, i) => { dummy.position.set(t.x, t.h, t.z); dummy.rotation.set(0, t.t * 6.28, 0); dummy.scale.set(t.s, t.s * (0.9 + t.t * 0.4), t.s); dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix) })
+      pines.forEach((t, i) => { for (let k = 0; k < 3; k++) { dummy.position.set(t.x, t.h + (5 + k * 3.4) * t.s, t.z); dummy.rotation.set(0, t.t * 6.28, 0); const sc2 = (1 - k * 0.26) * t.s; dummy.scale.set(sc2, sc2 * 0.95, sc2); dummy.updateMatrix(); pineM[k].setMatrixAt(i, dummy.matrix); cc.setHSL(0.37 + t.t * 0.04, 0.5, 0.16 + t.t * 0.08 + k * 0.02); pineM[k].setColorAt(i, cc) } })
+      const BO = [[0, 8.2, 0, 3.9], [2.1, 7.1, 0.7, 3.0], [-1.7, 9.3, -0.9, 2.9]]
+      rounds.forEach((t, i) => { for (let k = 0; k < 3; k++) { const o = BO[k]; dummy.position.set(t.x + o[0] * t.s, t.h + o[1] * t.s, t.z + o[2] * t.s); dummy.rotation.set(0, t.t * 6.28 + k, 0); const s2 = o[3] * t.s; dummy.scale.set(s2, s2 * 0.82, s2); dummy.updateMatrix(); blobM[k].setMatrixAt(i, dummy.matrix); cc.setHSL(0.25 + t.t * 0.07, 0.55, 0.26 + t.t * 0.08 + k * 0.025); blobM[k].setColorAt(i, cc) } })
+      ;[trunks, ...pineM, ...blobM].forEach((m) => { m.castShadow = true; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; scene.add(m) })
+      trees.forEach((t) => { if (Math.hypot(t.x, t.z) < RAID_R + 12) solids.push({ x: t.x, z: t.z, r: 0.85 * t.s }) })
+      const rocks = mk(new T.DodecahedronGeometry(1.4, 1), 0xffffff, 140)
+      for (let i = 0; i < 140; i++) { let x = 0, z = 0, g = 0; do { const a = rnd() * Math.PI * 2, r = 40 + Math.sqrt(rnd()) * 280; x = Math.cos(a) * r; z = Math.sin(a) * r; g++ } while (g < 20 && (Math.hypot(x - TX, z - TZ) < 48 || Math.abs(z - raidRiverZ(x)) < 10)); const s = 0.8 + rnd() * 2.4; dummy.position.set(x, raidH(x, z) + s * 0.35, z); dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); dummy.scale.set(s, s * 0.7, s * 1.1); dummy.updateMatrix(); rocks.setMatrixAt(i, dummy.matrix); cc.setHSL(0.09, 0.07, 0.36 + rnd() * 0.2); rocks.setColorAt(i, cc); if (Math.hypot(x, z) < RAID_R + 8) solids.push({ x, z, r: s * 1.05 }) }
+      rocks.castShadow = true; rocks.instanceMatrix.needsUpdate = true; rocks.instanceColor.needsUpdate = true; scene.add(rocks)
+      // ---- animated grass: crossed tapered blades, swayed in the vertex shader; re-scattered around the player as you walk
+      const bladeGeo = (() => { const pos = [], nor = [], idx = []; for (let k = 0; k < 3; k++) { const ang = (k * Math.PI) / 3, ca = Math.cos(ang), sa = Math.sin(ang), base = pos.length / 3; for (let row = 0; row <= 3; row++) { const y = row / 3, wd = 0.26 * (1 - y * 0.92); for (const sx of [-1, 1]) { pos.push(sx * wd * ca, y, sx * wd * sa); nor.push(0, 1, 0) } } for (let row = 0; row < 3; row++) { const a = base + row * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2) } } const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setIndex(idx); return g })()
+      const wind = { value: 0 }, grassMat = new T.MeshLambertMaterial({ color: 0xffffff, side: T.DoubleSide })
+      grassMat.onBeforeCompile = (sh) => { sh.uniforms.uTime = wind; sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;').replace('#include <begin_vertex>', '#include <begin_vertex>\n#ifdef USE_INSTANCING\nfloat ph = instanceMatrix[3].x * 0.31 + instanceMatrix[3].z * 0.27;\nfloat sw = sin(uTime * 1.7 + ph) * 0.24 + sin(uTime * 3.3 + ph * 2.1) * 0.08;\ntransformed.x += sw * position.y;\ntransformed.z += cos(uTime * 1.3 + ph * 1.3) * 0.14 * position.y;\n#endif') }
+      const GMAX = 13000, grass = new T.InstancedMesh(bladeGeo, grassMat, GMAX), FMAX = 900, flw = new T.InstancedMesh(new T.SphereGeometry(0.15, 6, 5), new T.MeshLambertMaterial({ color: 0xffffff }), FMAX), fpal = [0xffffff, 0xffe45c, 0xff8fc8, 0xb98cff, 0xff6b5c]
+      grass.frustumCulled = false; flw.frustumCulled = false; grass.receiveShadow = true; scene.add(grass); scene.add(flw)
+      const GR = 50, GRID = 0.8, lastC = { x: 1e9, z: 1e9 }
+      const scatter = (cx, cz) => {
+        lastC.x = cx; lastC.z = cz; let n = 0, nf = 0
+        const i0 = Math.floor((cx - GR) / GRID), i1 = Math.ceil((cx + GR) / GRID), j0 = Math.floor((cz - GR) / GRID), j1 = Math.ceil((cz + GR) / GRID)
+        for (let i = i0; i <= i1 && n < GMAX; i++) for (let j = j0; j <= j1 && n < GMAX; j++) {
+          const x = (i + hs(i, j, 1)) * GRID, z = (j + hs(i, j, 2)) * GRID, d = Math.hypot(x - cx, z - cz); if (d > GR) continue
+          if (Math.hypot(x, z) < 31 || Math.hypot(x - TX, z - TZ) < 40) continue
+          const h = raidH(x, z); if (h < RAID_WATER + 0.5 || h > 90 || Math.abs(raidH(x + 1, z) - h) > 0.75) continue
+          if (pathD(x, z) < 2.4) continue
+          const fade = 1 - rSmooth(GR - 14, GR, d)
+          dummy.position.set(x, h, z); dummy.rotation.set(0, hs(i, j, 3) * 6.28, 0); dummy.scale.set(0.9 + hs(i, j, 5) * 0.7, (0.7 + hs(i, j, 4) * 1.2) * fade, 0.9 + hs(i, j, 5) * 0.7); dummy.updateMatrix(); grass.setMatrixAt(n, dummy.matrix)
+          cc.setHSL(0.22 + hs(i, j, 6) * 0.09, 0.5 + hs(i, j, 7) * 0.2, 0.24 + hs(i, j, 9) * 0.16); grass.setColorAt(n, cc); n++
+          if (hs(i, j, 8) < 0.045 && nf < FMAX) { dummy.position.set(x + 0.2, h + 0.55 * fade, z); dummy.rotation.set(0, 0, 0); dummy.scale.set(fade, fade, fade); dummy.updateMatrix(); flw.setMatrixAt(nf, dummy.matrix); cc.setHex(fpal[Math.floor(hs(i, j, 10) * fpal.length)]); flw.setColorAt(nf, cc); nf++ }
+        }
+        grass.count = n; flw.count = nf; grass.instanceMatrix.needsUpdate = true; if (grass.instanceColor) grass.instanceColor.needsUpdate = true; flw.instanceMatrix.needsUpdate = true; if (flw.instanceColor) flw.instanceColor.needsUpdate = true
+      }
+      scatter(0, 14)
+      // ---- the player: YOUR profile blook as a thick 3D slab (stacked layers), always facing the camera
+      const hero = new T.Group(), skin = new T.Group(); hero.add(skin); scene.add(hero)
+      const BH = 4.4, LAYERS = 9, DEPTH = 0.7, av = snapOf(user).av, src = raidAvatarSrc(av)
+      const buildSlab = (aspect, map) => { for (let i = 0; i < LAYERS; i++) { const f = i / (LAYERS - 1), z = (f - 0.5) * DEPTH, edge = Math.abs(f - 0.5) * 2, m = new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.45, side: T.DoubleSide, toneMapped: false }); m.color.setScalar(i === 0 || i === LAYERS - 1 ? 1 : 0.62 + 0.3 * edge); const pl = new T.Mesh(new T.PlaneGeometry(BH * aspect, BH), m); pl.position.set(0, BH / 2, z); skin.add(pl) } }
+      if (src) new T.TextureLoader().load(src, (t) => buildSlab((t.image.width || 1) / (t.image.height || 1), t), undefined, () => buildSlab(1, null))
+      else buildSlab(1, null)
+      const nm = label(user.name, 384, 72, 44, '#ffffff'); nm.scale.set(5, 0.95, 1); nm.position.y = BH + 1; hero.add(nm)
+      const blob = new T.Mesh(new T.CircleGeometry(1.7, 20), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false })); blob.rotation.x = -Math.PI / 2; scene.add(blob)
+      const st = { x: 0, z: 14, y: 0, vy: 0, yaw: 0, pitch: 0.42, dist: 12, t: 0, mv: 0, lx: 0, ly: 0 }, keys = {}
+      const kd = (e) => { if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); keys[e.code] = true }, ku = (e) => { keys[e.code] = false }
+      addEventListener('keydown', kd); addEventListener('keyup', ku)
+      const drag = {}
+      const pd = (e) => { drag[e.pointerId] = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId) } catch {} }
+      const pm = (e) => { const d = drag[e.pointerId]; if (!d) return; st.yaw -= (e.clientX - d.x) * 0.006; st.pitch = Math.max(0.1, Math.min(1.2, st.pitch + (e.clientY - d.y) * 0.005)); d.x = e.clientX; d.y = e.clientY }
+      const pu = (e) => { delete drag[e.pointerId] }
+      el.addEventListener('pointerdown', pd); el.addEventListener('pointermove', pm); el.addEventListener('pointerup', pu); el.addEventListener('pointercancel', pu)
+      const onWheel = (e) => { st.dist = Math.max(5, Math.min(26, st.dist + e.deltaY * 0.01)) }; el.addEventListener('wheel', onWheel, { passive: true })
+      const resize = () => { const w = el.clientWidth, h = el.clientHeight || 1; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix() }; addEventListener('resize', resize)
+      let raf = 0, last = performance.now()
+      const loop = (now) => {
+        raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; st.t += dt; wind.value = st.t
+        const ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + inp.current.x, iy = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + inp.current.y
+        if (keys.KeyQ) st.yaw += 1.8 * dt; if (keys.KeyE) st.yaw -= 1.8 * dt
+        let jx = ix, jy = iy; const len = Math.hypot(jx, jy); if (len > 1) { jx /= len; jy /= len }
+        const run = keys.ShiftLeft || keys.ShiftRight || inp.current.run, speed = (run ? 30 : 14) * Math.min(1, len)
+        const fx = -Math.sin(st.yaw), fz = -Math.cos(st.yaw), rx = Math.cos(st.yaw), rz = -Math.sin(st.yaw)
+        let dx = fx * jy + rx * jx, dz = fz * jy + rz * jx; const dl = Math.hypot(dx, dz)
+        if (dl > 0.001) { dx /= dl; dz /= dl; const nx = st.x + dx * speed * dt, nz = st.z + dz * speed * dt; if (raidH(nx, nz) > RAID_WATER - 0.9) { st.x = nx; st.z = nz } } // the deep river is not walkable
+        for (const s of solids) { const ox = st.x - s.x; if (ox > 14 || ox < -14) continue; const oz = st.z - s.z, d = Math.hypot(ox, oz), min = s.r + 0.8; if (d < min && d > 0.0001) { st.x = s.x + (ox / d) * min; st.z = s.z + (oz / d) * min } }
+        const rr = Math.hypot(st.x, st.z); if (rr > RAID_R) { st.x *= RAID_R / rr; st.z *= RAID_R / rr }
+        const gy = raidH(st.x, st.z)
+        if ((keys.Space || inp.current.jump) && st.y <= 0.001) st.vy = 12; st.vy -= 30 * dt; st.y += st.vy * dt; if (st.y < 0) { st.y = 0; st.vy = 0 }
+        st.mv += ((dl > 0.001 ? Math.min(1, len) : 0) - st.mv) * Math.min(1, dt * 10); st.lx += (jx - st.lx) * Math.min(1, dt * 8); st.ly += (jy - st.ly) * Math.min(1, dt * 8)
+        const hop = Math.abs(Math.sin(st.t * (run ? 13 : 10))) * 0.4 * st.mv, sq = Math.sin(st.t * 3) * 0.015
+        hero.position.set(st.x, gy + st.y + hop, st.z); hero.rotation.y = st.yaw; skin.rotation.z = -st.lx * 0.28; skin.rotation.x = -st.ly * 0.14; skin.scale.set(1 + sq - hop * 0.04, 1 - sq + hop * 0.05, 1)
+        blob.position.set(st.x, gy + 0.06, st.z); const bs = Math.max(0.5, 1 - st.y * 0.06); blob.scale.set(bs, bs, bs)
+        const cp = Math.cos(st.pitch), cx = st.x + Math.sin(st.yaw) * cp * st.dist, cz = st.z + Math.cos(st.yaw) * cp * st.dist; let cy = gy + st.y + 2 + Math.sin(st.pitch) * st.dist
+        cy = Math.max(cy, raidH(cx, cz) + 1.6); camera.position.set(cx, cy, cz); camera.lookAt(st.x, gy + st.y + 2.6, st.z)
+        sun.position.set(st.x + 80, gy + 120, st.z + 50); sun.target.position.set(st.x, gy, st.z); sun.target.updateMatrixWorld()
+        dome.position.set(camera.position.x, 0, camera.position.z); sunSpr.position.set(camera.position.x + 1100, 1300, camera.position.z + 700)
+        clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > camera.position.x + 1300) c.position.x = camera.position.x - 1300 })
+        wtex.offset.x = st.t * 0.0035; wtex.offset.y = st.t * 0.0015
+        if (Math.hypot(st.x - lastC.x, st.z - lastC.z) > 16) scatter(st.x, st.z)
+        portal.rotation.z += dt * 1.2; portal.material.opacity = 0.65 + Math.sin(st.t * 3) * 0.15
+        flames.forEach((f, i) => { const s = 1 + Math.sin(st.t * 6 + i) * 0.12; f.scale.set(s, s, s) })
+        renderer.render(scene, camera)
+      }
+      raf = requestAnimationFrame(loop)
+      cleanup = () => {
+        cancelAnimationFrame(raf); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', resize)
+        el.removeEventListener('pointerdown', pd); el.removeEventListener('pointermove', pm); el.removeEventListener('pointerup', pu); el.removeEventListener('pointercancel', pu); el.removeEventListener('wheel', onWheel)
+        scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose() }) } })
+        renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
+      }
+    } catch (e) { setErr('3D world error: ' + (e && e.message ? e.message : e)) }
+    return () => { if (cleanup) cleanup() }
   }, [])
   // on-screen joystick (touch devices)
   const joy = useRef(null)
