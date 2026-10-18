@@ -447,9 +447,18 @@ const emailOf = (n) => n.trim().toLowerCase() + '@oranget.app'
 const needFB = () => { if (!FB) throw new Error('Firebase could not load. Check your connection and reload.') }
 const strip = (u) => { const { hash, salt, ...r } = u; return r }
 const cacheKey = (uid) => 'oranget_cloud_' + uid
+const cSum = (s) => { let h1 = 0xdeadbeef ^ 7, h2 = 0x41c6ce57 ^ 7; const t = s + '|oranget-cache-v1'; for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677) } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36) }
+const readCache = (k) => { try { const w = JSON.parse(localStorage.getItem(k)); if (!w || typeof w.d !== 'string' || w.h !== cSum(w.d)) return null; return JSON.parse(w.d) } catch { return null } } // a hand-edited local cache fails this check and is ignored
 function rawXpOf(u) { return (u.packs || 0) * 0.15 + (u.msgs || 0) * 2 + (u.trades || 0) * 10 }
 const norm0 = (u) => ({ packs: 0, msgs: 0, trades: 0, fish: {}, fc: 0, fs: 0, chips: 0, cbuy: null, done: [], avatar: null, escrow: [], buying: [], sales: 0, lastSpin: 0, labLog: [], fused: 0, rpg: {}, main: null, ...u, name: u.name === 'DEVDRAGON' ? 'DEVMASTER' : u.name, tokens: Math.max(0, Number(u.tokens) || 0), ...(u.rv ? {} : { rv: 1, xp0: rawXpOf(u), tokens: Math.min(1000, Math.max(0, Number(u.tokens) || 0)) }), inv: (u.inv || []).map((id) => (id === 'z_margaritamaster' ? 'margaritamaster' : id === 'z_crablord' ? 'crablord' : id)).filter((id) => byId(id) && !String(id).startsWith('fuse:')) })
-const norm = (u) => { const r = norm0(u), dx = String(r.name || '').toLowerCase() === 'dxm'; if (dx && !r.inv.includes('pinksmile')) return { ...r, inv: [...r.inv, 'pinksmile'] }; if (!dx && r.inv.includes('pinksmile')) return { ...r, inv: r.inv.filter((x) => x !== 'pinksmile'), avatar: r.avatar === 'pinksmile' ? null : r.avatar }; return r } // the dxm staff blook belongs to Dxm only
+const norm = (u) => {
+  let r = norm0(u); const n = String(r.name || ''), dx = n.toLowerCase() === 'dxm'
+  if (dx && !r.inv.includes('pinksmile')) r = { ...r, inv: [...r.inv, 'pinksmile'] }
+  if (!dx && r.inv.includes('pinksmile')) r = { ...r, inv: r.inv.filter((x) => x !== 'pinksmile'), avatar: r.avatar === 'pinksmile' ? null : r.avatar }
+  if (!isOw(n) && r.inv.includes('yoshiking')) r = { ...r, inv: r.inv.filter((x) => x !== 'yoshiking'), avatar: r.avatar === 'yoshiking' ? null : r.avatar } // owner-only blook
+  if (!isOw(n) && !isEt(n) && (Number(r.tokens) > 5000000 || !Number.isFinite(Number(r.tokens)))) r = { ...r, tokens: 0 } // impossible balance: tampered save
+  return r
+} // the dxm staff blook belongs to Dxm only, the owner blook to the owner only
 const fbErr = (x) => {
   const c = (x && x.code) || ''
   if (c === 'auth/email-already-in-use') return new Error('That username is taken.')
@@ -474,7 +483,7 @@ const pushCloud = async () => {
   try { await FB.db.doc('users/' + c.uid).set({ name: u.name, nameLower: u.name.toLowerCase(), blob: JSON.stringify(strip(u)), saved: u.saved, at: FB.ts() }, { merge: true }); SYNC.base = { saved: u.saved, inv: [...(u.inv || [])], tokens: u.tokens || 0 } } catch (e) { console.warn('cloud save failed', e) }
 }
 let lsT = 0
-const lsFlush = () => { clearTimeout(lsT); lsT = 0; const c = FB && FB.auth.currentUser; if (c && latest) { try { localStorage.setItem(cacheKey(c.uid), JSON.stringify(strip(latest))) } catch {} } }
+const lsFlush = () => { clearTimeout(lsT); lsT = 0; const c = FB && FB.auth.currentUser; if (c && latest) { try { const d = JSON.stringify(strip(latest)); localStorage.setItem(cacheKey(c.uid), JSON.stringify({ d, h: cSum(d) })) } catch {} } }
 let lastInvKey = ''
 const invKeyOf = (u) => (u.inv ? u.inv.length + ':' + u.inv.slice(-4).join(',') + ':' + (u.escrow ? JSON.stringify(u.escrow).length : 0) : '')
 const saveUser = (u) => {
@@ -536,7 +545,7 @@ async function logIn(name, pass) {
   }
   let u = null
   try { const d = await FB.db.doc('users/' + cred.user.uid).get(); if (d.exists) u = JSON.parse(d.data().blob) } catch (x) { throw fbErr(x) }
-  const c = read(cacheKey(cred.user.uid), null)
+  const c = readCache(cacheKey(cred.user.uid))
   if (c && (!u || (c.saved || 0) > (u.saved || 0))) u = c
   if (!u) { const lu = loadLocal(name); u = { ...(lu ? strip(lu) : { name, tokens: 100, inv: ['toast', 'cereal'], lastBonus: 0 }), saved: Date.now() }; try { await putNew(cred.user.uid, u) } catch (x) { throw fbErr(x) } }
   registerDevice(cred.user.uid, u.name); latest = u; return norm(u)
@@ -545,7 +554,7 @@ async function restoreSession() {
   if (!FB) return null
   const au = await new Promise((res) => { const off = FB.auth.onAuthStateChanged((x) => { off(); res(x) }) })
   if (!au) return null
-  let u = null; const c = read(cacheKey(au.uid), null)
+  let u = null; const c = readCache(cacheKey(au.uid))
   try { const d = await Promise.race([FB.db.doc('users/' + au.uid).get(), new Promise((_, r) => setTimeout(() => r(new Error('slow')), 6000))]); if (d.exists) u = JSON.parse(d.data().blob) } catch {}
   if (c && (!u || (c.saved || 0) > (u.saved || 0))) u = c
   if (!u) return null
@@ -1434,6 +1443,7 @@ function Profile({ user, update, go }) {
         <div className="bk-mid">
           <div className="bk-name chunk"><span className={nmCls(user.name)}>{user.name}</span><small>{title}</small></div>
           <div className="bk-lv"><span className="chunk bk-lvn">{level}</span><div className="bk-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: pct + '%' }} /></div></div>
+          <div className="bk-join">Joined {fmtD(user.created || joinedOf())}</div>
         </div>
         <div className="bk-badges">{bl.map((id) => <button key={id} onClick={() => setBd(id)} aria-label={BADGE_DEFS[id].n} title={BADGE_DEFS[id].n}><img src={BADGE_DEFS[id].img} width="40" height="40" alt={BADGE_DEFS[id].n} draggable={false} /></button>)}</div>
       </section>
@@ -1623,7 +1633,7 @@ function LobbyRow({ l, onJoin }) {
 function ProfileCard({ name, me, snap, onClose, onTrade }) {
   const [bd, setBd] = useState(null), [, tick] = useState(0)
   useEffect(() => { const f = () => tick((n) => n + 1); cmdSubs.add(f); return () => { cmdSubs.delete(f) } }, []) // mod / artist roles arrive after the profile opens, so re-draw when they do
-  const title = roleOf(name), bl = badgesOf(name), pct = snap && snap.px != null ? snap.px : 0
+  const title = roleOf(name), bl = [...new Set([...badgesOf(name), ...((snap && snap.bg) || []).filter((x) => (x === 'mod' || x === 'artist') && BADGE_DEFS[x])])], pct = snap && snap.px != null ? snap.px : 0
   return (
     <div className="app-bg fixed inset-0 z-30 overflow-y-auto" style={{ padding: 'max(3.2rem, calc(env(safe-area-inset-top) + 2.4rem)) 1.25rem 2rem' }} role="dialog" aria-label={`${name} profile`}>
       <div className="bk-prof mx-auto max-w-5xl space-y-6">
@@ -1632,6 +1642,7 @@ function ProfileCard({ name, me, snap, onClose, onTrade }) {
           <div className="bk-mid">
             <div className="bk-name chunk"><span className={nmCls(name)}>{name}</span><small>{title}</small></div>
             {snap && <div className="bk-lv"><span className="chunk bk-lvn">{snap.lv}</span><div className="bk-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: pct + '%' }} /></div></div>}
+            {snap && <div className="bk-join">Joined {fmtD(snap.cr)}</div>}
           </div>
           <div className="bk-badges" style={{ position: 'relative', zIndex: 3 }}>{bl.map((id) => <button key={id} type="button" onClick={() => setBd(id)} aria-label={BADGE_DEFS[id].n} title={BADGE_DEFS[id].n} style={{ position: 'relative', zIndex: 3, touchAction: 'manipulation', cursor: 'pointer' }}><img src={BADGE_DEFS[id].img} width="40" height="40" alt={BADGE_DEFS[id].n} draggable={false} style={{ pointerEvents: 'none' }} /></button>)}</div>
         </section>
@@ -1713,7 +1724,7 @@ function Chat({ user, eng, go }) {
     try {
       if (c === '/help') {
         const L = []
-        if (isOw(user.name)) L.push('Owner: /tokenset name amount, /give name amount, /halve name, /wipe name confirm, /giveblook name blookid, /badge name id, /unbadge name id, /admin name, /unadmin name, /mod name, /unmod name, /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /altcheck name. Artist badge: /key3 key, then /artist name or /unartist name. Badge ids: ' + BADGE_IDS.join(', '))
+        if (isOw(user.name)) L.push('Owner: /tokenset name amount, /give name amount, /halve name, /wipe name confirm, /delete name confirm, /giveblook name blookid, /badge name id, /unbadge name id, /admin name, /unadmin name, /mod name, /unmod name, /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /altcheck name. Artist badge: /key3 key, then /artist name or /unartist name. Badge ids: ' + BADGE_IDS.join(', '))
         else {
           if (isAd(user.name)) L.push('Admin: /mute name minutes, /unmute name, /ban name, /unban name, /announce message')
           if (isEt(user.name)) L.push('Co-owner: /give yourself amount, /mute name minutes, /unmute name, /ban name, /unban name')
@@ -1721,6 +1732,17 @@ function Chat({ user, eng, go }) {
         }
         L.push('Everyone: /help')
         return toast(L.join('  '))
+      }
+      if (c === '/delete') {
+        if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /delete.')
+        if (!a) throw new Error('Add a player name.')
+        if (isProt(a) || lc(a) === lc(user.name)) throw new Error('You cannot delete staff or the owner.')
+        if (b !== 'confirm') throw new Error('This deletes the account permanently. Type /delete name confirm')
+        toast('Deleting…')
+        const q = await FB.db.collection('users').where('nameLower', '==', lc(a)).get(); if (q.empty) throw new Error('No player named ' + a + '.')
+        for (const d of q.docs) { await FB.db.doc('users/' + d.id).delete(); try { await FB.db.doc('presence/' + d.id).delete() } catch {} }
+        await sendCmd('ban', a, user.name) // also blocks the name so the deleted account cannot just log back in
+        return toast(a + ' was deleted and banned. Use /unban ' + a + ' to free the name.', 'ok')
       }
       if (c === '/altcheck') { if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /altcheck.'); toast('Checking…'); return toast(await altCheck(a)) }
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return toast('Mute key saved. Use /mute name minutes and /unmute name.') }
@@ -1747,7 +1769,7 @@ function Chat({ user, eng, go }) {
   const onReply = useCallback((m) => { setReply({ id: m.id, user: m.user, text: m.text }); setEditing(null); if (comp.current) { comp.current.setText((t) => (t.startsWith('@' + m.user) ? t : '@' + m.user + ' ' + t)); comp.current.focus() } }, [])
   const onEdit = useCallback((m) => { setEditing({ id: m.id }); setReply(null); if (comp.current) { comp.current.setText(m.text); comp.current.focus() } }, [])
   const view = useMemo(() => msgs.filter((m) => (!m.text.startsWith('§') || (OKC.get(m.id) || {}).c === 'announce') && !CS.banned[lc(m.user)] && !((CS.muted[lc(m.user)] || 0) > Date.now())).map((m) => ({ m, role: isOw(m.user) ? 'owner' : isAd(m.user) ? 'admin' : isCo(m.user) ? 'co' : CS.mods[lc(m.user)] || isJm(m.user) || isHm(m.user) ? 'mod' : '', ann: m.text.startsWith('§') ? OKC.get(m.id).arg : null, artist: isArtist(m.user), ping: m.user !== user.name && (pinged(m, user.name) || (user.name === 'DEVMASTER' && pinged(m, 'DEVDRAGON'))) })), [msgs, ct, user.name])
-  const pres = hub.pres(), now = Date.now(), online = Object.keys(pres).filter((n) => n !== user.name && now - pres[n].at < 130000)
+  const pres = hub.pres(), now = Date.now(), online = Object.keys(pres).filter((n) => n !== user.name && !CS.banned[lc(n)] && now - pres[n].at < 130000)
   const snapOf2 = (n) => (n === user.name ? snapOf(user) : pres[n] && pres[n].s), avOf = (n) => { const s = snapOf2(n); return s ? s.av : null }
   const known = useMemo(() => [...new Set([...Object.keys(pres), ...msgs.map((m) => m.user)])].filter((n) => n !== user.name), [msgs])
   return (
@@ -1782,7 +1804,8 @@ const levelOf = (u) => 1 + Math.floor(xpOf(u) / 100)
 const scoreOf = (u) => u.inv.reduce((s, id) => s + (PTS[byId(id)?.rarity] || 0), 0)
 const joinedOf = () => { try { const t = FB && FB.auth.currentUser && FB.auth.currentUser.metadata.creationTime; return t ? Date.parse(t) || 0 : 0 } catch { return 0 } }
 const fmtD = (t) => (t ? new Date(t).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown')
-const snapOf = (u) => ({ px: xpOf(u) % 100, av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '', cr: u.created || joinedOf() })
+const lbSane = (s, n) => isOw(n) || isEt(n) || !s || (Number(s.tk || 0) <= 5000000 && Number(s.sc || 0) <= 5000000 && Number(s.lv || 0) <= 500 && Number(s.ub || 0) <= BLOOKS.length && Number(s.pk || 0) <= 5000000 && Number(s.ms || 0) <= 5000000 && s.av !== 'yoshiking')
+const snapOf = (u) => ({ bg: badgesOf(u.name).filter((x) => x === 'mod' || x === 'artist'), px: xpOf(u) % 100, av: u.avatar && u.inv.includes(u.avatar) ? u.avatar : u.inv[0] || 'toast', lv: levelOf(u), ub: new Set(u.inv.filter((x) => !isLab(x))).size, pk: u.packs || 0, ms: u.msgs || 0, tr: u.trades || 0, sc: scoreOf(u), tk: u.tokens, g: u.guild ? u.guild.id : '', cr: u.created || joinedOf() })
 
 const hub = (() => {
   let log = [], pres = {}, ids = new Set(), subs = new Map(), started = false, status = '', state = 'retry', ver = 0, pend = new Set(), qf = false, qs = false
@@ -1840,7 +1863,7 @@ const hub = (() => {
 function derive(log, me, pres) {
   const now = Date.now(), by = {}
   for (const m of log) if (typeof m.id === 'string') (by[m.id] ||= []).push(m)
-  const names = Object.keys(pres).filter((n) => n !== me && now - pres[n].at < 130000)
+  const names = Object.keys(pres).filter((n) => n !== me && !CS.banned[lc(n)] && now - pres[n].at < 130000)
   const invites = [], outgoing = []
   let act = null
   for (const [id, ms] of Object.entries(by)) {
@@ -2914,7 +2937,7 @@ function OnlineTab({ user, upd, ur }) {
   if (active && states[active.id]) return <div className="h-full overflow-y-auto"><MatchView mt={active} me={me} st={states[active.id]} now={now} send={send} canAgain={chips >= active.bet} onAgain={() => { setDismissed(new Set([...dismissed, active.id])); joinQ(active.game, active.bet) }} onClose={() => setDismissed(new Set([...dismissed, active.id]))} /></div>
   if (bm) return <div className="h-full overflow-y-auto"><BotMatch key={bm.game + bm.bet + bm.k} user={user} upd={upd} ur={ur} game={bm.game} bet={bm.bet} onDone={(next) => setBm(next ? { ...next, k: Date.now() } : null)} /></div>
   const lobby = Object.entries(wait).flatMap(([k, l]) => l.filter((e) => e.from !== me && now - e.at < 120000).map((e) => ({ k, ...e }))).sort((a, b) => b.at - a.at)
-  const pres = hub.pres(), online = Object.keys(pres).filter((n) => n !== me && Date.now() - pres[n].at < 130000).length
+  const pres = hub.pres(), online = Object.keys(pres).filter((n) => n !== me && !CS.banned[lc(n)] && Date.now() - pres[n].at < 130000).length
   return (
     <div className="h-full overflow-y-auto p-3 text-white sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-2"><div><h2 className="chunk text-3xl sm:text-5xl">Online</h2><p className="mute text-sm">{omode === 'live' ? 'Queue up and get matched with another player who picked the same game and chips amount. Your chips are taken when the match starts.' : 'Play a bot instantly, no waiting for a match. Same games, same chips.'}</p></div><span className="chip">{online + 1} online</span></div>
@@ -3398,7 +3421,7 @@ function Leaderboard({ user, eng, go }) {
   const all = { ...read(LB_KEY, {}) }
   for (const [n, v] of Object.entries(hub.pres())) if (v.s) all[n] = { s: v.s, at: v.at }
   all[user.name] = { s: snapOf(user), at: Date.now() }
-  const LB_HIDE = new Set(['devmaster', 'icbomber']), rows = Object.entries(all).filter(([n, v]) => NAME_OK.test(n) && v && v.s && !LB_HIDE.has(lc(n)) && !(CS.wiped[lc(n)] && (v.at || 0) <= CS.wiped[lc(n)])).map(([n, v]) => ({ n, s: v.s, on: n === user.name || now - v.at < 130000 })).sort((a, b) => (b.s[by] || 0) - (a.s[by] || 0) || a.n.localeCompare(b.n))
+  const LB_HIDE = new Set(['devmaster', 'icbomber']), rows = Object.entries(all).filter(([n, v]) => NAME_OK.test(n) && v && v.s && !LB_HIDE.has(lc(n)) && !CS.banned[lc(n)] && lbSane(v.s, n) && !(CS.wiped[lc(n)] && (v.at || 0) <= CS.wiped[lc(n)])).map(([n, v]) => ({ n, s: v.s, on: n === user.name || now - v.at < 130000 })).sort((a, b) => (b.s[by] || 0) - (a.s[by] || 0) || a.n.localeCompare(b.n))
   useEffect(() => { const keep = Object.fromEntries(Object.entries(all).filter(([n]) => n !== user.name).sort((a, b) => b[1].at - a[1].at).slice(0, 150)); try { localStorage.setItem(LB_KEY, JSON.stringify(keep)) } catch {} }, [rows.length])
   const me = rows.findIndex((r) => r.n === user.name) + 1, top = rows.slice(0, 3), top50 = rows.slice(0, 50), val = (r) => Number(r.s[by] || 0).toLocaleString()
   const order = top.length === 3 ? [1, 0, 2] : top.map((_, i) => i)
@@ -3908,7 +3931,7 @@ function OnlineC4({ user, rep, onBack }) {
     if (!g.winner) setRes({ win: false, gain: 0, tok: 0, tie: true }); else { const w = g.winner === seat; setRes({ win: w, ...rep(w, w ? 30 : 0) }) }
   }, [g && g.status])
   const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, board: Array(42).fill(0), turn: 1, status: 'open', winner: 0, at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch { setErr('Could not create a lobby. Check the Firestore rule for duels.') } }
-  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const s = await t.get(r); if (!s.exists || s.data().status !== 'open') throw new Error('gone'); t.update(r, { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }) }); paid.current = false; setRes(null); setId(l.id) } catch { setErr('That lobby is gone.') } }
+  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const s = await t.get(r); if (!s.exists || s.data().status !== 'open') throw new Error('gone'); t.update(r, { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : 'That lobby is gone.') } }
   const move = async (c) => {
     if (busy.current || !g || g.status !== 'playing' || g.turn !== seat) return; busy.current = true
     try { const r = FB.db.doc('duels/' + id); await FB.db.runTransaction(async (t) => { const s = await t.get(r), d = s.data(); if (d.status !== 'playing' || d.turn !== seat) throw new Error('no'); const b = [...d.board], row = c4row(b, c); if (row < 0) throw new Error('full'); b[row * 7 + c] = seat; const win = c4line(b, seat), full = b.every(Boolean); t.update(r, { board: b, turn: seat === 1 ? 2 : 1, upd: Date.now(), ...(win ? { status: 'done', winner: seat } : full ? { status: 'done', winner: 0 } : {}) }) }) } catch {} finally { busy.current = false }
@@ -3963,7 +3986,7 @@ function OnlineGame({ game, user, rep, onBack }) {
     if (!g.winner) setRes({ win: false, gain: 0, tok: 0, tie: true }); else { const w = g.winner === seat; setRes({ win: w, ...rep(w, w ? 30 : 0) }) }
   }, [g && g.status])
   const create = async () => { if (!uid) return setErr('Sign in first.'); const nid = crypto.randomUUID().slice(0, 10); try { await FB.db.doc('duels/' + nid).set({ game, host: user.name, hostAv: snapOf(user).av, hostUid: uid, guest: null, guestUid: null, status: 'open', winner: 0, s: initOnline(game), at: Date.now(), upd: Date.now() }); paid.current = false; setRes(null); setId(nid) } catch { setErr('Could not create a lobby. Check the Firestore rule for duels.') } }
-  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rndN(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch { setErr('That lobby is gone.') } }
+  const join = async (l) => { if (!uid) return; try { const r = FB.db.doc('duels/' + l.id); await FB.db.runTransaction(async (t) => { const d = await t.get(r); if (!d.exists || d.data().status !== 'open') throw new Error('gone'); const u = { guest: user.name, guestUid: uid, status: 'playing', upd: Date.now() }; if (game === 'draw') u['s.go'] = Date.now() + 3500 + rndN(3000); t.update(r, u) }); paid.current = false; setRes(null); setId(l.id) } catch (e) { setErr(e && e.code === 'permission-denied' ? 'Duels are blocked by Firestore rules. Publish the new rules, then reload.' : 'That lobby is gone.') } }
   const leave = async () => { try { if (id && g && g.status === 'open' && seat === 1) await FB.db.doc('duels/' + id).delete(); else if (id && g && g.status === 'playing' && seat) await FB.db.doc('duels/' + id).update({ status: 'done', winner: oppSeat(seat), upd: Date.now() }) } catch {} ; onBack() }
   const mineIn = s && (game === 'draw' ? s['r' + seat] !== null : s['p' + seat] !== undefined && s['p' + seat] !== null) || (game === 'shoot' && s && s['s' + seat] !== null)
   const theirIn = s && (game === 'draw' ? s['r' + oppSeat(seat)] !== null : game === 'shoot' ? s['s' + oppSeat(seat)] !== null : s['p' + oppSeat(seat)] !== undefined && s['p' + oppSeat(seat)] !== null)
