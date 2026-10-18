@@ -1726,7 +1726,7 @@ function Chat({ user, eng, go }) {
     try {
       if (c === '/help') {
         const L = []
-        if (isOw(user.name)) L.push('Owner: /tokenset name amount, /give name amount, /halve name, /wipe name confirm, /delete name confirm, /giveblook name blookid, /badge name id, /unbadge name id, /admin name, /unadmin name, /mod name, /unmod name, /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /altcheck name. Artist badge: /key3 key, then /artist name or /unartist name. Badge ids: ' + BADGE_IDS.join(', '))
+        if (isOw(user.name)) L.push('Owner: /tokenset name amount, /give name amount, /halve name, /wipe name confirm, /delete name confirm, /fbtest, /giveblook name blookid, /badge name id, /unbadge name id, /admin name, /unadmin name, /mod name, /unmod name, /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /altcheck name. Artist badge: /key3 key, then /artist name or /unartist name. Badge ids: ' + BADGE_IDS.join(', '))
         else {
           if (isAd(user.name)) L.push('Admin: /mute name minutes, /unmute name, /ban name, /unban name, /announce message')
           if (isEt(user.name)) L.push('Co-owner: /give yourself amount, /mute name minutes, /unmute name, /ban name, /unban name')
@@ -1748,6 +1748,22 @@ function Chat({ user, eng, go }) {
         for (const id of ids) { await FB.db.doc('users/' + id).delete(); try { await FB.db.doc('presence/' + id).delete() } catch {} }
         await sendCmd('ban', a, user.name) // also blocks the name so the deleted account cannot just log back in
         return toast(a + ' was deleted and banned. Use /unban ' + a + ' to free the name.', 'ok')
+      }
+      if (c === '/fbtest') {
+        if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /fbtest.')
+        if (!FB || !FB.auth.currentUser) throw new Error('Not signed in to Firebase.')
+        const uid2 = FB.auth.currentUser.uid, out = [], bid = 'zz_test_' + Date.now(), did = 'zz_test_' + Date.now()
+        const step = async (n, f) => { try { await f(); out.push(n + ': OK') } catch (e) { out.push(n + ': ' + ((e && (e.code || e.message)) || 'error')) } }
+        toast('Testing Firebase…')
+        await step('bazaar read', () => FB.db.collection('bazaar').where('state', '==', 'open').limit(1).get())
+        await step('bazaar list', () => FB.db.doc('bazaar/' + bid).set({ seller: user.name, sellerUid: uid2, blook: 'toast', price: 1, at: Date.now(), state: 'open' }))
+        try { await FB.db.doc('bazaar/' + bid).update({ state: 'sold', buyer: user.name, buyerUid: uid2, soldAt: Date.now() }); out.push('buy own listing: ALLOWED (the OLD rules are still live)') } catch (e) { out.push('buy own listing: blocked ' + ((e && e.code) || '') + ' (correct with the new rules)') }
+        await step('bazaar cleanup', () => FB.db.doc('bazaar/' + bid).delete())
+        await step('duel read', () => FB.db.collection('duels').where('status', '==', 'open').limit(1).get())
+        await step('duel create', () => FB.db.doc('duels/' + did).set({ host: user.name, hostUid: uid2, guest: null, guestUid: null, status: 'open', at: Date.now(), upd: Date.now() }))
+        await step('duel host update', () => FB.db.doc('duels/' + did).update({ upd: Date.now() }))
+        await step('duel cleanup', () => FB.db.doc('duels/' + did).delete())
+        return toast(out.join('  |  '))
       }
       if (c === '/altcheck') { if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /altcheck.'); toast('Checking…'); return toast(await altCheck(a)) }
       if (c === '/key4') { localStorage.setItem(MKY, a || ''); return toast('Mute key saved. Use /mute name minutes and /unmute name.') }
@@ -3588,7 +3604,7 @@ function RaidWorld({ user, onExit }) {
       // ---- sky: gradient dome, sun, textured clouds
       const sc = document.createElement('canvas'); sc.width = 4; sc.height = 256; const sg = sc.getContext('2d'), gr = sg.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#1f78d6'); gr.addColorStop(0.42, '#5fb4ea'); gr.addColorStop(0.5, '#a9dcf3'); gr.addColorStop(1, '#a9dcf3'); sg.fillStyle = gr; sg.fillRect(0, 0, 4, 256)
       const dome = new T.Mesh(new T.SphereGeometry(2200, 24, 16), new T.MeshBasicMaterial({ map: new T.CanvasTexture(sc), side: T.BackSide, fog: false, depthWrite: false, toneMapped: false })); scene.add(dome)
-      const soft = (rgb, n) => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); for (let i = 0; i < n; i++) { const x = n === 1 ? 128 : 40 + rnd() * 176, y = n === 1 ? 64 : 36 + rnd() * 56, rr = n === 1 ? 62 : 18 + rnd() * 30, r = g.createRadialGradient(x, y, 1, x, y, rr); r.addColorStop(0, `rgba(${rgb},${n === 1 ? 1 : 0.5})`); r.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = r; g.fillRect(0, 0, 256, 128) } return new T.CanvasTexture(c) }
+      const soft = (rgb, n) => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = `rgba(${rgb},0.01)`; g.fillRect(0, 0, 256, 128); for (let i = 0; i < n; i++) { const x = n === 1 ? 128 : 40 + rnd() * 176, y = n === 1 ? 64 : 36 + rnd() * 56, rr = n === 1 ? 62 : 18 + rnd() * 30, r = g.createRadialGradient(x, y, 1, x, y, rr); r.addColorStop(0, `rgba(${rgb},${n === 1 ? 1 : 0.5})`); r.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = r; g.fillRect(0, 0, 256, 128) } return new T.CanvasTexture(c) }
       const sunSpr = new T.Sprite(new T.SpriteMaterial({ map: soft('255,244,205', 1), fog: false, depthWrite: false, toneMapped: false })); sunSpr.scale.set(520, 260, 1); scene.add(sunSpr)
       const cloudTex = [soft('255,255,255', 14), soft('250,252,255', 11), soft('255,255,255', 17)], clouds = []
       for (let i = 0; i < 26; i++) { const c = new T.Sprite(new T.SpriteMaterial({ map: cloudTex[i % 3], transparent: true, opacity: 0.85, fog: false, depthWrite: false, toneMapped: false })); const sz = 260 + rnd() * 320; c.scale.set(sz, sz * 0.45, 1); c.position.set((rnd() - 0.5) * 2400, 260 + rnd() * 160, (rnd() - 0.5) * 2400); c.userData.v = 3 + rnd() * 5; scene.add(c); clouds.push(c) }
@@ -3631,7 +3647,7 @@ function RaidWorld({ user, onExit }) {
         const ring = new T.Mesh(new T.TorusGeometry(7, 0.28, 8, 56), new T.MeshBasicMaterial({ color: p.c })); ring.rotation.x = Math.PI / 2; ring.position.set(p.x, RAID_G + 0.2, p.z); scene.add(ring)
         const beam = new T.Mesh(new T.CylinderGeometry(6.6, 6.6, 28, 32, 1, true), new T.MeshBasicMaterial({ color: p.c, transparent: true, opacity: 0.13, side: T.DoubleSide, depthWrite: false })); beam.position.set(p.x, RAID_G + 14, p.z); scene.add(beam)
         const t1 = label(p.n, 512, 80, 54, '#ffffff'); t1.scale.set(13, 2.1, 1); t1.position.set(p.x, RAID_G + 11, p.z); scene.add(t1)
-        const t2 = label('0 / 4 queued', 384, 64, 40, '#ffe9b0'); t2.scale.set(8.5, 1.4, 1); t2.position.set(p.x, RAID_G + 8.9, p.z); scene.add(t2)
+        const t2 = label('Solo raid', 384, 64, 40, '#ffe9b0'); t2.scale.set(7, 1.4, 1); t2.position.set(p.x, RAID_G + 8.9, p.z); scene.add(t2)
       })
       const mk = (geo, color, n) => new T.InstancedMesh(geo, new T.MeshLambertMaterial({ color }), n)
       const TX = RAID_TX, TZ = RAID_TZ // (no town any more; kept far away so the exclusion checks below stay harmless)
@@ -3752,10 +3768,10 @@ function RaidWorld({ user, onExit }) {
         <button className="bk-b bk-o" onClick={onExit}>← Back</button>
       </div>
       <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
-        <div className="chunk" style={{ fontSize: 28 }}>Raid Lobby</div><div style={{ fontSize: 14, opacity: 0.85 }}>1 / 4 players · {user.name}</div>
+        <div className="chunk" style={{ fontSize: 28 }}>Raid Lobby</div><div style={{ fontSize: 14, opacity: 0.85 }}>Solo raids · {user.name}</div>
       </div>
       <div style={{ ...hud, top: 'max(14px, env(safe-area-inset-top))', right: 14 }}><button className="bk-b" disabled style={{ opacity: 0.55 }}>Start raid · soon</button></div>
-      {(pad || queued) && <div style={{ ...hud, bottom: touch ? 170 : 56, left: 0, right: 0, textAlign: 'center' }}>{pad ? <button className="bk-b bk-g chunk" onClick={() => setQueued(pad)} style={{ fontSize: 20 }}>{queued === pad ? `Queued for ${pad}` : `Queue for ${pad}${touch ? '' : '  (F)'}`}</button> : <div className="chunk" style={{ fontSize: 18 }}>Queued for {queued} · raids launch soon</div>}</div>}
+      {(pad || queued) && <div style={{ ...hud, bottom: touch ? 170 : 56, left: 0, right: 0, textAlign: 'center' }}>{pad ? <button className="bk-b bk-g chunk" onClick={() => setQueued(pad)} style={{ fontSize: 20 }}>{queued === pad ? `Queued for ${pad}` : `Queue for ${pad}${touch ? '' : '  (F)'}`}</button> : <div className="chunk" style={{ fontSize: 18 }}>Solo raid: {queued} · launching soon</div>}</div>}
       {!touch && <div style={{ ...hud, bottom: 16, left: 0, right: 0, textAlign: 'center', fontSize: 14, pointerEvents: 'none' }}>WASD / Arrow keys move · Shift run · Space jump · drag to look · Q / E turn · scroll to zoom</div>}
       {touch && <>
         <div ref={joyRef} onPointerDown={jDown} onPointerMove={jMove} onPointerUp={jUp} onPointerCancel={jUp} style={{ ...hud, left: 'max(24px, env(safe-area-inset-left))', bottom: 'max(28px, env(safe-area-inset-bottom))', width: 132, height: 132, borderRadius: '50%', background: 'rgba(255,255,255,.14)', border: '3px solid rgba(255,255,255,.4)', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
