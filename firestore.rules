@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function me() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.name; }
+    function isOwner() { return me() == 'DEVMASTER' || me() == 'DEVDRAGON'; }
+    function badgeList(n) { return exists(/databases/$(db)/documents/badges/$(n)) ? get(/databases/$(db)/documents/badges/$(n)).data.list : []; }
+    function hasBadge(list) { return badgeList(me().lower()).hasAny(list); }
+
+    match /users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isOwner());
+      allow create: if request.auth != null && request.auth.uid == uid && request.auth.token.email == request.resource.data.nameLower + '@oranget.app';
+      allow update: if request.auth != null && request.auth.uid == uid && (
+        request.resource.data.name == resource.data.name ||
+        (request.auth.token.email == request.resource.data.nameLower + '@oranget.app' && request.resource.data.name.lower() == request.resource.data.nameLower)
+      );
+      allow delete: if request.auth != null && isOwner();   // Dxm can no longer delete accounts
+    }
+    match /aliases/{n} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && !(n in ['devmaster','devdragon','dxm','aditya','ethan32','jeff76','tytytyt'])
+        && (get(/databases/$(db)/documents/users/$(request.auth.uid)).data.nameLower == request.resource.data.orig.lower()
+            || get(/databases/$(db)/documents/aliases/$(request.resource.data.orig.lower())).data.uid == request.auth.uid);
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid && request.resource.data.orig == resource.data.orig;
+      allow delete: if false;
+    }
+    match /presence/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid && request.resource.data.name == me();
+      allow delete: if request.auth != null && isOwner();
+    }
+    match /chat/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid && request.resource.data.user == me();
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid && request.resource.data.user == resource.data.user && request.resource.data.uid == resource.data.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    match /trades/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid && request.resource.data.from == me();
+    }
+
+    // BAZAAR: open -> sold (buyer) -> collected (seller is paid). Same flow as before, plus a price check on listing.
+    match /bazaar/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.sellerUid == request.auth.uid
+        && request.resource.data.state == 'open'
+        && request.resource.data.price is int
+        && request.resource.data.price >= 1 && request.resource.data.price <= 1000000;
+      allow update: if request.auth != null && (
+        (resource.data.state == 'open'
+          && request.resource.data.state == 'sold'
+          && resource.data.sellerUid != request.auth.uid
+          && request.resource.data.buyerUid == request.auth.uid
+          && request.resource.data.sellerUid == resource.data.sellerUid
+          && request.resource.data.price == resource.data.price)
+        ||
+        (resource.data.state == 'sold'
+          && request.resource.data.state == 'collected'
+          && resource.data.sellerUid == request.auth.uid
+          && request.resource.data.sellerUid == resource.data.sellerUid
+          && request.resource.data.buyerUid == resource.data.buyerUid
+          && request.resource.data.price == resource.data.price)
+      );
+      allow delete: if request.auth != null && resource.data.sellerUid == request.auth.uid && resource.data.state != 'sold';
+    }
+
+    // DUELS: bets (hostStake / guestStake) are frozen once written, seats are frozen once playing,
+    // finished duels cannot change, and only an open lobby can be deleted (so nobody can delete a lost duel).
+    match /duels/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.status == 'open'
+        && request.resource.data.guestUid == null;
+      allow update: if request.auth != null
+        && request.resource.data.hostUid == resource.data.hostUid
+        && request.resource.data.hostStake == resource.data.hostStake
+        && request.resource.data.game == resource.data.game
+        && (
+          (resource.data.status == 'open' && resource.data.guestUid == null
+            && request.resource.data.status == 'playing'
+            && request.resource.data.guestUid == request.auth.uid
+            && request.auth.uid != resource.data.hostUid)
+          ||
+          (resource.data.status == 'open' && resource.data.hostUid == request.auth.uid
+            && request.resource.data.status == 'open' && request.resource.data.guestUid == null)
+          ||
+          (resource.data.status == 'playing'
+            && (resource.data.hostUid == request.auth.uid || resource.data.guestUid == request.auth.uid)
+            && request.resource.data.guestUid == resource.data.guestUid
+            && request.resource.data.guestStake == resource.data.guestStake)
+        );
+      allow delete: if request.auth != null && resource.data.hostUid == request.auth.uid && resource.data.status == 'open';
+    }
+
+    // BANS: owner, Dxm (hardwired staff), and anyone holding the admin or coowner badge.
+    match /bans/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isOwner() || me().lower() == 'dxm' || hasBadge(['admin', 'coowner']));
+    }
+    // BADGES: owner = anything. coowner badge = anything except 'owner'. admin badge = only the badges below.
+    match /badges/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        isOwner()
+        || (hasBadge(['coowner']) && request.resource != null && !request.resource.data.list.hasAny(['owner']))
+        || (hasBadge(['admin']) && request.resource != null
+            && request.resource.data.list.hasOnly(['beta','booster','plus','verified','youtube','mod','artist','og'])
+            && (resource == null || resource.data.list.hasOnly(['beta','booster','plus','verified','youtube','mod','artist','og'])))
+      );
+    }
+  }
+}
