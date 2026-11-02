@@ -419,6 +419,7 @@ const FB = (() => {
 })()
 
 // ---- Quota guard: when Firebase says the free daily limit is gone, stop hammering it, keep playing from the local save, and resume by itself ----
+const SRV = { down: false, msg: '', subs: new Set() }
 const QUOTA = (() => {
   const K = 'oranget_quota'; let until = 0, el = null, probing = false; try { until = Number(localStorage.getItem(K)) || 0 } catch {}
   const nextReset = () => { const now = new Date(), pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })), nx = new Date(pt); nx.setHours(24, 3, 0, 0); return Date.now() + (nx - pt) }
@@ -1777,7 +1778,7 @@ function Chat({ user, eng, go }) {
         if (isOw(user.name)) L.push('Owner: /tokenset name amount, /give name amount, /halve name, /wipe name confirm, /delete name confirm, /deviceban name, /fbtest, /giveblook name blookid, /badge name id, /unbadge name id, /admin name, /unadmin name, /mod name, /unmod name, /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /altcheck name. Artist badge: /key3 key, then /artist name or /unartist name. Badge ids: ' + BADGE_IDS.join(', '))
         else {
           if (isAdP(user.name) && !isCoP(user.name)) L.push('Admin: /mute name minutes, /unmute name, /ban name, /unban name, /announce message, /badge name id, /unbadge name id (admins can give: ' + ADMIN_BADGES.join(', ') + ')')
-          if (isCoP(user.name)) L.push('Co-owner: every command (/give, /tokenset, /halve, /wipe, /giveblook, /badge, /unbadge, /admin, /unadmin, /mod, /unmod, /mute, /unmute, /ban, /unban, /announce). Only /delete, /deviceban, /fbtest and /altcheck are DEVMASTER only.')
+          if (isCoP(user.name)) L.push('Co-owner: every command (/give, /tokenset, /halve, /wipe, /giveblook, /badge, /unbadge, /admin, /unadmin, /mod, /unmod, /mute, /unmute, /ban, /unban, /announce). Only /delete, /deviceban, /fbtest, /altcheck, /shutdown and /redo are DEVMASTER only.')
           if (!isAdP(user.name) && !isCoP(user.name) && isModP(user.name)) L.push('Moderator: /mute name minutes and /unmute name')
         }
         if (isSt(user.name)) L.push('Staff: /mute name minutes, /unmute name, /ban name, /unban name')
@@ -1797,6 +1798,13 @@ function Chat({ user, eng, go }) {
         try { await FB.db.doc('bans/' + lc(a)).set({ name: a, by: user.name, at: Date.now() }) } catch {}
         await sendCmd('ban', a, user.name) // also blocks the name so the deleted account cannot just log back in
         return toast(a + ' was deleted and banned. Use /unban ' + a + ' to free the name.', 'ok')
+      }
+      if (c === '/shutdown' || c === '/redo') {
+        if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /' + c.slice(1) + '.')
+        if (!FB || !FB.auth.currentUser) throw new Error('Not signed in to Firebase.')
+        const down = c === '/shutdown'
+        await FB.db.doc('config/server').set({ down, by: user.name, at: Date.now(), msg: down ? (a || 'Oranget is down for maintenance. Please check back soon.') : '' })
+        return toast(down ? 'Server is DOWN. Everyone except you is locked out. Use /redo to bring it back.' : 'Server is back UP.', 'ok')
       }
       if (c === '/fbtest') {
         if (!isOw(user.name)) throw new Error('Only DEVMASTER can use /fbtest.')
@@ -3625,26 +3633,83 @@ const raidH = (x, z) => {
 }
 const RAID_PATH = [[20, -34], [34, -68], [18, -98], [58, -124], [96, -134], [RAID_TX - 38, RAID_TZ + 4]]
 const raidPathPts = () => []
-// Realm: the hub meadow with two portals + the open-world story mode (engine lives in realm.js)
-function RealmWorld({ user, onExit, onRaid }) {
+// Raid party network on the Realtime Database (free, no per-read billing). Host = the member who joined first.
+function makeRaidNet(user) {
+  const uid = FB.auth.currentUser.uid, L = { mem: [], pos: [], chat: [], state: [], ev: {} }
+  let db = null, code = null, mem = [], offs = [], ref = null
+  const getDb = async () => { if (!db) db = await rtdb(); if (!db) throw new Error('The party service (Realtime Database) is unreachable right now.'); return db }
+  const off = () => { offs.forEach((f) => { try { f() } catch {} }); offs = [] }
+  const net = {
+    uid, name: user.name, get code() { return code }, isHost: () => mem.length > 0 && mem[0].uid === uid,
+    async create() { const d = await getDb(), c = String(1000 + Math.floor(Math.random() * 9000)); await d.ref('oranget_raids/' + c + '/meta').set({ t: Date.now(), by: uid }); await net.join(c); return c },
+    async join(c) {
+      const d = await getDb(); c = String(c || '').trim(); if (!/^\d{4}$/.test(c)) throw new Error('Enter the 4-digit party code.')
+      const base = d.ref('oranget_raids/' + c); const meta = await base.child('meta').once('value'); if (!meta.exists()) throw new Error('No party with that code.')
+      const ms = await base.child('m').once('value'); const cur = ms.val() || {}; if (Object.keys(cur).length >= 4 && !cur[uid]) throw new Error('That party is full.')
+      if (code) net.leave(); ref = base; code = c; const joinTs = Date.now()
+      const me = base.child('m/' + uid); await me.set({ name: user.name, av: user.avatar || 'toast', ready: false, t: joinTs }); me.onDisconnect().remove(); base.child('p/' + uid).onDisconnect().remove()
+      const onM = base.child('m').on('value', (sn) => { const v = sn.val() || {}; mem = Object.keys(v).map((k) => ({ uid: k, ...v[k] })).sort((a, b) => a.t - b.t).map((m, i) => ({ ...m, host: i === 0 })); L.mem.forEach((f) => f(mem)) }); offs.push(() => base.child('m').off('value', onM))
+      const onC = base.child('chat').orderByChild('ts').startAt(joinTs).on('child_added', (sn) => { const m = sn.val(); if (m && m.uid !== uid) L.chat.forEach((f) => f(m)) }); offs.push(() => base.child('chat').off('child_added', onC))
+      const onE = base.child('ev').orderByChild('ts').startAt(joinTs).on('child_added', (sn) => { const m = sn.val(); if (m && m.from !== uid) (L.ev[m.type] || []).forEach((f) => f(m.data, m.from)) }); offs.push(() => base.child('ev').off('child_added', onE))
+      const onP = (sn) => { if (sn.key !== uid) L.pos.forEach((f) => f(sn.key, sn.val() || {})) }; base.child('p').on('child_changed', onP); base.child('p').on('child_added', onP); offs.push(() => { base.child('p').off('child_changed', onP); base.child('p').off('child_added', onP) })
+      const onS = base.child('s').on('value', (sn) => { const v = sn.val(); if (v && v.from !== uid) L.state.forEach((f) => f(v.d)) }); offs.push(() => base.child('s').off('value', onS))
+      return true
+    },
+    leave() { if (!code) return; const b = ref; off(); try { b.child('m/' + uid).remove(); b.child('p/' + uid).remove(); if (mem.length <= 1) b.remove() } catch {} code = null; mem = []; ref = null; L.mem.forEach((f) => f([])) },
+    members: () => mem, onMembers: (f) => L.mem.push(f), setReady(b) { if (ref) ref.child('m/' + uid + '/ready').set(!!b) },
+    send(type, data) { if (ref) ref.child('ev').push({ from: uid, type, data: data || {}, ts: Date.now() }).then((r) => setTimeout(() => r.remove().catch(() => {}), 20000)).catch(() => {}) }, on(type, f) { (L.ev[type] = L.ev[type] || []).push(f) },
+    pos(d) { if (ref) ref.child('p/' + uid).set(d).catch(() => {}) }, onPos: (f) => L.pos.push(f),
+    state(d) { if (ref) ref.child('s').set({ from: uid, d: JSON.parse(JSON.stringify(d)), t: Date.now() }).catch(() => {}) }, onState: (f) => L.state.push(f),
+    chat(text) { if (ref) ref.child('chat').push({ uid, name: user.name, text: String(text).slice(0, 140), ts: Date.now() }).then((r) => setTimeout(() => r.remove().catch(() => {}), 600000)).catch(() => {}) }, onChat: (f) => L.chat.push(f),
+  }
+  return net
+}
+// Realm: hub meadow with two portals, 5-chapter open-world story, raid lobby with party chat and Boss Rush (engine lives in realm.js)
+// Realm: hub meadow with two portals, 5-chapter open-world story, raid lobby with party chat and co-op Boss Rush (engine lives in realm.js)
+function makeRtdbNet(user) {
+  const uid = FB.auth.currentUser.uid, L = { m: [], pos: [], chat: [], state: [], ev: {} }; let db = null, code = null, host = false, members = [], offs = [], t0 = 0
+  rtdb().then((d) => { db = d })
+  const R = (p) => db.ref('oranget_raids/' + code + (p ? '/' + p : ''))
+  const need = () => { if (!db) throw new Error('Party service unavailable right now.') }
+  const listen = (ref, ev, f) => { ref.on(ev, f); offs.push(() => ref.off(ev, f)) }
+  const attach = () => {
+    t0 = Date.now() - 1500
+    listen(R('m'), 'value', (sn) => { members = Object.values(sn.val() || {}); host = !!members.find((m) => m.uid === uid && m.host); L.m.forEach((f) => f(members)); if (!members.length) code = null })
+    listen(R('chat').limitToLast(30), 'child_added', (sn) => { const m = sn.val(); if (m && m.ts > t0 && m.uid !== uid) L.chat.forEach((f) => f(m)) })
+    listen(R('ev').limitToLast(30), 'child_added', (sn) => { const m = sn.val(); if (m && m.ts > t0 && m.from !== uid) (L.ev[m.type] || []).forEach((f) => f(m.data || {}, m.from)) })
+    listen(R('p'), 'child_added', (sn) => { if (sn.key !== uid) L.pos.forEach((f) => f(sn.key, sn.val() || {})) }); listen(R('p'), 'child_changed', (sn) => { if (sn.key !== uid) L.pos.forEach((f) => f(sn.key, sn.val() || {})) })
+    listen(R('s'), 'value', (sn) => { const d = sn.val(); if (d && !host) L.state.forEach((f) => f(d)) })
+  }
+  const net = {
+    uid, name: user.name, get code() { return code }, isHost: () => host,
+    async create() { need(); const c = String(1000 + Math.floor(Math.random() * 9000)); await db.ref('oranget_raids/' + c + '/meta').set({ host: uid, t: Date.now() }); return net.join(c, true) },
+    async join(c, asHost) { need(); c = String(c || '').trim(); const meta = await db.ref('oranget_raids/' + c + '/meta').once('value'); if (!meta.exists()) throw new Error('No party with that code.'); const mem = await db.ref('oranget_raids/' + c + '/m').once('value'); if (Object.keys(mem.val() || {}).length >= 4 && !(mem.val() || {})[uid]) throw new Error('That party is full.'); code = c; host = !!asHost
+      const me = db.ref('oranget_raids/' + c + '/m/' + uid); await me.set({ uid, name: user.name, av: user.avatar || 'toast', host: !!asHost, ready: false }); me.onDisconnect().remove(); if (asHost) db.ref('oranget_raids/' + c).onDisconnect().remove(); attach(); return true },
+    leave() { if (!code || !db) return; offs.forEach((f) => f()); offs = []; try { host ? R().remove() : R('m/' + uid).remove(); R('p/' + uid).remove() } catch {} code = null; host = false; members = [] },
+    members: () => members, onMembers: (f) => L.m.push(f), setReady(b) { if (code) R('m/' + uid + '/ready').set(!!b) },
+    send(type, data) { if (code) R('ev').push({ from: uid, type, data: JSON.parse(JSON.stringify(data || {})), ts: Date.now() }) }, on(type, f) { (L.ev[type] = L.ev[type] || []).push(f) },
+    pos(d) { if (code) R('p/' + uid).set(d) }, onPos: (f) => L.pos.push(f), state(d) { if (code) R('s').set(JSON.parse(JSON.stringify(d))) }, onState: (f) => L.state.push(f),
+    chat(text) { if (code) R('chat').push({ uid, name: user.name, text: String(text).slice(0, 140), ts: Date.now() }) }, onChat: (f) => L.chat.push(f),
+  }
+  return net
+}
+function RealmWorld({ user, onExit }) {
   const host = useRef(null), [msg, setMsg] = useState('Loading the realm...')
   useEffect(() => {
     let api = null, dead = false
     const start = () => {
       if (dead || !host.current) return
       if (!window.OrangetRealm) { setMsg('The realm engine (realm.js) is missing. Upload realm.js next to index.html.'); return }
-      try { setMsg(''); api = window.OrangetRealm.create(host.current, { avatar: raidAvatarSrc(user.avatar && user.inv.includes(user.avatar) ? user.avatar : 'toast'), name: user.name, onExit, onRaid }) } catch (e) { console.error(e); setMsg('The realm could not start: ' + (e.message || e)) }
+      const bid = user.avatar && user.inv.includes(user.avatar) ? user.avatar : 'toast'
+      try { setMsg(''); api = window.OrangetRealm.create(host.current, { blookId: bid, name: user.name, avatar: raidAvatarSrc(bid), avatarFor: (id) => { const b = byId(id) || BLOOKS[0]; return { src: raidAvatarSrc(id), name: b.name, rarity: b.rarity, zero: !!b.zero, hue: !!(b.chroma || b.anim) } }, onExit, makeNet: () => (FB && FB.auth.currentUser ? makeRtdbNet(user) : null) }) } catch (e) { console.error(e); setMsg('The realm could not start: ' + (e.message || e)) }
     }
     if (window.OrangetRealm) start()
-    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=1'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
+    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=2'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
     return () => { dead = true; if (api && api.dispose) api.dispose() }
   }, [])
   return <div className="fixed inset-0 z-[60] bg-black"><div ref={host} className="absolute inset-0" />{msg && <div className="absolute inset-0 grid place-items-center p-6 text-center text-lg text-white">{msg}<button className="btn mt-4 bg-white/20 text-white" onClick={onExit}>Back</button></div>}</div>
 }
-function RaidGate({ user, update, onExit }) {
-  const [lobby, setLobby] = useState(false)
-  return lobby ? <RaidWorld user={user} update={update} onExit={() => setLobby(false)} /> : <RealmWorld user={user} onExit={onExit} onRaid={() => setLobby(true)} />
-}
+function RaidGate({ user, update, onExit }) { return <RealmWorld user={user} onExit={onExit} /> }
 function RaidWorld({ user, update, onExit }) {
   const mountRef = useRef(null), joyRef = useRef(null), knobRef = useRef(null), inp = useRef({ x: 0, y: 0, jump: false, run: false })
   const swapRef = useRef(null), padRef = useRef(null), [bp, setBp] = useState(false), [cb, setCb] = useState({ p: 100, b: 0, bm: 800, a: false, m: '' }), [pad, setPad] = useState(null), [queued, setQueued] = useState(''), [err, setErr] = useState(''), touch = useMemo(() => 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0, [])
@@ -4640,9 +4705,10 @@ function App() {
   const [, bumpImg] = useState(0), [, bumpRoles] = useState(0)
   useEffect(() => { // bans and badges are stored in Firestore so every device agrees
     if (!FB || !user) return
+    const uS = FB.db.doc('config/server').onSnapshot((sn) => { const d = sn.exists ? sn.data() : null; SRV.down = !!(d && d.down); SRV.msg = (d && d.msg) || ''; SRV.subs.forEach((f) => f()) }, () => {})
     const u1 = FB.db.collection('bans').onSnapshot((sn) => { const next = {}; let mine = false; sn.docs.forEach((d) => { if (d.id.startsWith('dev_')) { if (d.id === 'dev_' + DEVID) mine = true } else next[d.id] = 1 }); Object.keys(CS.fbBans || {}).forEach((k) => { if (!next[k]) delete CS.banned[k] }); Object.keys(next).forEach((k) => { CS.banned[k] = 1 }); if (mine) CS.banned[lc(user.name)] = 1; CS.fbBans = next; bumpRoles((n) => n + 1) }, () => {})
     const u2 = FB.db.collection('badges').onSnapshot((sn) => { sn.docs.forEach((d) => { CS.badges[d.id] = d.data().list || [] }); bumpRoles((n) => n + 1) }, () => {})
-    return () => { u1(); u2() }
+    return () => { uS(); u1(); u2() }
   }, [user && user.name])
   useEffect(() => { const f = () => bumpImg((n) => n + 1); thumbSubs.add(f); return () => thumbSubs.delete(f) }, [])
   useEffect(() => { document.documentElement.dataset.theme = (user && user.theme) || read('oranget_theme', 'orange') }, [user && user.theme])
@@ -4653,7 +4719,9 @@ function App() {
       const s = document.createElement('script'); s.src = 'https://cdn.tailwindcss.com'; document.head.appendChild(s)
     }
   }, [])
-  return (
+const [, srvTick] = useState(0); useEffect(() => { const f = () => srvTick((n) => n + 1); SRV.subs.add(f); return () => SRV.subs.delete(f) }, [])
+  if (ready && user && SRV.down && !isOw(user.name)) return <div className="fixed inset-0 z-[999] grid place-items-center bg-[#1a0d02] p-6 text-center text-white"><div><div className="chunk text-4xl">Oranget is offline</div><p className="mx-auto mt-3 max-w-md opacity-80">{SRV.msg || 'We are doing maintenance. Please check back soon.'}</p></div></div>
+    return (
     <>
       {!ready ? <Loader full /> : !user ? <Landing onAuth={setUser} /> : <Dashboard user={user} update={update} onLogout={async () => { await logOut(); location.reload() }} />}
     </>
