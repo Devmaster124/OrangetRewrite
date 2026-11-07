@@ -3694,19 +3694,19 @@ function makeRtdbNet(user) {
   return net
 }
 function RealmWorld({ user, onExit }) {
-  const host = useRef(null), [msg, setMsg] = useState('Loading the realm...')
+  const host = useRef(null), [msg, setMsg] = useState('Loading the realm...'), [rev, setRev] = useState(0)
   useEffect(() => {
     let api = null, dead = false
     const start = () => {
       if (dead || !host.current) return
       if (!window.OrangetRealm) { setMsg('The realm engine (realm.js) is missing. Upload realm.js next to index.html.'); return }
       const bid = user.avatar && user.inv.includes(user.avatar) ? user.avatar : 'toast'
-      try { setMsg(''); api = window.OrangetRealm.create(host.current, { blookId: bid, name: user.name, avatar: raidAvatarSrc(bid), avatarFor: (id) => { const b = byId(id) || BLOOKS[0]; return { src: raidAvatarSrc(id), name: b.name, rarity: b.rarity, zero: !!b.zero, hue: !!(b.chroma || b.anim) } }, onExit, makeNet: () => (FB && FB.auth.currentUser ? makeRtdbNet(user) : null) }) } catch (e) { console.error(e); setMsg('The realm could not start: ' + (e.message || e)) }
+      try { setMsg(''); api = window.OrangetRealm.create(host.current, { blookId: bid, name: user.name, avatar: raidAvatarSrc(bid), avatarFor: (id) => { const b = byId(id) || BLOOKS[0]; return { src: raidAvatarSrc(id), name: b.name, rarity: b.rarity, zero: !!b.zero, hue: !!(b.chroma || b.anim) } }, onExit, onReload: () => setRev((n) => n + 1), makeNet: () => (FB && FB.auth.currentUser ? makeRtdbNet(user) : null) }) } catch (e) { console.error(e); setMsg('The realm could not start: ' + (e.message || e)) }
     }
     if (window.OrangetRealm) start()
-    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=2'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
+    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=3'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
     return () => { dead = true; if (api && api.dispose) api.dispose() }
-  }, [])
+  }, [rev])
   return <div className="fixed inset-0 z-[60] bg-black"><div ref={host} className="absolute inset-0" />{msg && <div className="absolute inset-0 grid place-items-center p-6 text-center text-lg text-white">{msg}<button className="btn mt-4 bg-white/20 text-white" onClick={onExit}>Back</button></div>}</div>
 }
 function RaidGate({ user, update, onExit }) { return <RealmWorld user={user} onExit={onExit} /> }
