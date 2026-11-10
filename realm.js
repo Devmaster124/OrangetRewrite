@@ -168,23 +168,23 @@ vec3 groundAlbedo(vec2 p, float h, vec3 N, out float grassAmt){
     grassAmt = rimk*(1.0-rk2); return c;
   }
   float big = fbm(p*0.02+4.0,3), mid = vnoise(p*0.35), fine = vnoise(p*3.1);
-  vec3 g1 = vec3(0.022,0.044,0.010), g2 = vec3(0.046,0.074,0.016), dry = vec3(0.120,0.100,0.036);
+  vec3 g1 = vec3(0.07,0.20,0.04), g2 = vec3(0.14,0.33,0.06), dry = vec3(0.30,0.32,0.09);
   vec3 grass = mix(g1,g2,smoothstep(0.3,0.7,big));
   grass = mix(grass, dry, smoothstep(0.62,0.86,fbm(p*0.011+9.0,3))*0.5);
-  grass *= 0.74 + 0.5*mid*fine + 0.22*(fine-0.5);
-  vec3 dirt = vec3(0.085,0.055,0.032)*(0.7+0.6*mid);
+  grass *= 0.92 + 0.16*mid + 0.12*(fine-0.5);
+  vec3 dirt = vec3(0.42,0.26,0.095)*(0.85+0.3*mid);
   vec3 rock = mix(vec3(0.12,0.11,0.105), vec3(0.21,0.19,0.17), vnoise(p*vec2(0.7,2.4)+h*0.4)) * (0.72+0.55*fine);
-  vec3 sand = vec3(0.30,0.24,0.15)*(0.8+0.4*mid);
+  vec3 sand = vec3(0.62,0.52,0.32)*(0.85+0.3*mid);
   vec3 snow = vec3(0.70,0.73,0.78);
   float fd = forestD(p,h);
-  vec3 litter = vec3(0.060,0.045,0.020)*(0.7+0.7*mid);
+  vec3 litter = vec3(0.20,0.20,0.06)*(0.8+0.5*mid);
   vec3 c = mix(grass, litter, fd*0.8);
-  float pd = pathD(p); float pm = (1.0-smoothstep(1.2,2.6,pd))*0.95;
+  float pd = pathD(p); float pm = (1.0-smoothstep(1.4,3.6,pd))*0.92;
   c = mix(c, dirt, pm);
   float wx = abs(N.x)/(abs(N.x)+abs(N.z)+1e-3);
   float tri = mix(vnoise(vec2(p.y,h)*1.7), vnoise(vec2(p.x,h)*1.7), wx), tri2 = mix(vnoise(vec2(p.y,h)*6.5), vnoise(vec2(p.x,h)*6.5), wx);
   float strata = 0.5+0.5*sin(h*1.9 + tri*5.0);
-  rock = mix(vec3(0.10,0.095,0.09), vec3(0.24,0.22,0.20), clamp(tri*0.7+strata*0.45,0.0,1.0)) * (0.72+0.55*tri2);
+  rock = mix(vec3(0.22,0.22,0.25), vec3(0.46,0.43,0.40), clamp(tri*0.7+strata*0.45,0.0,1.0)) * (0.80+0.35*tri2);
   float rk = smoothstep(0.24,0.42,slope+(fine-0.5)*0.05);
   float fz = frostA(p), az = ashA(p);
   c = mix(c, vec3(0.045,0.040,0.038)*(0.6+0.9*fine) + vec3(0.05)*smoothstep(0.55,0.8,mid)*0.8, az);
@@ -323,8 +323,8 @@ void main(){
   col += texture(uBloom, uv).rgb * uBloomAmt;
   col *= uExposure;
   float vig = smoothstep(1.05, 0.30, length(cc*vec2(uRes.x/uRes.y,1.0)));
-  col *= mix(0.72, 1.0, vig);
-  float lum = dot(col, vec3(0.2126,0.7152,0.0722)); col = mix(vec3(lum), col, 1.08);
+  col *= mix(0.86, 1.0, vig);
+  float lum = dot(col, vec3(0.2126,0.7152,0.0722)); col = mix(vec3(lum), col, 1.32); col *= vec3(1.03,1.0,0.96);
   col = aces(col);
   col = pow(col, vec3(1.0/2.2));
   col += (hash2(ivec2(gl_FragCoord.xy) + ivec2(int(TIME*60.0)%97, 3)) - 0.5) * 0.012;
@@ -466,18 +466,18 @@ function atmosphere(hours, cloud) {
   const l = Math.hypot(...sunDir); sunDir[0] /= l; sunDir[1] /= l; sunDir[2] /= l
   const s = sunDir[1], day = sstep(-0.12, 0.28, s), tw = sstep(-0.18, 0.0, s) * (1 - sstep(0.0, 0.32, s)), night = 1 - sstep(-0.22, -0.02, s)
   const moonDir = [-sunDir[0] * 0.9 + 0.2, Math.max(0.25, -sunDir[1] * 0.8 + 0.35), -sunDir[2] * 0.9]; const ml = Math.hypot(...moonDir); moonDir[0] /= ml; moonDir[1] /= ml; moonDir[2] /= ml
-  let zen = lerp3([0.004, 0.007, 0.022], [0.075, 0.20, 0.55], day), hor = lerp3([0.012, 0.018, 0.04], [0.42, 0.58, 0.78], day)
+  let zen = lerp3([0.004, 0.007, 0.022], [0.05, 0.22, 0.80], day), hor = lerp3([0.012, 0.018, 0.04], [0.42, 0.66, 0.98], day)
   hor = lerp3(hor, [0.95, 0.42, 0.17], tw * 0.85); zen = lerp3(zen, [0.10, 0.12, 0.30], tw * 0.5)
   const warm = 1 - sstep(0.0, 0.5, s)
-  let sunCol = lerp3([1.0, 0.93, 0.80], [1.0, 0.50, 0.22], warm), sunI = 3.6 * sstep(-0.03, 0.14, s); sunCol = mul3(sunCol, sunI)
+  let sunCol = lerp3([1.0, 0.93, 0.80], [1.0, 0.50, 0.22], warm), sunI = 2.1 * sstep(-0.03, 0.14, s); sunCol = mul3(sunCol, sunI)
   // light that actually shines on the ground: the sun by day, the moon at night
   let ldir = sunDir, lcol = sunCol
   const moonCol = mul3([0.45, 0.58, 1.0], 0.42 * night)
   if (s < 0.02) { const k = sstep(0.02, -0.06, s); ldir = [mix(sunDir[0], moonDir[0], k), mix(Math.max(sunDir[1], 0.12), moonDir[1], k), mix(sunDir[2], moonDir[2], k)]; const q = Math.hypot(...ldir); ldir = [ldir[0] / q, Math.max(ldir[1] / q, 0.1), ldir[2] / q]; lcol = lerp3(sunCol, moonCol, k) }
-  const skyAmb = mul3(lerp3(lerp3(hor, zen, 0.6), [0.6, 0.55, 0.5], 0.12), 0.95 * (0.35 + 0.65 * day) + 0.18 * night)
-  const gndAmb = mul3(lerp3([0.02, 0.025, 0.03], [0.11, 0.15, 0.07], day), 1)
+  const skyAmb = mul3(lerp3(lerp3(hor, zen, 0.6), [0.6, 0.55, 0.5], 0.12), 1.7 * (0.35 + 0.65 * day) + 0.18 * night)
+  const gndAmb = mul3(lerp3([0.02, 0.025, 0.03], [0.26, 0.34, 0.12], day), 1)
   const fog = hor
-  return { sunDir, ldir, lcol, moonDir, zen, hor, skyAmb, gndAmb, fog, night, day, exposure: mix(2.1, 1.05, day) * (1 - 0.12 * tw), cloud }
+  return { sunDir, ldir, lcol, moonDir, zen, hor, skyAmb, gndAmb, fog, night, day, exposure: mix(2.1, 0.82, day) * (1 - 0.12 * tw), cloud }
 }
 
 // push all per-frame data into the global uniform block
@@ -588,8 +588,8 @@ void main(){
   vec2 dp = p - uPlayer.xz; float pr = length(dp); float push = smoothstep(uPlayer.w, 0.0, pr) * (1.0-smoothstep(1.5,3.0,abs(h-uPlayer.y)));
   wp.xz += (dp/(pr+0.001))*push*hgt*1.1*curve; wp.y -= push*hgt*0.55*curve;
   float dryk = smoothstep(0.55,0.9,fbm(p*0.011+9.0,2));
-  vec3 baseC = galb*0.7; vec3 tipC = mix(vec3(0.040,0.085,0.016), vec3(0.105,0.150,0.030), r2); tipC = mix(tipC, vec3(0.19,0.16,0.055), dryk*0.6);
-  float ao = mix(0.28, 1.0, smoothstep(0.0,0.75,t));
+  vec3 baseC = galb*0.95; vec3 tipC = mix(vec3(0.09,0.26,0.045), vec3(0.21,0.43,0.08), r2); tipC = mix(tipC, vec3(0.44,0.42,0.12), dryk*0.5);
+  float ao = mix(0.62, 1.0, smoothstep(0.0,0.75,t));
   vCol = mix(baseC, tipC, smoothstep(0.0,0.85,t)) * ao * (0.85+0.3*hash2(bc+ivec2(5,5)));
   vT = t; vWP = wp; vNg = gN; vFace = vec3(fw.x,0.0,fw.y);
   vSh = shadow1(vec3(p.x,h,p.y));
@@ -738,17 +738,17 @@ void main(){
     vec3 N = normalize(vCrown); float facing = dot(N, V) < -0.2 ? -1.0 : 1.0;
     vec3 N2 = normalize(N + vec3(0.0,0.35,0.0));
     float ndl = clamp(dot(N2, L)*0.6+0.4, 0.0, 1.0); float trans = pow(clamp(dot(-V,L),0.0,1.0), 2.0) * 0.8;
-    vec3 base = uKind < 1.5 ? mix(vec3(0.014,0.034,0.007), vec3(0.040,0.066,0.012), vAux.w) : mix(vec3(0.016,0.040,0.020), vec3(0.036,0.070,0.030), vAux.w);
+    vec3 base = uKind < 1.5 ? mix(vec3(0.06,0.17,0.03), vec3(0.20,0.36,0.06), vAux.w) : mix(vec3(0.016,0.040,0.020), vec3(0.036,0.070,0.030), vAux.w);
     base *= 0.8 + 0.5*hash1(vData.y*91.0); base = mix(base, vec3(0.13,0.12,0.03), (uKind<1.5?0.12:0.0)*hash1(vAux.z*7.0+1.0));
     float vein = uKind < 1.5 ? 0.82 + 0.18*smoothstep(0.0,0.5,m) : 0.85 + 0.3*m;
     float ao = vData.z; float sh = shadow1(vWP);
-    vec3 lit = base*vein*(uSunCol.rgb*(ndl*sh + trans*sh*0.9*vec3(1.0,1.0,0.5)) + ambient(N2)*ao*1.1 + pointLights(vWP,N2));
+    vec3 lit = base*vein*(uSunCol.rgb*(ndl*sh + trans*sh*0.9*vec3(1.0,1.0,0.5)) + ambient(N2)*(0.55+0.45*ao)*1.35 + pointLights(vWP,N2));
     o = vec4(applyFog(lit, vWP), smoothstep(0.04,0.5,m));
   } else {
     if (uExtra.w > 0.5) { o = vec4(0.0); return; }
     vec3 N = normalize(vN); float u = vUV.x, v = vUV.y;
     float bn = vnoise(vec2(u*22.0, v*3.0)) * 0.6 + vnoise(vec2(u*60.0, v*9.0)) * 0.4; float ridge = smoothstep(0.35,0.75,bn);
-    vec3 bark = mix(vec3(0.030,0.021,0.014), vec3(0.075,0.058,0.042), ridge) * (0.8+0.4*vData.y);
+    vec3 bark = mix(vec3(0.11,0.075,0.045), vec3(0.24,0.18,0.12), ridge) * (0.8+0.4*vData.y);
     bark = mix(bark, vec3(0.03,0.06,0.02), smoothstep(0.4,0.0,vData.w)*0.35*vnoise(vec2(u*6.0,v*2.0)));
     N = normalize(N + vec3(0.0,0.0,0.0)*bn);
     float ndl = max(dot(N, uSunDir.xyz), 0.0), sh = shadow1(vWP);
@@ -902,7 +902,7 @@ void main(){
   vec3 N = normalize(vN); vec3 V = normalize(uCam.xyz - vWP); vec3 alb = uTint; vec3 em = vec3(0.0); float rough = 0.0;
   if (uMat == 0) { // blook cube: art on the four sides
     vec3 a = abs(N);
-    if (a.y < 0.8) { vec4 t = texture(uTex, vec2(vUV.x, 1.0 - vUV.y)); alb = mix(pow(uTint,vec3(2.2)), pow(t.rgb,vec3(2.2)), t.a)*0.28; } else alb = pow(uTint,vec3(2.2))*0.25;
+    if (a.y < 0.8) { vec4 t = texture(uTex, vec2(vUV.x, 1.0 - vUV.y)); alb = mix(pow(uTint,vec3(2.2)), pow(t.rgb,vec3(2.2)), t.a)*0.40; } else alb = pow(uTint,vec3(2.2))*0.32;
   } else if (uMat == 1 || uMat == 2) { // stone (1) and cracked titan rock (2)
     vec3 q = vWP*1.7 + vLP*0.3; float n1 = vnoise(q.xz*3.0 + q.y*2.0), n2 = vnoise(q.xz*11.0 + q.yz*9.0);
     float crack = 1.0 - smoothstep(0.0, 0.05, abs(vnoise(q.xy*2.2 + q.z*2.6) - 0.5)); 
@@ -929,7 +929,7 @@ void main(){
   float sh = shadowAt(vWP, N); float ndl = max(dot(N, uSunDir.xyz), 0.0);
   float rim = pow(1.0 - max(dot(N,V),0.0), 3.0);
   vec3 lit = alb * (uSunCol.rgb*ndl*sh + ambient(N)*(0.75+0.25*N.y) + pointLights(vWP, N)) + em;
-  if (uMat == 7 || uMat == 8) { vec3 Rf = reflect(-V, N); float F = 0.25+0.75*pow(1.0-max(dot(N,V),0.0),3.0); lit += skyCol(Rf)*mix(vec3(0.9), uTint*2.0, 0.55)*F*(uMat==7?0.55:0.3) + pow(max(dot(Rf,uSunDir.xyz),0.0),40.0)*uSunCol.rgb*sh*0.5; }
+  if (uMat == 7 || uMat == 8) { vec3 Rf = reflect(-V, N); float F = 0.25+0.75*pow(1.0-max(dot(N,V),0.0),3.0); lit += skyCol(Rf)*mix(vec3(0.9), uTint*2.0, 0.55)*F*(uMat==7?0.5:0.1) + pow(max(dot(Rf,uSunDir.xyz),0.0),40.0)*uSunCol.rgb*sh*0.5; }
   lit += rim * ambient(N) * 0.25 * alb;
   if (uMat == 0) lit += pow(max(dot(reflect(-uSunDir.xyz, N), V), 0.0), 40.0) * uSunCol.rgb * sh * 0.05;
   o = vec4(applyFog(lit, vWP), 1.0);
@@ -989,7 +989,7 @@ void main(){
   vec3 N = waveN(vWP.xz); N = normalize(mix(N, vec3(0.0,1.0,0.0), smoothstep(30.0,300.0,dist)*0.8));
   float fres = 0.02 + 0.98*pow(1.0 - max(dot(N,V),0.0), 5.0);
   vec3 R = reflect(-V, N); R.y = abs(R.y); vec3 refl = skyCol(R) + uSunCol.rgb*pow(max(dot(R,uSunDir.xyz),0.0), 700.0)*6.0;
-  vec3 shallow = vec3(0.045,0.16,0.14), deep = vec3(0.006,0.035,0.05);
+  vec3 shallow = vec3(0.10,0.46,0.42), deep = vec3(0.02,0.15,0.24);
   float k = 1.0 - exp(-depth*0.42); vec3 body = mix(shallow, deep, k) * (uSunCol.rgb*0.18*max(uSunDir.y,0.0) + ambient(vec3(0,1,0))*0.9);
   float foam = (1.0 - smoothstep(0.0, 0.55, depth + (vnoise(vWP.xz*3.0+TIME*0.5)-0.5)*0.35)) * (0.5 + 0.5*vnoise(vWP.xz*9.0 - TIME*0.8));
   vec3 col = mix(body, refl, clamp(fres,0.0,1.0)) + vec3(0.8,0.85,0.9)*foam*0.5*(uSunCol.rgb*0.2+ambient(vec3(0,1,0)));
@@ -1786,7 +1786,7 @@ function createUI(root, opts) {
   const dlg = el('div', 'rm-dlg', '<b></b><p></p><small></small>', ui), dWho = dlg.querySelector('b'), dTxt = dlg.querySelector('p')
   const prompt = el('div', 'rm-prompt', '', ui), title = el('div', 'rm-title', '<h1></h1><p></p>', ui), toast = el('div', 'rm-toast', '', ui)
   const skip = el('button', 'rm-btn rm-skip', 'Skip', ui)
-  const help = el('div', 'rm-help', coarse ? '' : 'WASD move | Shift run | Space jump | J / click attack | E talk | drag to look', ui)
+  const help = el('div', 'rm-help', coarse ? '' : 'Realm v4 · WASD move | Shift run | Space jump | J / click attack | E talk | drag to look', ui)
   const stick = el('div', 'rm-stick', '<i></i>', ui), knob = stick.querySelector('i')
   const act = el('div', 'rm-act', '', ui), bUse = el('button', 'sm', 'Use', act), bAtk = el('button', '', 'Attack', act), bJump = el('button', '', 'Jump', act)
   const tags = {}, marks = {}
@@ -2231,7 +2231,7 @@ function create(parent, opts = {}) {
   }
   const sm = (t) => t * t * (3 - 2 * t)
   function person(o, out, extras) {
-    const ARM = I.ARMOR[o.armor], av = Av.avg(o.id), body = ARM ? ARM.col : [av[0] * 0.5 + 0.12, av[1] * 0.5 + 0.12, av[2] * 0.5 + 0.12], trim = ARM ? ARM.trim : [Math.min(1, av[0] * 0.9 + 0.05), Math.min(1, av[1] * 0.9 + 0.05), Math.min(1, av[2] * 0.9 + 0.05)]
+    const ARM = I.ARMOR[o.armor], av = Av.avg(o.id), body = ARM ? ARM.col : [av[0] * 0.75, av[1] * 0.75, av[2] * 0.75], trim = ARM ? ARM.trim : [Math.min(1, av[0] * 0.9 + 0.05), Math.min(1, av[1] * 0.9 + 0.05), Math.min(1, av[2] * 0.9 + 0.05)]
     const ph = o.t * 8.5, mv = o.mv, sw = Math.sin(ph) * 0.85 * mv, inter = o.inter || 0, f = o.face, hipY = 0.78 - inter * 0.16 + Math.abs(Math.cos(ph)) * 0.05 * mv
     const add = (mesh, lx, ly, lz, sx, sy, sz, rx, rz, t, mat, em) => { const p = rotLocal(f, lx, ly, lz); extras.push({ mesh, model: M.trs(o.x + p[0], o.y + p[1], o.z + p[2], f, sx, sy, sz, rx || 0, rz || 0), mat: mat == null ? 8 : mat, tint: t || body, em: em || [0, 0, 0, 0], p: [1, 0, 0, 0] }) }
     const limb = (px, py, pz, len, w, th, t, mat) => { add('box', px, py - len / 2 * Math.cos(th), pz - len / 2 * Math.sin(th), w, len, w, th, 0, t, mat); return [px, py - len * Math.cos(th), pz - len * Math.sin(th)] }
@@ -2266,7 +2266,7 @@ function create(parent, opts = {}) {
     E.fov = 1.02; atmo = A.atmosphere(S.hours, S.cloud)
     const pos = camState.pos.slice(), tgt = camState.target.slice(); if (S.shake > 0) { const k = S.shake * 0.12; pos[0] += (Math.random() - 0.5) * k; pos[1] += (Math.random() - 0.5) * k; pos[2] += (Math.random() - 0.5) * k }
     const lights = lightsList(), sv = A.shadowMatrix(E, atmo, [S.px, S.py, S.pz], 46), wind = (0.85 + 0.4 * Math.sin(S.t * 0.13)) * (S.cloud > 0.6 ? 1.35 : 1)
-    fr = { atmo, cam: { pos, target: tgt, fov: E.fov, aspect: w / h }, shadowVP: sv, groundY: H(pos[0], pos[2]), fogDensity: S.scene === 'hub' ? 0.0017 : S.scene === 'world' ? 0.0009 + 0.0005 * S.cloud : 0.0021, time: S.t, wind, lights, player: [S.px, S.py, S.pz], bendRadius: 1.5, flash: 0 }
+    fr = { atmo, cam: { pos, target: tgt, fov: E.fov, aspect: w / h }, shadowVP: sv, groundY: H(pos[0], pos[2]), fogDensity: S.scene === 'hub' ? 0.0014 : S.scene === 'world' ? 0.0006 + 0.0004 * S.cloud : 0.0021, time: S.t, wind, lights, player: [S.px, S.py, S.pz], bendRadius: 1.5, flash: 0 }
     vpInfo = A.writeFrame(E, fr); ground.update(pos[0], pos[2], PATHF)
     const dyn = dynamicObjects(), all = statics
     const drawDyn = (shadow) => { for (const a of dyn.avatars) { if (!Av.draw(a.id, a.model, a.anim, shadow, a.flash)) O.draw(a.fallback, shadow) } for (const o of dyn.extras) O.draw(o, shadow) }
