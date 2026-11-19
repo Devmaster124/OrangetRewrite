@@ -637,7 +637,7 @@ const mask = (t) => String(t).replace(BADRE, (m) => '*'.repeat(Math.min(m.length
 const cleanMsg = (t) => mask(t).replace(/[\u0000-\u001f\u007f]/g, '').replace(/https?:\/\/\S+/gi, '[link removed]').trim().slice(0, 200)
 const okMsg = (m, id, fallbackTs) => m && typeof m.user === 'string' && typeof m.text === 'string' && m.user.length > 0
   ? { id, role: m.role === 'owner' || m.role === 'mod' ? m.role : '', user: m.user.slice(0, 16), text: cleanMsg(m.text), ts: Number(m.ts) || fallbackTs } : null
-const msgOf = (id, d) => d && typeof d.user === 'string' && typeof d.text === 'string' && d.user ? { id, role: '', user: d.user.slice(0, 16), text: cleanMsg(d.text), ts: d.ts && d.ts.toMillis ? d.ts.toMillis() : Date.now(), edited: !!d.edited, reply: d.reply && typeof d.reply.user === 'string' ? { id: String(d.reply.id || '').slice(0, 40), user: d.reply.user.slice(0, 16), text: cleanMsg(String(d.reply.text || '')).slice(0, 90) } : null } : null
+const msgOf = (id, d) => d && typeof d.user === 'string' && typeof d.text === 'string' && d.user ? { id, role: '', user: d.user.slice(0, 16), text: cleanMsg(d.text), img: typeof d.img === 'string' && /^data:image\/jpeg;base64,/.test(d.img) && d.img.length < 125000 ? d.img : '', ts: d.ts && d.ts.toMillis ? d.ts.toMillis() : Date.now(), edited: !!d.edited, reply: d.reply && typeof d.reply.user === 'string' ? { id: String(d.reply.id || '').slice(0, 40), user: d.reply.user.slice(0, 16), text: cleanMsg(String(d.reply.text || '')).slice(0, 90) } : null } : null
 const pinged = (m, n) => new RegExp('(^|[^A-Za-z0-9_])@' + n + '(?![A-Za-z0-9_])', 'i').test(m.text) || !!(m.reply && String(m.reply.user).toLowerCase() === String(n).toLowerCase())
 const chat = (() => { // one shared live listener for the whole app
   let list = [], subs = new Set(), authOff = null, snapOff = null, state = '', cache = new Map(), lastError = ''
@@ -704,16 +704,17 @@ const chat = (() => { // one shared live listener for the whole app
       return () => subs.delete(f)
     },
     getError() { return lastError || 'Message was not sent. Please try again.' },
-    async send(user, text, reply) {
-      const t = cleanMsg(text)
+    async send(user, text, reply, img) {
+      const t = cleanMsg(text), pic = typeof img === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) && img.length < 125000 ? img : ''
       lastError = ''
-      if (!t) { lastError = 'Type a message first.'; return false }
+      if (!t && !pic) { lastError = 'Type a message first.'; return false }
       if (!FB) { lastError = 'Firebase did not load. Reload the page and check the Firebase scripts.'; return false }
       if (Date.now() - lastSend < 1200) { lastError = 'Please wait a second before sending another message.'; return false }
       const authUser = await getUser()
       if (!authUser) { lastError = 'You are not signed in to Firebase. Sign out and sign back in, then retry.'; return false }
       lastSend = Date.now()
       const data = { user: String(user || '').slice(0, 24), text: t, ts: FB.ts(), uid: authUser.uid }
+      if (pic) data.img = pic
       if (reply) data.reply = { id: String(reply.id).slice(0, 40), user: String(reply.user).slice(0, 16), text: cleanMsg(String(reply.text)).slice(0, 90) }
       try {
         await Promise.race([
@@ -1732,7 +1733,7 @@ const ChatRow = React.memo(function ChatRow({ m, me, av, role, ann, artist, ping
           {lc(m.user) === 'tytytyt' && <img src="data:image/png;base64,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" alt="Artist" title="Artist" width="24" height="24" className="inline-block shrink-0" draggable={false} />}
           <span className="mute text-xs">{new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>{m.edited && <span className="mute text-xs">(edited)</span>}
         </div>
-        {m.reply ? <div className="ch-reply"><div className="mute text-xs">From @{m.reply.user}: {m.reply.text}</div>{body}</div> : body}
+        {m.reply ? <div className="ch-reply"><div className="mute text-xs">From @{m.reply.user}: {m.reply.text}</div>{body}{m.img && <ChatImg src={m.img} />}</div> : <>{body}{m.img && <ChatImg src={m.img} />}</>}
       </div>
       <div className="ch-acts">
         <button onClick={() => onReply(m)}>Reply</button>
@@ -1742,8 +1743,12 @@ const ChatRow = React.memo(function ChatRow({ m, me, av, role, ann, artist, ping
     </div>
   )
 })
-const Composer = React.forwardRef(function Composer({ known, onSend }, ref) { // typing only re-renders this small box, never the message list
-  const [text, setText] = useState(''), [emo, setEmo] = useState(false), inp = useRef()
+const shrinkImage = (file) => new Promise((ok, no) => { // makes a small JPEG (about 40-100 KB) so it fits in a chat message
+  const r = new FileReader(); r.onerror = () => no(new Error('read')); r.onload = () => { const im = new Image(); im.onerror = () => no(new Error('img')); im.onload = () => { for (const [max, q] of [[560, 0.62], [460, 0.55], [360, 0.5]]) { const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); const u = c.toDataURL('image/jpeg', q); if (u.length < 120000) return ok(u) } ok(null) }; im.src = r.result }; r.readAsDataURL(file)
+})
+const ChatImg = ({ src }) => <img src={src} alt="Shared picture" loading="lazy" className="mt-1 block max-h-60 max-w-full cursor-zoom-in rounded-lg" onClick={() => window.open(src, '_blank')} />
+const Composer = React.forwardRef(function Composer({ known, onSend, onImage }, ref) { // typing only re-renders this small box, never the message list
+  const [text, setText] = useState(''), [emo, setEmo] = useState(false), inp = useRef(), fileRef = useRef()
   React.useImperativeHandle(ref, () => ({ setText, focus: () => inp.current && inp.current.focus() }), [])
   const mm = text.match(/(?:^|\s)@([A-Za-z0-9_]{0,16})$/), sugg = mm ? known.filter((n) => lc(n).startsWith(lc(mm[1]))).slice(0, 5) : []
   const pick = (n) => { setText(text.replace(/@([A-Za-z0-9_]{0,16})$/, '@' + n + ' ')); inp.current && inp.current.focus() }
@@ -1753,6 +1758,8 @@ const Composer = React.forwardRef(function Composer({ known, onSend }, ref) { //
       {emo && <div className="ch-emo">{EMO.map((e) => <button key={e} onClick={() => { setText((t) => t + e); inp.current && inp.current.focus() }}>{e}</button>)}</div>}
       <form onSubmit={(e) => { e.preventDefault(); onSend(text) }} className="ch-in">
         <input ref={inp} className={FIELD} value={text} onChange={(e) => setText(e.target.value)} placeholder="Message #global" maxLength={200} aria-label="Message" />
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f && onImage) onImage(f) }} />
+        <button type="button" className="btn bg-white/25 px-3 text-sm text-white" aria-label="Send a picture" title="Send a picture" onClick={() => fileRef.current && fileRef.current.click()}>Photo</button>
         <button type="button" className="text-2xl" aria-label="Emoji" onClick={() => setEmo(!emo)}>🙂</button>
         <button className="btn bg-[#f7953a]" aria-label="Send"><Send size={20} /></button>
       </form>
@@ -1767,6 +1774,13 @@ function Chat({ user, eng, go }) {
   useEffect(() => { const p = end.current && end.current.parentElement; if (!p) return; if (first.current || p.scrollHeight - p.scrollTop - p.clientHeight < 240) { p.scrollTop = p.scrollHeight; if (msgs.length) first.current = false } }, [msgs])
   const setText = (v) => comp.current && comp.current.setText(v)
   const cancel = () => { setReply(null); setEditing(null); setText('') }
+  const lastImg = useRef(0)
+  const sendImg = async (file) => {
+    if (!file || !/^image\//.test(file.type)) { setErr('Pick a picture file.'); return }
+    if (CS.banned[lc(user.name)]) return; if ((CS.muted[lc(user.name)] || 0) > Date.now()) { setErr('You are muted.'); return }
+    if (Date.now() - lastImg.current < 6000) { setErr('Wait a few seconds between pictures.'); return }
+    try { const img = await shrinkImage(file); if (!img) { setErr('That picture is too big. Try a smaller one.'); return } lastImg.current = Date.now(); const ok = await chat.send(user.name, '', reply, img); if (ok) { setReply(null); setErr('') } else setErr(chat.getError()) } catch { setErr('Could not read that picture.') }
+  }
   const send = async (text) => {
     const t = text.trim(); if (!t) return
     if (editing) { if (await chat.edit(editing.id, t)) cancel(); else setErr('Could not edit that message.'); return }
@@ -1876,7 +1890,7 @@ function Chat({ user, eng, go }) {
           {view.map((v) => <ChatRow key={v.m.id} m={v.m} me={user.name} av={avOf(v.m.user)} role={v.role} ann={v.ann} artist={v.artist} ping={v.ping} onBadge={setBdg} onProfile={setWho} onReply={onReply} onEdit={onEdit} onDelete={chat.remove} />)}<div ref={end} />
         </div>
         {(reply || editing) && <div className="ch-bar"><span className="min-w-0 flex-1 truncate">{editing ? 'Editing your message' : <>Replying to <b>@{reply.user}</b>: {reply.text}</>}</span><button onClick={cancel} aria-label="Cancel">✕</button></div>}
-        <Composer ref={comp} known={known} onSend={send} />
+        <Composer ref={comp} known={known} onSend={send} onImage={sendImg} />
       </div>
       {bdg && <BadgeModal id={bdg} onClose={() => setBdg(null)} />}
       {who && <ProfileCard name={who} me={user.name} snap={snapOf2(who)} onClose={() => setWho(null)} onTrade={() => { eng.invite(who); setWho(null); go('trade') }} />}
@@ -3704,7 +3718,7 @@ function RealmWorld({ user, onExit }) {
       try { setMsg(''); api = window.OrangetRealm.create(host.current, { blookId: bid, name: user.name, avatar: raidAvatarSrc(bid), avatarFor: (id) => { const b = byId(id) || BLOOKS[0]; return { src: raidAvatarSrc(id), name: b.name, rarity: b.rarity, zero: !!b.zero, hue: !!(b.chroma || b.anim) } }, onExit, onReload: () => setRev((n) => n + 1), makeNet: () => (FB && FB.auth.currentUser ? makeRtdbNet(user) : null) }) } catch (e) { console.error(e); setMsg('The realm could not start: ' + (e.message || e)) }
     }
     if (window.OrangetRealm) start()
-    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=4'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
+    else { const sc = document.createElement('script'); sc.src = 'realm.js?v=5'; sc.onload = start; sc.onerror = () => !dead && setMsg('Could not load realm.js. Upload it next to index.html.'); document.head.appendChild(sc) }
     return () => { dead = true; if (api && api.dispose) api.dispose() }
   }, [rev])
   return <div className="fixed inset-0 z-[60] bg-black"><div ref={host} className="absolute inset-0" />{msg && <div className="absolute inset-0 grid place-items-center p-6 text-center text-lg text-white">{msg}<button className="btn mt-4 bg-white/20 text-white" onClick={onExit}>Back</button></div>}</div>
